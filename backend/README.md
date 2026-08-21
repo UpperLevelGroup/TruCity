@@ -77,6 +77,18 @@ Migration order: 001_initial_schema.sql
 
 <img width="1061" height="511" alt="supabase-schema-ismtusenmqwwbsawirle" src="https://github.com/user-attachments/assets/8704e781-7c50-46b7-b360-8ecb406cc6a4" />
 
+<img width="1061" height="511" alt="supabase-schema-ismtusenmqwwbsawirle (1)" src="https://github.com/user-attachments/assets/7a123af0-c70d-4ffa-bec2-cf8eb59212df" />
+
+<img width="1061" height="511" alt="supabase-schema-ismtusenmqwwbsawirle (2)" src="https://github.com/user-attachments/assets/c6b49ed5-6043-4053-ba13-1b541336e64c" />
+
+<img width="1061" height="511" alt="supabase-schema-ismtusenmqwwbsawirle (3)" src="https://github.com/user-attachments/assets/47072aee-d681-4f2b-aec0-e76d476434a1" />
+
+<img width="1061" height="511" alt="supabase-schema-ismtusenmqwwbsawirle (2)" src="https://github.com/user-attachments/assets/0c9974bd-66f3-4d64-8a78-5c48fcd222da" />
+
+<img width="1061" height="511" alt="supabase-schema-ismtusenmqwwbsawirle (4)" src="https://github.com/user-attachments/assets/7e37aac3-2752-43b1-89b9-b8f3d2dc394f" />
+
+
+
 ---
 
 # Environment Configuration
