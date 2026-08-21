@@ -64,7 +64,6 @@ The platform enables secure identity verification, employment verification, docu
 
 
 ---
-
 # User Roles
 
 | Role | Description |
@@ -74,6 +73,15 @@ The platform enables secure identity verification, employment verification, docu
 | VERIFIER | Performs background verification |
 | ADMIN | Platform administration |
 
+
+---
+ # Team Tasks
+ 
+Technical Lead Tasks
+Backend Architecture Security Database API Design
+
+Frontend Team Task:
+Candidate Portal Employer Portal Admin Portal
 
 ---
 
