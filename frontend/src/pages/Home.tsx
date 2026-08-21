@@ -4,18 +4,9 @@ return (
 
 <div className="p-10">
 
-<h1 className="text-4xl font-bold">
+<h1 className="text-4xl font-bold"> TruCity </h1> 
 
-Verified Talent Platform
-
-</h1>
-
-
-<p className="mt-4">
-
-Verified professionals connected with trusted employers.
-
-</p>
+<p className="mt-4"> Verified professionals connected with trusted employers. </p>
 
 
 </div>

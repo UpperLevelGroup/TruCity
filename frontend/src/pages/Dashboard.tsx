@@ -4,11 +4,7 @@ return (
 
 <div className="p-10">
 
-<h1 className="text-4xl font-bold">
-
-Verified Talent Platform
-
-</h1>
+<h1 className="text-4xl font-bold"> Welcome to TruCity where "Truth" is varified</h1>
 
 
 <p className="mt-4">
