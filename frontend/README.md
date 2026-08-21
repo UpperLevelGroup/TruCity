@@ -1,3 +1,225 @@
+Vite - React Application
+
+---
+
+
+# Development Setup
+
+
+
+
+## Clone Repository
+
+
+
+git clone https://github.com/UpperLevelGroup/TruCity.git
+
+
+
+
+
+---
+
+
+# Backend Setup
+
+
+Requirements:
+
+
+- Java 21
+- Maven
+
+
+
+
+Navigate:
+
+
+
+cd backend
+
+
+
+
+
+Create `.env`
+
+
+
+DATABASE_URL=jdbc:postgresql://db.xxx.supabase.co:5432/postgres
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=password
+JWT_SECRET=secret
+
+
+
+
+
+Run:
+
+
+
+./mvnw spring-boot:run
+
+
+
+
+
+API:
+
+
+
+http://localhost:8080
+
+
+
+
+
+---
+
+
+# Frontend Setup
+
+
+
+
+Requirements:
+
+
+- Node.js 20+
+
+
+
+
+Navigate:
+
+
+
+cd frontend
+
+
+
+
+
+Install:
+
+
+
+npm install
+
+
+
+
+
+Create `.env`
+
+
+
+VITE_API_URL=http://localhost:8080
+
+
+
+
+
+Run:
+
+
+npm run dev
+
+
+
+
+
+---
+
+
+# Development Team Structure
+
+
+
+
+## Minion 1 - Specialist
+
+
+Responsibilities:
+
+- React development
+- UI components
+- API integration
+- Specialist experience
+- Frontend testing
+
+
+
+
+## Minion 2 - Company
+
+
+Responsibilities:
+
+
+- React development
+- UI components
+- API integration
+- Company experience
+- Frontend testing
+
+
+
+
+---
+
+
+# Engineering Standards
+
+
+
+
+
+Pull requests require:
+
+
+- Code review
+- Testing
+- Documentation update
+
+
+
+
+---
+
+
+# Deployment
+
+
+Frontend: Vercel
+
+
+
+
+Backend: AWS / Render
+
+
+
+
+Database: Supabase PostgreSQL
+
+
+
+
+---
+
+
+# License
+
+
+Private Enterprise Project
+
+
+© UpperLevelGroup
+
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
