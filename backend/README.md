@@ -75,6 +75,7 @@ Migration order: 001_initial_schema.sql
 ### Data Flow Diagram
 
 
+<img width="1061" height="511" alt="supabase-schema-ismtusenmqwwbsawirle" src="https://github.com/user-attachments/assets/8704e781-7c50-46b7-b360-8ecb406cc6a4" />
 
 ---
 
