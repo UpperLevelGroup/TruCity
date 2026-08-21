@@ -209,19 +209,3 @@ Pull requests require: Code review, Tests
 
 [ ] Administration
 
-Contributors
-
-## Technical Lead Tasks
-
-Backend Architecture
-Security
-Database
-API Design
-
-## Frontend Team Task:
-
-Candidate Portal
-Employer Portal
-Admin Portal
-
-
