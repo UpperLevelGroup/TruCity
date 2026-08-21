@@ -85,5 +85,10 @@ Frontend Team Task:
 Candidate Portal, Employer Portal and Admin Portal
 
 ---
+# License
+
+Private Enterprise Project
+
+© UpperLevelGroup
 
 # Repository Structure
