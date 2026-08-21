@@ -209,3 +209,7 @@ Pull requests require: Code review, Tests
 
 [ ] Administration
 
+### License
+Private Enterprise Project
+
+© UpperLevelGroup
