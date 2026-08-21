@@ -75,13 +75,14 @@ The platform enables secure identity verification, employment verification, docu
 
 
 ---
+
  # Team Tasks
  
-Technical Lead Tasks
-Backend Architecture Security Database API Design
+Technical Lead Tasks:
+Backend Architecture, Security, Database and API Design
 
 Frontend Team Task:
-Candidate Portal Employer Portal Admin Portal
+Candidate Portal, Employer Portal and Admin Portal
 
 ---
 
