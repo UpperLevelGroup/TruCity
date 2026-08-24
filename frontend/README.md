@@ -166,7 +166,11 @@ Responsibilities:
 - API integration
 - Company experience
 - Frontend testing
-
+  
+Progress:
+*Built the two-step verification plit across VerificatationPage.tsx and AuthPage.tsx
+*Designed the physical site audit status
+*Implemented CIPC validation
 
 
 
