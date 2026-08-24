@@ -150,7 +150,9 @@ Responsibilities:
 - Specialist experience
 - Frontend testing
 
-
+Progress:
+- Registration page complete ( Awaiting backend)
+- Working on Candidate feed.
 
 
 ## Minion 2 - Company
