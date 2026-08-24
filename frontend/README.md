@@ -139,7 +139,7 @@ npm run dev
 
 
 
-## Minion 1 - Specialist
+## Minion 1 - Specialist/Candidate
 
 
 Responsibilities:
@@ -152,7 +152,7 @@ Responsibilities:
 
 Progress:
 - Registration page complete ( Awaiting backend)
-- Working on Candidate feed.
+- Working on Company feed page.
 
 
 ## Minion 2 - Company
