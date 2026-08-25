@@ -79,22 +79,23 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
 
 
-            // Public authentication endpoints
             .requestMatchers(
                 "/api/v1/auth/**"
             )
             .permitAll()
 
 
-            // Swagger
             .requestMatchers(
-                "/swagger-ui/**",
-                "/v3/api-docs/**"
+            "/swagger-ui/**",
+            "/v3/api-docs/**"
             )
             .permitAll()
 
+            .requestMatchers(            
+            "/api/health"
+            )
+            .permitAll()
 
-            // Everything else requires JWT
             .anyRequest()
             .authenticated()
 

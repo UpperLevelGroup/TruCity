@@ -55,3 +55,6 @@ target/
 # OS
 .DS_Store
 Thumbs.db
+
+# Spring Boot
+application-local.properties
