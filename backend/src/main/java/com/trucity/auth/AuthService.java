@@ -1,28 +1,23 @@
 package com.trucity.auth;
 
-
+import com.trucity.audit.AuditService;
 import com.trucity.security.JwtService;
 import com.trucity.user.Role;
 import com.trucity.user.RoleRepository;
 import com.trucity.user.User;
 import com.trucity.user.UserRepository;
 
-
 import lombok.RequiredArgsConstructor;
-
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
-
-
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-
 
     private final UserRepository userRepository;
 
@@ -32,30 +27,34 @@ public class AuthService {
 
     private final PasswordEncoder passwordEncoder;
 
+    private final AuditService auditService;
 
 
-    public AuthResponse register(RegisterRequest request){
+    /*
+     * =========================================================
+     * REGISTER
+     * =========================================================
+     */
 
+    @Transactional
+    public AuthResponse register(RegisterRequest request) {
 
-        if(userRepository.existsByEmail(request.getEmail())){
+        if (userRepository.existsByEmail(request.getEmail())) {
 
             throw new RuntimeException(
                     "Email already registered"
             );
-
         }
-
 
 
         Role candidateRole =
                 roleRepository
-                .findByName("CANDIDATE")
-                .orElseThrow(
-                        () -> new RuntimeException(
-                                "CANDIDATE role does not exist"
-                        )
-                );
-
+                        .findByName("CANDIDATE")
+                        .orElseThrow(
+                                () -> new RuntimeException(
+                                        "CANDIDATE role does not exist"
+                                )
+                        );
 
 
         User user = User.builder()
@@ -87,21 +86,32 @@ public class AuthService {
                 .build();
 
 
-
         user.getRoles()
                 .add(candidateRole);
 
 
+        User savedUser =
+                userRepository.save(user);
 
-        userRepository.save(user);
 
+        /*
+         * =====================================================
+         * AUDIT
+         * =====================================================
+         */
+
+        auditService.log(
+                savedUser.getId(),
+                "CANDIDATE_REGISTERED",
+                "Candidate account registered: "
+                        + savedUser.getEmail()
+        );
 
 
         String token =
                 jwtService.generateToken(
-                        user.getEmail()
+                        savedUser.getEmail()
                 );
-
 
 
         return AuthResponse.builder()
@@ -115,44 +125,50 @@ public class AuthService {
                 )
 
                 .build();
-
-
     }
 
 
+    /*
+     * =========================================================
+     * LOGIN
+     * =========================================================
+     */
 
-
-
-    public AuthResponse login(LoginRequest request){
-
-
+    @Transactional
+    public AuthResponse login(LoginRequest request) {
 
         User user =
                 userRepository
-                .findByEmail(request.getEmail())
-                .orElseThrow(
-                        () -> new RuntimeException(
-                                "Invalid credentials"
-                        )
-                );
+                        .findByEmail(request.getEmail())
+                        .orElseThrow(
+                                () -> new RuntimeException(
+                                        "Invalid credentials"
+                                )
+                        );
 
 
-
-        if(!passwordEncoder.matches(
-
+        if (!passwordEncoder.matches(
                 request.getPassword(),
-
                 user.getPasswordHash()
+        )) {
 
-        )){
-
-
-            throw new RuntimeException( "Invalid credentials" );
-
-
+            throw new RuntimeException(
+                    "Invalid credentials"
+            );
         }
 
 
+        /*
+         * =====================================================
+         * AUDIT SUCCESSFUL LOGIN
+         * =====================================================
+         */
+
+        auditService.log(
+                user.getId(),
+                "USER_LOGIN",
+                "User signed in successfully"
+        );
 
 
         String token =
@@ -161,20 +177,12 @@ public class AuthService {
                 );
 
 
-
         String userRole =
                 user.getRoles()
-
-                .stream()
-
-                .findFirst()
-
-                .map(Role::getName)
-
-                .orElse(
-                        "USER"
-                );
-
+                        .stream()
+                        .findFirst()
+                        .map(Role::getName)
+                        .orElse("USER");
 
 
         return AuthResponse.builder()
@@ -186,10 +194,5 @@ public class AuthService {
                 .role(userRole)
 
                 .build();
-
-
     }
-
-
-
 }

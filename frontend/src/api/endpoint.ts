@@ -1,39 +1,16 @@
-import axios from "axios";
+export const ENDPOINTS = {
 
+  AUTH: {
+    REGISTER:
+      "/api/v1/auth/register",
 
-const api = axios.create({
+    LOGIN:
+      "/api/v1/auth/login",
+  },
 
-baseURL:
-import.meta.env.VITE_API_URL,
+  COMPANY: {
+    CANDIDATES:
+      "/api/company/candidates",
+  },
 
-headers:{
-"Content-Type":"application/json"
-}
-
-});
-
-
-api.interceptors.request.use(
-
-(config)=>{
-
-const token =
-localStorage.getItem("token");
-
-
-if(token){
-
-config.headers.Authorization =
-`Bearer ${token}`;
-
-}
-
-
-return config;
-
-}
-
-);
-
-
-export default api;
+} as const;

@@ -1,16 +1,19 @@
-export default function Home(){
+import "../styles/landing.css";
 
-return (
+import HeroSection from "../components/landing/HeroSection";
+import FeatureSection from "../components/landing/FeatureSection";
+import AudienceSection from "../components/landing/AudienceSection";
+import LandingCTA from "../components/landing/LandingCTA";
+import Footer from "../components/common/Footer";
 
-<div className="p-10">
-
-<h1 className="text-4xl font-bold"> TruCity </h1> 
-
-<p className="mt-4"> Verified professionals connected with trusted employers. </p>
-
-
-</div>
-
-)
-
+export default function Home() {
+  return (
+    <main className="landing-page">
+      <HeroSection />
+      <FeatureSection />
+      <AudienceSection />
+      <LandingCTA />
+      <Footer />
+    </main>
+  );
 }
