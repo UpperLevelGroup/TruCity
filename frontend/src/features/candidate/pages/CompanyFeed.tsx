@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useNavigate } from "react-router-dom";
+
 
 import { useNotifications } from "../../../context/NotificationsContext";
 import { companyService } from "../../company/company.service";
@@ -364,7 +364,6 @@ function JobDetailSection({
 export default function CompanyFeed({
   onReport = () => {},
 }: CompanyFeedProps) {
-  const navigate = useNavigate();
 
   const { addNotification } =
     useNotifications();
