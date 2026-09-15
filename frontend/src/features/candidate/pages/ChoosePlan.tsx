@@ -15,7 +15,6 @@ import {
 
 import type { LucideIcon } from 'lucide-react';
 
-import { useChoosePlan } from './plans/useChoosePlan';
 import AuthShell from '../../../components/auth/AuthShell';
 
 /* =========================================================
