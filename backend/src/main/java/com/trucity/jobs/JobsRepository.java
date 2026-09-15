@@ -13,9 +13,8 @@ public interface JobsRepository
 
     List<Jobs> findAllByOrderByCreatedAtDesc();
 
-    List<Jobs> findAllByStatusNotOrderByCreatedAtDesc(
-            String status
-    );
+    List<Jobs> findAllByStatusNotOrderByCreatedAtDesc(String status);
+    List<Jobs> findByStatusIgnoreCaseOrderByCreatedAtDesc(String status);
 
     @Query(
             value = """

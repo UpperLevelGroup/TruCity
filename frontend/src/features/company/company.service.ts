@@ -364,6 +364,13 @@ function mapJob(
   return {
     id: job.id,
 
+    companyId:
+      job.companyId,
+
+    companyName:
+      job.companyName ||
+      "Unknown Company",
+
     title:
       job.title ||
       "Untitled Position",
@@ -456,6 +463,7 @@ function mapJob(
       undefined,
   };
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -861,6 +869,49 @@ export const companyService = {
       throw error;
     }
   },
+
+  /*
+  |--------------------------------------------------------------------------
+  | REAL BACKEND — CANDIDATE OPEN JOBS
+  |--------------------------------------------------------------------------
+  |
+  | Loads active jobs that are available to candidates.
+  |
+  */
+
+  async getOpenJobs(): Promise<CompanyJob[]> {
+    try {
+      const response =
+        await api.get<BackendJobResponse[]>(
+          "/api/jobs/open"
+        );
+
+      if (
+        !Array.isArray(
+          response.data
+        )
+      ) {
+        console.error(
+          "Unexpected open jobs response:",
+          response.data
+        );
+
+        return [];
+      }
+
+      return response.data.map(
+        mapJob
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load open jobs:",
+        error
+      );
+
+      throw error;
+    }
+  },
+
 
   /*
   |--------------------------------------------------------------------------

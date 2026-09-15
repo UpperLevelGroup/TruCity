@@ -56,47 +56,30 @@ export type PaymentMethod =
 
 export interface CompanyJob {
   id: string;
-
+  companyId?: string;
+  companyName?: string;
   title: string;
-
   department: string;
-
   location: string;
-
   workplaceType: WorkplaceType;
-
   type: EmploymentType;
-
   status: CompanyJobStatus;
-
   applicants: number;
-
   postedDate: string;
-
   description?: string;
-
   salaryMin?: number;
-
   salaryMax?: number;
-
   salaryCurrency?: string;
-
   salaryNegotiable?: boolean;
-
   qualifications?: string;
-
   experienceRequired?: string;
-
   skills: string[];
-
   responsibilities?: string;
-
   benefits?: string;
-
   openings?: number;
-
   applicationDeadline?: string;
 }
+
 
 
 /*
@@ -107,37 +90,21 @@ export interface CompanyJob {
 
 export interface CompanyJobRequest {
   title: string;
-
   department: string;
-
   description?: string;
-
   location: string;
-
   workplaceType: WorkplaceType;
-
   type: EmploymentType;
-
   salaryMin?: number;
-
   salaryMax?: number;
-
   salaryCurrency?: string;
-
   salaryNegotiable?: boolean;
-
   qualifications?: string;
-
   experienceRequired?: string;
-
   skills: string[];
-
   responsibilities?: string;
-
   benefits?: string;
-
   openings?: number;
-
   applicationDeadline?: string;
 }
 
@@ -150,33 +117,19 @@ export interface CompanyJobRequest {
 
 export interface CompanyCandidate {
   id: string;
-
   userId?: string;
-
   firstName?: string;
-
   lastName?: string;
-
   name: string;
-
   role: string;
-
   category: CandidateCategory;
-
   status: CandidateStatus;
-
   verified: boolean;
-
   skills: string[];
-
   experience: number;
-
   email?: string;
-
   phone?: string;
-
   location?: string;
-
   bio?: string;
 }
 
@@ -189,17 +142,11 @@ export interface CompanyCandidate {
 
 export interface CompanyPipelineCandidate
   extends CompanyCandidate {
-
   applicationId: string;
-
   jobId: string;
-
   jobTitle: string;
-
   applicationStatus: string;
-
   stage: PipelineStage;
-
   appliedAt?: string;
 }
 
@@ -212,23 +159,16 @@ export interface CompanyPipelineCandidate
 
 export interface CompanyMessage {
   id: string;
-
   sender: "me" | "them";
-
   text: string;
-
   timestamp: string;
 }
 
 export interface CompanyChatThread {
   id: string;
-
   name: string;
-
   role: string;
-
   messages: CompanyMessage[];
-
   unread?: number;
 }
 

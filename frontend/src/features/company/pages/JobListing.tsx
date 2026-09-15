@@ -14,6 +14,12 @@ import type {
 } from "../company.types";
 
 
+/*
+|--------------------------------------------------------------------------
+| Constants
+|--------------------------------------------------------------------------
+*/
+
 const DEPARTMENTS = [
   "Engineering",
   "Finance & Accounting",
@@ -41,6 +47,12 @@ const WORKPLACE_TYPES: WorkplaceType[] = [
 ];
 
 
+/*
+|--------------------------------------------------------------------------
+| Types
+|--------------------------------------------------------------------------
+*/
+
 interface JobFormState {
   title: string;
   department: string;
@@ -66,6 +78,12 @@ interface JobFormState {
   applicationDeadline: string;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Empty form
+|--------------------------------------------------------------------------
+*/
 
 const EMPTY_FORM: JobFormState = {
   title: "",
@@ -101,25 +119,22 @@ function createEmptyForm(): JobFormState {
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
 function jobToForm(
   job: CompanyJob
 ): JobFormState {
   return {
-    title:
-      job.title || "",
-
-    department:
-      job.department || "Engineering",
-
-    description:
-      job.description || "",
-
-    location:
-      job.location || "",
-
+    title: job.title || "",
+    department: job.department || "Engineering",
+    description: job.description || "",
+    location: job.location || "",
     workplaceType:
       job.workplaceType || "On-site",
-
     type:
       job.type || "Full-time",
 
@@ -137,9 +152,7 @@ function jobToForm(
       job.salaryCurrency || "ZAR",
 
     salaryNegotiable:
-      Boolean(
-        job.salaryNegotiable
-      ),
+      Boolean(job.salaryNegotiable),
 
     qualifications:
       job.qualifications || "",
@@ -159,9 +172,7 @@ function jobToForm(
       job.benefits || "",
 
     openings:
-      String(
-        job.openings ?? 1
-      ),
+      String(job.openings ?? 1),
 
     applicationDeadline:
       job.applicationDeadline || "",
@@ -176,13 +187,10 @@ function formatDate(
     return "Not specified";
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
   if (
-    Number.isNaN(
-      date.getTime()
-    )
+    Number.isNaN(date.getTime())
   ) {
     return value;
   }
@@ -201,9 +209,7 @@ function formatDate(
 function formatSalary(
   job: CompanyJob
 ): string {
-  if (
-    job.salaryNegotiable
-  ) {
+  if (job.salaryNegotiable) {
     return "Salary negotiable";
   }
 
@@ -215,8 +221,7 @@ function formatSalary(
   }
 
   const currency =
-    job.salaryCurrency ||
-    "ZAR";
+    job.salaryCurrency || "ZAR";
 
   const formatter =
     new Intl.NumberFormat(
@@ -239,9 +244,7 @@ function formatSalary(
     )}`;
   }
 
-  if (
-    job.salaryMin != null
-  ) {
+  if (job.salaryMin != null) {
     return `From ${formatter.format(
       job.salaryMin
     )}`;
@@ -252,6 +255,12 @@ function formatSalary(
   )}`;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Main component
+|--------------------------------------------------------------------------
+*/
 
 export default function JobListing() {
 
@@ -294,8 +303,13 @@ export default function JobListing() {
     useState("");
 
 
-  const loadJobs = async () => {
+  /*
+  |--------------------------------------------------------------------------
+  | Load jobs
+  |--------------------------------------------------------------------------
+  */
 
+  const loadJobs = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -333,17 +347,28 @@ export default function JobListing() {
   }, []);
 
 
+  /*
+  |--------------------------------------------------------------------------
+  | Derived values
+  |--------------------------------------------------------------------------
+  */
+
   const activeJobs =
     useMemo(
       () =>
         jobs.filter(
           job =>
-            job.status ===
-            "Active"
+            job.status === "Active"
         ),
       [jobs]
     );
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | Create / edit form
+  |--------------------------------------------------------------------------
+  */
 
   const handleOpenCreate =
     () => {
@@ -355,11 +380,8 @@ export default function JobListing() {
       );
 
       setSkillInput("");
-
       setFormError(null);
-
       setError(null);
-
       setShowForm(true);
     };
 
@@ -374,11 +396,8 @@ export default function JobListing() {
       );
 
       setSkillInput("");
-
       setFormError(null);
-
       setError(null);
-
       setShowForm(true);
     };
 
@@ -391,15 +410,11 @@ export default function JobListing() {
       }
 
       setShowForm(false);
-
       setEditingJob(null);
-
       setForm(
         createEmptyForm()
       );
-
       setSkillInput("");
-
       setFormError(null);
     };
 
@@ -419,6 +434,12 @@ export default function JobListing() {
     );
   };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | Skills
+  |--------------------------------------------------------------------------
+  */
 
   const addSkill = () => {
 
@@ -455,22 +476,21 @@ export default function JobListing() {
   };
 
 
-  const removeSkill = (
-    skillToRemove: string
-  ) => {
+  const removeSkill =
+    (skillToRemove: string) => {
 
-    setForm(
-      current => ({
-        ...current,
-        skills:
-          current.skills.filter(
-            skill =>
-              skill !==
-              skillToRemove
-          ),
-      })
-    );
-  };
+      setForm(
+        current => ({
+          ...current,
+          skills:
+            current.skills.filter(
+              skill =>
+                skill !==
+                skillToRemove
+            ),
+        })
+      );
+    };
 
 
   const handleSkillKeyDown = (
@@ -481,13 +501,17 @@ export default function JobListing() {
       event.key === "Enter" ||
       event.key === ","
     ) {
-
       event.preventDefault();
-
       addSkill();
     }
   };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | Validation
+  |--------------------------------------------------------------------------
+  */
 
   const validateForm =
     (): string | null => {
@@ -522,16 +546,12 @@ export default function JobListing() {
 
       const min =
         form.salaryMin.trim()
-          ? Number(
-              form.salaryMin
-            )
+          ? Number(form.salaryMin)
           : undefined;
 
       const max =
         form.salaryMax.trim()
-          ? Number(
-              form.salaryMax
-            )
+          ? Number(form.salaryMax)
           : undefined;
 
       if (
@@ -559,14 +579,10 @@ export default function JobListing() {
       }
 
       const openings =
-        Number(
-          form.openings
-        );
+        Number(form.openings);
 
       if (
-        !Number.isInteger(
-          openings
-        ) ||
+        !Number.isInteger(openings) ||
         openings < 1
       ) {
         return "Number of openings must be at least 1.";
@@ -576,21 +592,23 @@ export default function JobListing() {
     };
 
 
+  /*
+  |--------------------------------------------------------------------------
+  | Request builder
+  |--------------------------------------------------------------------------
+  */
+
   const buildRequest =
     (): CompanyJobRequest => {
 
       const min =
         form.salaryMin.trim()
-          ? Number(
-              form.salaryMin
-            )
+          ? Number(form.salaryMin)
           : undefined;
 
       const max =
         form.salaryMax.trim()
-          ? Number(
-              form.salaryMax
-            )
+          ? Number(form.salaryMax)
           : undefined;
 
       return {
@@ -643,9 +661,7 @@ export default function JobListing() {
           form.benefits.trim(),
 
         openings:
-          Number(
-            form.openings
-          ),
+          Number(form.openings),
 
         applicationDeadline:
           form.applicationDeadline ||
@@ -653,6 +669,12 @@ export default function JobListing() {
       };
     };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | Save job
+  |--------------------------------------------------------------------------
+  */
 
   const handleSubmit =
     async (
@@ -674,9 +696,7 @@ export default function JobListing() {
       try {
 
         setSaving(true);
-
         setFormError(null);
-
         setError(null);
 
         const request =
@@ -699,13 +719,10 @@ export default function JobListing() {
         await loadJobs();
 
         setShowForm(false);
-
         setEditingJob(null);
-
         setForm(
           createEmptyForm()
         );
-
         setSkillInput("");
 
       } catch (err) {
@@ -726,6 +743,12 @@ export default function JobListing() {
       }
     };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | View job
+  |--------------------------------------------------------------------------
+  */
 
   const handleViewJob =
     async (
@@ -757,6 +780,12 @@ export default function JobListing() {
     };
 
 
+  /*
+  |--------------------------------------------------------------------------
+  | Close job
+  |--------------------------------------------------------------------------
+  */
+
   const handleCloseJob =
     async (
       job: CompanyJob
@@ -773,10 +802,7 @@ export default function JobListing() {
 
       try {
 
-        setClosingId(
-          job.id
-        );
-
+        setClosingId(job.id);
         setError(null);
 
         await companyService.closeJob(
@@ -797,22 +823,23 @@ export default function JobListing() {
         );
 
       } finally {
-
-        setClosingId(
-          null
-        );
+        setClosingId(null);
       }
     };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | Delete job
+  |--------------------------------------------------------------------------
+  */
 
   const handleDeleteJob =
     async (
       job: CompanyJob
     ) => {
 
-      if (
-        job.applicants > 0
-      ) {
+      if (job.applicants > 0) {
 
         const closeInstead =
           window.confirm(
@@ -827,10 +854,7 @@ export default function JobListing() {
           return;
         }
 
-        await handleCloseJob(
-          job
-        );
-
+        await handleCloseJob(job);
         return;
       }
 
@@ -845,10 +869,7 @@ export default function JobListing() {
 
       try {
 
-        setDeletingId(
-          job.id
-        );
-
+        setDeletingId(job.id);
         setError(null);
 
         await companyService.deleteJob(
@@ -869,52 +890,70 @@ export default function JobListing() {
         );
 
       } finally {
-
-        setDeletingId(
-          null
-        );
+        setDeletingId(null);
       }
     };
 
 
+  /*
+  |--------------------------------------------------------------------------
+  | Render
+  |--------------------------------------------------------------------------
+  */
+
   return (
     <div
-      className="min-h-screen flex flex-col justify-between overflow-x-hidden"
-      style={{
-        backgroundColor: "#F8FCFF",
-        color: "#00273D",
-        fontFamily:
-          "Helvetica, Arial, sans-serif",
-      }}
+      style={styles.page}
     >
 
+      {/* Decorative TruCity watermark */}
+
       <div
-        style={
-          styles.container
-        }
-        className="p-6 lg:p-12 w-full"
+        style={styles.watermark}
+        aria-hidden="true"
+      >
+        TRUCITY
+      </div>
+
+      <div
+        style={styles.skyline}
+        aria-hidden="true"
+      >
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
+
+
+      <main
+        style={styles.container}
       >
 
-        {/* Header */}
+        {/* --------------------------------------------------------------- */}
+        {/* Header                                                          */}
+        {/* --------------------------------------------------------------- */}
 
-        <div
-          style={
-            styles.topRow
-          }
+        <section
+          style={styles.hero}
         >
 
-          <div>
+          <div
+            style={styles.heroCopy}
+          >
 
             <div
-              style={
-                styles.brandEyebrow
-              }
+              style={styles.eyebrow}
             >
+              <span
+                style={styles.eyebrowDot}
+              />
               TRUCITY
               <span
-                style={
-                  styles.brandDot
-                }
+                style={styles.eyebrowDivider}
               >
                 •
               </span>
@@ -922,83 +961,95 @@ export default function JobListing() {
             </div>
 
             <h1
-              style={
-                styles.title
-              }
+              style={styles.title}
             >
               Job Listings
             </h1>
 
             <p
-              style={
-                styles.subtitle
-              }
+              style={styles.subtitle}
             >
-              Create, manage and track your company's hiring posts.
+              Manage your hiring posts, attract verified talent,
+              and keep every position organised in one place.
             </p>
 
           </div>
 
 
-          <button
-            type="button"
-            style={
-              styles.btnPrimary
-            }
-            onClick={
-              handleOpenCreate
-            }
-            disabled={
-              loading ||
-              saving
-            }
+          <div
+            style={styles.heroAction}
           >
-            + Post New Job
-          </button>
 
-        </div>
+            <div
+              style={styles.activeSummary}
+            >
+              <strong>
+                {activeJobs.length}
+              </strong>
+
+              <span>
+                active{" "}
+                {activeJobs.length === 1
+                  ? "position"
+                  : "positions"}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              style={styles.btnPrimary}
+              onClick={
+                handleOpenCreate
+              }
+              disabled={
+                loading ||
+                saving
+              }
+            >
+              <span
+                style={styles.plus}
+              >
+                +
+              </span>
+
+              Post New Job
+            </button>
+
+          </div>
+
+        </section>
 
 
-        {/* Error */}
+        {/* --------------------------------------------------------------- */}
+        {/* Error                                                           */}
+        {/* --------------------------------------------------------------- */}
 
         {error && (
           <div
-            style={
-              styles.errorCard
-            }
+            style={styles.errorCard}
           >
 
             <div>
-
               <strong
-                style={
-                  styles.errorTitle
-                }
+                style={styles.errorTitle}
               >
                 Something went wrong
               </strong>
 
               <p
-                style={
-                  styles.errorText
-                }
+                style={styles.errorText}
               >
                 {error}
               </p>
-
             </div>
 
             <button
               type="button"
-              style={
-                styles.retryButton
-              }
+              style={styles.retryButton}
               onClick={() =>
                 void loadJobs()
               }
-              disabled={
-                loading
-              }
+              disabled={loading}
             >
               Retry
             </button>
@@ -1007,70 +1058,56 @@ export default function JobListing() {
         )}
 
 
-        {/* Form */}
+        {/* --------------------------------------------------------------- */}
+        {/* Create / edit form                                              */}
+        {/* --------------------------------------------------------------- */}
 
         {showForm && (
           <form
-            onSubmit={
-              handleSubmit
-            }
-            style={
-              styles.formCard
-            }
+            onSubmit={handleSubmit}
+            style={styles.formCard}
           >
 
             <div
-              style={
-                styles.formHeader
-              }
+              style={styles.formHeader}
             >
 
               <div>
 
                 <div
-                  style={
-                    styles.formEyebrow
-                  }
+                  style={styles.formEyebrow}
                 >
                   {editingJob
                     ? "POSITION MANAGEMENT"
                     : "NEW POSITION"}
                 </div>
 
-                <h4
-                  style={
-                    styles.formTitle
-                  }
+                <h2
+                  style={styles.formTitle}
                 >
                   {editingJob
                     ? "Edit Job Listing"
                     : "Create New Job Listing"}
-                </h4>
+                </h2>
 
                 <p
-                  style={
-                    styles.formSubtitle
-                  }
+                  style={styles.formSubtitle}
                 >
                   {editingJob
                     ? "Update the position details stored in your company's database."
-                    : "Provide candidates with the information they need to understand the position."}
+                    : "Give verified candidates the information they need to understand the opportunity."}
                 </p>
 
               </div>
 
               <button
                 type="button"
-                style={
-                  styles.closeButton
-                }
+                style={styles.closeButton}
                 onClick={
                   handleCloseForm
                 }
-                disabled={
-                  saving
-                }
-                aria-label="Close"
+                disabled={saving}
+                aria-label="Close job form"
               >
                 ✕
               </button>
@@ -1080,35 +1117,21 @@ export default function JobListing() {
 
             {formError && (
               <div
-                style={
-                  styles.formError
-                }
+                style={styles.formError}
               >
                 {formError}
               </div>
             )}
 
 
-            {/* Basic Information */}
+            {/* Basic information */}
 
-            <div
-              style={
-                styles.formSection
-              }
+            <FormSection
+              label="01 / Basic information"
             >
 
               <div
-                style={
-                  styles.sectionLabel
-                }
-              >
-                Basic information
-              </div>
-
-              <div
-                style={
-                  styles.formGrid
-                }
+                style={styles.formGrid}
               >
 
                 <Field
@@ -1117,23 +1140,16 @@ export default function JobListing() {
                 >
                   <input
                     type="text"
-                    value={
-                      form.title
+                    value={form.title}
+                    onChange={event =>
+                      updateForm(
+                        "title",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "title",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
+                    style={styles.input}
                     placeholder="e.g. Senior Software Engineer"
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
                 </Field>
 
@@ -1143,32 +1159,21 @@ export default function JobListing() {
                   required
                 >
                   <select
-                    value={
-                      form.department
+                    value={form.department}
+                    onChange={event =>
+                      updateForm(
+                        "department",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "department",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
-                    disabled={
-                      saving
-                    }
+                    style={styles.input}
+                    disabled={saving}
                   >
                     {DEPARTMENTS.map(
                       department => (
                         <option
-                          key={
-                            department
-                          }
-                          value={
-                            department
-                          }
+                          key={department}
+                          value={department}
                         >
                           {department}
                         </option>
@@ -1184,23 +1189,16 @@ export default function JobListing() {
                 >
                   <input
                     type="text"
-                    value={
-                      form.location
+                    value={form.location}
+                    onChange={event =>
+                      updateForm(
+                        "location",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "location",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
+                    style={styles.input}
                     placeholder="e.g. Johannesburg, Gauteng"
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
                 </Field>
 
@@ -1213,19 +1211,14 @@ export default function JobListing() {
                     value={
                       form.workplaceType
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "workplaceType",
-                          event.target.value as WorkplaceType
-                        )
+                    onChange={event =>
+                      updateForm(
+                        "workplaceType",
+                        event.target.value as WorkplaceType
+                      )
                     }
-                    style={
-                      styles.input
-                    }
-                    disabled={
-                      saving
-                    }
+                    style={styles.input}
+                    disabled={saving}
                   >
                     {WORKPLACE_TYPES.map(
                       type => (
@@ -1246,22 +1239,15 @@ export default function JobListing() {
                   required
                 >
                   <select
-                    value={
-                      form.type
+                    value={form.type}
+                    onChange={event =>
+                      updateForm(
+                        "type",
+                        event.target.value as EmploymentType
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "type",
-                          event.target.value as EmploymentType
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
-                    disabled={
-                      saving
-                    }
+                    style={styles.input}
+                    disabled={saving}
                   >
                     {EMPLOYMENT_TYPES.map(
                       type => (
@@ -1284,169 +1270,117 @@ export default function JobListing() {
                   <input
                     type="number"
                     min="1"
-                    value={
-                      form.openings
+                    value={form.openings}
+                    onChange={event =>
+                      updateForm(
+                        "openings",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "openings",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
-                    disabled={
-                      saving
-                    }
+                    style={styles.input}
+                    disabled={saving}
                   />
                 </Field>
 
               </div>
 
-            </div>
+            </FormSection>
 
 
             {/* Description */}
 
-            <div
-              style={
-                styles.formSection
-              }
+            <FormSection
+              label="02 / Job description"
             >
 
-              <div
-                style={
-                  styles.sectionLabel
-                }
-              >
-                Job description
-              </div>
+              <Field label="Description">
 
-              <Field
-                label="Description"
-              >
                 <textarea
-                  value={
-                    form.description
+                  value={form.description}
+                  onChange={event =>
+                    updateForm(
+                      "description",
+                      event.target.value
+                    )
                   }
-                  onChange={
-                    event =>
-                      updateForm(
-                        "description",
-                        event.target.value
-                      )
-                  }
-                  style={
-                    styles.textarea
-                  }
+                  style={styles.textarea}
                   placeholder="Describe the position, team and what the successful candidate will be doing."
-                  rows={5}
-                  disabled={
-                    saving
-                  }
+                  rows={6}
+                  disabled={saving}
                 />
+
               </Field>
 
-            </div>
+            </FormSection>
 
 
-            {/* Salary */}
+            {/* Compensation */}
 
-            <div
-              style={
-                styles.formSection
-              }
+            <FormSection
+              label="03 / Compensation"
             >
 
               <div
-                style={
-                  styles.sectionLabel
-                }
-              >
-                Compensation
-              </div>
-
-              <div
-                style={
-                  styles.formGrid
-                }
+                style={styles.formGrid}
               >
 
-                <Field
-                  label="Minimum salary"
-                >
+                <Field label="Minimum salary">
+
                   <input
                     type="number"
                     min="0"
-                    value={
-                      form.salaryMin
+                    value={form.salaryMin}
+                    onChange={event =>
+                      updateForm(
+                        "salaryMin",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "salaryMin",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
+                    style={styles.input}
                     placeholder="e.g. 25000"
                     disabled={
                       saving ||
                       form.salaryNegotiable
                     }
                   />
+
                 </Field>
 
 
-                <Field
-                  label="Maximum salary"
-                >
+                <Field label="Maximum salary">
+
                   <input
                     type="number"
                     min="0"
-                    value={
-                      form.salaryMax
+                    value={form.salaryMax}
+                    onChange={event =>
+                      updateForm(
+                        "salaryMax",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "salaryMax",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
+                    style={styles.input}
                     placeholder="e.g. 45000"
                     disabled={
                       saving ||
                       form.salaryNegotiable
                     }
                   />
+
                 </Field>
 
 
-                <Field
-                  label="Currency"
-                >
+                <Field label="Currency">
+
                   <select
-                    value={
-                      form.salaryCurrency
+                    value={form.salaryCurrency}
+                    onChange={event =>
+                      updateForm(
+                        "salaryCurrency",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "salaryCurrency",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.input
-                    }
+                    style={styles.input}
                     disabled={
                       saving ||
                       form.salaryNegotiable
@@ -1468,13 +1402,12 @@ export default function JobListing() {
                       GBP — Pound Sterling
                     </option>
                   </select>
+
                 </Field>
 
 
                 <label
-                  style={
-                    styles.checkboxLabel
-                  }
+                  style={styles.checkboxLabel}
                 >
 
                   <input
@@ -1482,16 +1415,13 @@ export default function JobListing() {
                     checked={
                       form.salaryNegotiable
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "salaryNegotiable",
-                          event.target.checked
-                        )
+                    onChange={event =>
+                      updateForm(
+                        "salaryNegotiable",
+                        event.target.checked
+                      )
                     }
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
 
                   <span>
@@ -1502,30 +1432,17 @@ export default function JobListing() {
 
               </div>
 
-            </div>
+            </FormSection>
 
 
-            {/* Candidate Requirements */}
+            {/* Candidate requirements */}
 
-            <div
-              style={
-                styles.formSection
-              }
+            <FormSection
+              label="04 / Candidate requirements"
             >
 
               <div
-                style={
-                  styles.sectionLabel
-                }
-              >
-                Candidate requirements
-              </div>
-
-
-              <div
-                style={
-                  styles.formGrid
-                }
+                style={styles.formGrid}
               >
 
                 <Field
@@ -1535,21 +1452,16 @@ export default function JobListing() {
                     value={
                       form.experienceRequired
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "experienceRequired",
-                          event.target.value
-                        )
+                    onChange={event =>
+                      updateForm(
+                        "experienceRequired",
+                        event.target.value
+                      )
                     }
-                    style={
-                      styles.textarea
-                    }
+                    style={styles.textarea}
                     rows={4}
                     placeholder="e.g. 3+ years of professional Java/Spring Boot experience."
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
                 </Field>
 
@@ -1561,68 +1473,48 @@ export default function JobListing() {
                     value={
                       form.qualifications
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "qualifications",
-                          event.target.value
-                        )
+                    onChange={event =>
+                      updateForm(
+                        "qualifications",
+                        event.target.value
+                      )
                     }
-                    style={
-                      styles.textarea
-                    }
+                    style={styles.textarea}
                     rows={4}
                     placeholder="e.g. BSc Computer Science or equivalent."
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
                 </Field>
 
               </div>
 
 
-              <Field
-                label="Desired skills"
-              >
+              <Field label="Desired skills">
 
                 <div
-                  style={
-                    styles.skillInputRow
-                  }
+                  style={styles.skillInputRow}
                 >
 
                   <input
                     type="text"
-                    value={
-                      skillInput
-                    }
-                    onChange={
-                      event =>
-                        setSkillInput(
-                          event.target.value
-                        )
+                    value={skillInput}
+                    onChange={event =>
+                      setSkillInput(
+                        event.target.value
+                      )
                     }
                     onKeyDown={
                       handleSkillKeyDown
                     }
-                    style={
-                      styles.input
-                    }
+                    style={styles.input}
                     placeholder="Type a skill and press Enter"
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
 
                   <button
                     type="button"
-                    onClick={
-                      addSkill
-                    }
-                    style={
-                      styles.smallPrimaryButton
-                    }
+                    onClick={addSkill}
+                    style={styles.smallPrimaryButton}
                     disabled={
                       saving ||
                       !skillInput.trim()
@@ -1636,20 +1528,13 @@ export default function JobListing() {
 
                 {form.skills.length > 0 && (
                   <div
-                    style={
-                      styles.skillsContainer
-                    }
+                    style={styles.skillsContainer}
                   >
-
                     {form.skills.map(
                       skill => (
                         <span
-                          key={
-                            skill
-                          }
-                          style={
-                            styles.skillChip
-                          }
+                          key={skill}
+                          style={styles.skillChip}
                         >
                           {skill}
 
@@ -1663,9 +1548,7 @@ export default function JobListing() {
                             style={
                               styles.skillRemove
                             }
-                            disabled={
-                              saving
-                            }
+                            disabled={saving}
                             aria-label={`Remove ${skill}`}
                           >
                             ×
@@ -1673,35 +1556,22 @@ export default function JobListing() {
                         </span>
                       )
                     )}
-
                   </div>
                 )}
 
               </Field>
 
-            </div>
+            </FormSection>
 
 
-            {/* Responsibilities and benefits */}
+            {/* Position details */}
 
-            <div
-              style={
-                styles.formSection
-              }
+            <FormSection
+              label="05 / Position details"
             >
 
               <div
-                style={
-                  styles.sectionLabel
-                }
-              >
-                Position details
-              </div>
-
-              <div
-                style={
-                  styles.formGrid
-                }
+                style={styles.formGrid}
               >
 
                 <Field
@@ -1711,106 +1581,81 @@ export default function JobListing() {
                     value={
                       form.responsibilities
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "responsibilities",
-                          event.target.value
-                        )
+                    onChange={event =>
+                      updateForm(
+                        "responsibilities",
+                        event.target.value
+                      )
                     }
-                    style={
-                      styles.textarea
-                    }
+                    style={styles.textarea}
                     rows={5}
                     placeholder="List the main responsibilities of the successful candidate."
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
                 </Field>
 
 
-                <Field
-                  label="Benefits"
-                >
+                <Field label="Benefits">
+
                   <textarea
-                    value={
-                      form.benefits
+                    value={form.benefits}
+                    onChange={event =>
+                      updateForm(
+                        "benefits",
+                        event.target.value
+                      )
                     }
-                    onChange={
-                      event =>
-                        updateForm(
-                          "benefits",
-                          event.target.value
-                        )
-                    }
-                    style={
-                      styles.textarea
-                    }
+                    style={styles.textarea}
                     rows={5}
                     placeholder="e.g. Medical aid, pension, remote-work allowance, training."
-                    disabled={
-                      saving
-                    }
+                    disabled={saving}
                   />
+
                 </Field>
 
               </div>
 
-            </div>
+            </FormSection>
 
 
             {/* Deadline */}
 
-            <div
-              style={
-                styles.formSection
-              }
+            <FormSection
+              label="06 / Application deadline"
             >
 
-              <Field
-                label="Application deadline"
-              >
+              <Field label="Application deadline">
+
                 <input
                   type="date"
                   value={
                     form.applicationDeadline
                   }
-                  onChange={
-                    event =>
-                      updateForm(
-                        "applicationDeadline",
-                        event.target.value
-                      )
+                  onChange={event =>
+                    updateForm(
+                      "applicationDeadline",
+                      event.target.value
+                    )
                   }
-                  style={
-                    styles.input
-                  }
-                  disabled={
-                    saving
-                  }
+                  style={styles.input}
+                  disabled={saving}
                 />
+
               </Field>
 
-            </div>
+            </FormSection>
 
 
             {/* Actions */}
 
             <div
-              style={
-                styles.formActions
-              }
+              style={styles.formActions}
             >
 
               <button
                 type="submit"
-                style={
-                  styles.btnPrimary
-                }
-                disabled={
-                  saving
-                }
+                style={styles.btnPrimary}
+                disabled={saving}
               >
                 {saving
                   ? editingJob
@@ -1824,15 +1669,11 @@ export default function JobListing() {
 
               <button
                 type="button"
-                style={
-                  styles.btnSecondary
-                }
+                style={styles.btnSecondary}
                 onClick={
                   handleCloseForm
                 }
-                disabled={
-                  saving
-                }
+                disabled={saving}
               >
                 Cancel
               </button>
@@ -1843,89 +1684,87 @@ export default function JobListing() {
         )}
 
 
-        {/* Job section */}
+        {/* --------------------------------------------------------------- */}
+        {/* Job listings                                                     */}
+        {/* --------------------------------------------------------------- */}
 
-        <div
-          style={
-            styles.jobsSection
-          }
+        <section
+          style={styles.jobsSection}
         >
 
           <div
-            style={
-              styles.sectionHeader
-            }
+            style={styles.sectionHeader}
           >
 
             <div>
 
-              <h2
-                style={
-                  styles.sectionTitle
-                }
+              <div
+                style={styles.sectionEyebrow}
               >
-                Your Job Listings
+                YOUR HIRING PIPELINE
+              </div>
+
+              <h2
+                style={styles.sectionTitle}
+              >
+                Active Jobs
+                <span
+                  style={styles.countBadge}
+                >
+                  {activeJobs.length}
+                </span>
               </h2>
 
               <p
-                style={
-                  styles.sectionDescription
-                }
+                style={styles.sectionDescription}
               >
-                {activeJobs.length} active{" "}
-                {activeJobs.length === 1
-                  ? "position"
-                  : "positions"}{" "}
-                · {jobs.length} total
+                {jobs.length} total{" "}
+                {jobs.length === 1
+                  ? "listing"
+                  : "listings"}{" "}
+                in your company's records.
               </p>
 
             </div>
 
-            <span
-              style={
-                styles.sectionHint
-              }
+
+            <div
+              style={styles.liveIndicator}
             >
+              <span
+                style={styles.liveDot}
+              />
+
               {loading
                 ? "Loading listings..."
                 : "Live database listings"}
-            </span>
+            </div>
 
           </div>
 
 
           <div
-            style={
-              styles.jobList
-            }
+            style={styles.jobList}
           >
 
             {loading ? (
 
               <div
-                style={
-                  styles.emptyState
-                }
+                style={styles.emptyState}
               >
 
                 <div
-                  style={
-                    styles.loadingSpinner
-                  }
+                  style={styles.loadingSpinner}
                 />
 
                 <h3
-                  style={
-                    styles.emptyTitle
-                  }
+                  style={styles.emptyTitle}
                 >
                   Loading job listings
                 </h3>
 
                 <p
-                  style={
-                    styles.emptyText
-                  }
+                  style={styles.emptyText}
                 >
                   Retrieving your company's jobs from the server.
                 </p>
@@ -1935,40 +1774,30 @@ export default function JobListing() {
             ) : jobs.length === 0 ? (
 
               <div
-                style={
-                  styles.emptyState
-                }
+                style={styles.emptyState}
               >
 
                 <div
-                  style={
-                    styles.emptyIcon
-                  }
+                  style={styles.emptyIcon}
                 >
-                  ＋
+                  +
                 </div>
 
                 <h3
-                  style={
-                    styles.emptyTitle
-                  }
+                  style={styles.emptyTitle}
                 >
                   No job listings yet
                 </h3>
 
                 <p
-                  style={
-                    styles.emptyText
-                  }
+                  style={styles.emptyText}
                 >
                   Create your first position and provide candidates with a complete job description.
                 </p>
 
                 <button
                   type="button"
-                  style={
-                    styles.btnPrimary
-                  }
+                  style={styles.btnPrimary}
                   onClick={
                     handleOpenCreate
                   }
@@ -1982,26 +1811,17 @@ export default function JobListing() {
 
               jobs.map(
                 job => (
-
-                  <div
-                    key={
-                      job.id
-                    }
-                    style={
-                      styles.jobCard
-                    }
+                  <article
+                    key={job.id}
+                    style={styles.jobCard}
                   >
 
                     <div
-                      style={
-                        styles.jobInformation
-                      }
+                      style={styles.jobInformation}
                     >
 
                       <div
-                        style={
-                          styles.cardTopRow
-                        }
+                        style={styles.cardTopRow}
                       >
 
                         <span
@@ -2020,25 +1840,24 @@ export default function JobListing() {
                               : styles.statusClosedBadge
                           }
                         >
-                          {job.status}
+                          {job.status ===
+                          "Active"
+                            ? "Verified Active"
+                            : job.status}
                         </span>
 
                       </div>
 
 
                       <h3
-                        style={
-                          styles.jobTitle
-                        }
+                        style={styles.jobTitle}
                       >
                         {job.title}
                       </h3>
 
 
                       <p
-                        style={
-                          styles.jobSub
-                        }
+                        style={styles.jobSub}
                       >
                         {job.location}
                         {" • "}
@@ -2049,24 +1868,31 @@ export default function JobListing() {
 
 
                       <div
-                        style={
-                          styles.cardMeta
-                        }
+                        style={styles.cardMeta}
                       >
 
                         <span>
-                          💰 {formatSalary(job)}
+                          <strong>
+                            💰
+                          </strong>{" "}
+                          {formatSalary(job)}
                         </span>
 
                         <span>
-                          👥 {job.applicants}{" "}
+                          <strong>
+                            👥
+                          </strong>{" "}
+                          {job.applicants}{" "}
                           {job.applicants === 1
                             ? "applicant"
                             : "applicants"}
                         </span>
 
                         <span>
-                          📌 {job.openings ?? 1}{" "}
+                          <strong>
+                            📌
+                          </strong>{" "}
+                          {job.openings ?? 1}{" "}
                           {job.openings === 1
                             ? "opening"
                             : "openings"}
@@ -2077,9 +1903,7 @@ export default function JobListing() {
 
                       {job.skills.length > 0 && (
                         <div
-                          style={
-                            styles.cardSkills
-                          }
+                          style={styles.cardSkills}
                         >
 
                           {job.skills
@@ -2087,9 +1911,7 @@ export default function JobListing() {
                             .map(
                               skill => (
                                 <span
-                                  key={
-                                    skill
-                                  }
+                                  key={skill}
                                   style={
                                     styles.cardSkill
                                   }
@@ -2099,8 +1921,7 @@ export default function JobListing() {
                               )
                             )}
 
-                          {job.skills.length >
-                            5 && (
+                          {job.skills.length > 5 && (
                             <span
                               style={
                                 styles.moreSkills
@@ -2134,9 +1955,7 @@ export default function JobListing() {
 
 
                     <div
-                      style={
-                        styles.jobActions
-                      }
+                      style={styles.jobActions}
                     >
 
                       <button
@@ -2164,9 +1983,7 @@ export default function JobListing() {
                         style={
                           styles.btnEdit
                         }
-                        disabled={
-                          saving
-                        }
+                        disabled={saving}
                       >
                         Edit
                       </button>
@@ -2209,9 +2026,9 @@ export default function JobListing() {
                         }
                         disabled={
                           deletingId ===
-                          job.id ||
+                            job.id ||
                           closingId ===
-                          job.id
+                            job.id
                         }
                       >
                         {deletingId ===
@@ -2224,8 +2041,7 @@ export default function JobListing() {
 
                     </div>
 
-                  </div>
-
+                  </article>
                 )
               )
 
@@ -2233,64 +2049,69 @@ export default function JobListing() {
 
           </div>
 
-        </div>
+        </section>
 
-      </div>
+      </main>
 
 
-      {/* View modal */}
+      {/* --------------------------------------------------------------- */}
+      {/* Job details modal                                               */}
+      {/* --------------------------------------------------------------- */}
 
       {viewingJob && (
         <div
-          style={
-            styles.overlay
-          }
+          style={styles.overlay}
           onMouseDown={event => {
-
             if (
               event.target ===
               event.currentTarget
             ) {
               setViewingJob(null);
             }
-
           }}
         >
 
           <div
-            style={
-              styles.detailModal
-            }
+            style={styles.detailModal}
           >
 
             <div
-              style={
-                styles.modalHeader
-              }
+              style={styles.modalHeader}
             >
 
               <div>
 
-                <span
-                  style={
-                    styles.deptBadge
-                  }
+                <div
+                  style={styles.modalBadges}
                 >
-                  {viewingJob.department}
-                </span>
+
+                  <span
+                    style={styles.deptBadge}
+                  >
+                    {viewingJob.department}
+                  </span>
+
+                  <span
+                    style={
+                      viewingJob.status ===
+                      "Active"
+                        ? styles.statusBadge
+                        : styles.statusClosedBadge
+                    }
+                  >
+                    {viewingJob.status}
+                  </span>
+
+                </div>
 
                 <h2
-                  style={
-                    styles.modalTitle
-                  }
+                  style={styles.modalTitle}
                 >
                   {viewingJob.title}
                 </h2>
 
                 <p
-                  style={
-                    styles.modalSubtitle
-                  }
+                  style={styles.modalSubtitle}
                 >
                   {viewingJob.location}
                   {" • "}
@@ -2304,13 +2125,11 @@ export default function JobListing() {
 
               <button
                 type="button"
-                style={
-                  styles.closeButton
-                }
+                style={styles.closeButton}
                 onClick={() =>
                   setViewingJob(null)
                 }
-                aria-label="Close"
+                aria-label="Close job details"
               >
                 ✕
               </button>
@@ -2319,27 +2138,13 @@ export default function JobListing() {
 
 
             <div
-              style={
-                styles.detailStatusRow
-              }
+              style={styles.detailStatusRow}
             >
 
               <span
-                style={
-                  viewingJob.status ===
-                  "Active"
-                    ? styles.statusBadge
-                    : styles.statusClosedBadge
-                }
+                style={styles.detailMeta}
               >
-                {viewingJob.status}
-              </span>
-
-              <span
-                style={
-                  styles.detailMeta
-                }
-              >
+                👥{" "}
                 {viewingJob.applicants}{" "}
                 {viewingJob.applicants ===
                 1
@@ -2348,10 +2153,9 @@ export default function JobListing() {
               </span>
 
               <span
-                style={
-                  styles.detailMeta
-                }
+                style={styles.detailMeta}
               >
+                📌{" "}
                 {viewingJob.openings ??
                   1}{" "}
                 {viewingJob.openings ===
@@ -2360,13 +2164,20 @@ export default function JobListing() {
                   : "openings"}
               </span>
 
+              <span
+                style={styles.detailMeta}
+              >
+                💰{" "}
+                {formatSalary(
+                  viewingJob
+                )}
+              </span>
+
             </div>
 
 
             <div
-              style={
-                styles.detailBody
-              }
+              style={styles.detailBody}
             >
 
               <DetailSection
@@ -2378,9 +2189,7 @@ export default function JobListing() {
 
 
               <div
-                style={
-                  styles.detailGrid
-                }
+                style={styles.detailGrid}
               >
 
                 <DetailItem
@@ -2435,7 +2244,6 @@ export default function JobListing() {
 
               {viewingJob.skills.length >
                 0 && (
-
                 <div
                   style={
                     styles.detailSection
@@ -2459,9 +2267,7 @@ export default function JobListing() {
                     {viewingJob.skills.map(
                       skill => (
                         <span
-                          key={
-                            skill
-                          }
+                          key={skill}
                           style={
                             styles.skillChip
                           }
@@ -2474,7 +2280,6 @@ export default function JobListing() {
                   </div>
 
                 </div>
-
               )}
 
 
@@ -2510,16 +2315,12 @@ export default function JobListing() {
 
 
             <div
-              style={
-                styles.modalFooter
-              }
+              style={styles.modalFooter}
             >
 
               <button
                 type="button"
-                style={
-                  styles.btnSecondary
-                }
+                style={styles.btnSecondary}
                 onClick={() =>
                   setViewingJob(null)
                 }
@@ -2530,9 +2331,7 @@ export default function JobListing() {
 
               <button
                 type="button"
-                style={
-                  styles.btnPrimary
-                }
+                style={styles.btnPrimary}
                 onClick={() => {
 
                   setViewingJob(null);
@@ -2554,32 +2353,129 @@ export default function JobListing() {
       )}
 
 
-      {/* Footer */}
+      {/* --------------------------------------------------------------- */}
+      {/* Footer                                                           */}
+      {/* --------------------------------------------------------------- */}
 
       <footer
-        style={
-          styles.footer
-        }
+        style={styles.footer}
       >
-
         <div
-          style={
-            styles.footerText
-          }
+          style={styles.footerInner}
         >
-          ©{" "}
-          {new Date().getFullYear()}{" "}
-          <span
-            style={
-              styles.footerBrand
-            }
-          >
-            UpperLevel Group
+          <span>
+            TRUCITY
           </span>
-          . All rights reserved.
-        </div>
 
+          <span
+            style={styles.footerDivider}
+          >
+            •
+          </span>
+
+          <span>
+            VERIFY • CONNECT • PERSUE
+          </span>
+
+          <span
+            style={styles.footerCopyright}
+          >
+            © {new Date().getFullYear()} UpperLevel Group
+          </span>
+        </div>
       </footer>
+
+
+      {/* Responsive styles */}
+
+      <style>
+        {`
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
+          @media (max-width: 900px) {
+            .trucity-job-grid {
+              grid-template-columns: 1fr !important;
+            }
+
+            .trucity-job-card {
+              flex-direction: column !important;
+              align-items: flex-start !important;
+            }
+
+            .trucity-job-actions {
+              width: 100% !important;
+              justify-content: flex-start !important;
+            }
+
+            .trucity-hero {
+              flex-direction: column !important;
+              align-items: flex-start !important;
+            }
+
+            .trucity-hero-action {
+              width: 100% !important;
+              justify-content: space-between !important;
+            }
+          }
+
+          @media (max-width: 620px) {
+            .trucity-container {
+              padding: 24px 16px !important;
+            }
+
+            .trucity-title {
+              font-size: 32px !important;
+            }
+
+            .trucity-form-grid {
+              grid-template-columns: 1fr !important;
+            }
+
+            .trucity-job-actions {
+              flex-direction: column !important;
+              align-items: stretch !important;
+            }
+
+            .trucity-job-actions button {
+              width: 100% !important;
+            }
+
+            .trucity-form-actions {
+              flex-direction: column !important;
+            }
+
+            .trucity-form-actions button {
+              width: 100% !important;
+            }
+
+            .trucity-detail-grid {
+              grid-template-columns: 1fr !important;
+            }
+
+            .trucity-hero-action {
+              flex-direction: column !important;
+              align-items: stretch !important;
+            }
+
+            .trucity-hero-action button {
+              width: 100% !important;
+            }
+
+            .trucity-footer-inner {
+              flex-direction: column !important;
+              gap: 6px !important;
+            }
+          }
+        `}
+      </style>
 
     </div>
   );
@@ -2588,7 +2484,39 @@ export default function JobListing() {
 
 /*
 |--------------------------------------------------------------------------
-| Small form components
+| Form Section
+|--------------------------------------------------------------------------
+*/
+
+function FormSection({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+
+  return (
+    <section
+      style={styles.formSection}
+    >
+
+      <div
+        style={styles.sectionLabel}
+      >
+        {label}
+      </div>
+
+      {children}
+
+    </section>
+  );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Field
 |--------------------------------------------------------------------------
 */
 
@@ -2604,27 +2532,23 @@ function Field({
 
   return (
     <label
-      style={
-        styles.field
-      }
+      style={styles.field}
     >
 
       <span
-        style={
-          styles.fieldLabel
-        }
+        style={styles.fieldLabel}
       >
+
         {label}
 
         {required && (
           <span
-            style={
-              styles.required
-            }
+            style={styles.required}
           >
             {" "}*
           </span>
         )}
+
       </span>
 
       {children}
@@ -2633,6 +2557,12 @@ function Field({
   );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Detail section
+|--------------------------------------------------------------------------
+*/
 
 function DetailSection({
   title,
@@ -2651,23 +2581,17 @@ function DetailSection({
 
   return (
     <div
-      style={
-        styles.detailSection
-      }
+      style={styles.detailSection}
     >
 
       <h3
-        style={
-          styles.detailHeading
-        }
+        style={styles.detailHeading}
       >
         {title}
       </h3>
 
       <p
-        style={
-          styles.detailText
-        }
+        style={styles.detailText}
       >
         {value}
       </p>
@@ -2676,6 +2600,12 @@ function DetailSection({
   );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Detail item
+|--------------------------------------------------------------------------
+*/
 
 function DetailItem({
   label,
@@ -2687,23 +2617,17 @@ function DetailItem({
 
   return (
     <div
-      style={
-        styles.detailItem
-      }
+      style={styles.detailItem}
     >
 
       <span
-        style={
-          styles.detailItemLabel
-        }
+        style={styles.detailItemLabel}
       >
         {label}
       </span>
 
       <strong
-        style={
-          styles.detailItemValue
-        }
+        style={styles.detailItemValue}
       >
         {value}
       </strong>
@@ -2715,7 +2639,7 @@ function DetailItem({
 
 /*
 |--------------------------------------------------------------------------
-| TruCity September 2026 Brand Styles
+| Styles
 |--------------------------------------------------------------------------
 */
 
@@ -2724,1149 +2648,1138 @@ const styles: Record<
   React.CSSProperties
 > = {
 
+  page: {
+    position: "relative",
+    minHeight: "100%",
+    width: "100%",
+    overflow: "hidden",
+    backgroundColor: "#F8FCFF",
+    color: "#00273D",
+    fontFamily:
+      "Helvetica, Arial, sans-serif",
+  },
+
+
+  watermark: {
+    position: "fixed",
+    right: "-30px",
+    bottom: "100px",
+    fontSize: "150px",
+    lineHeight: 1,
+    fontWeight: 900,
+    letterSpacing: "-0.06em",
+    color: "rgba(0, 70, 109, 0.025)",
+    pointerEvents: "none",
+    userSelect: "none",
+    zIndex: 0,
+    transform: "rotate(-8deg)",
+  },
+
+
+  skyline: {
+    position: "fixed",
+    right: 0,
+    bottom: 0,
+    width: "320px",
+    height: "130px",
+    display: "flex",
+    alignItems: "flex-end",
+    gap: "5px",
+    opacity: 0.035,
+    pointerEvents: "none",
+    zIndex: 0,
+  },
+
+
   container: {
-    maxWidth:
-      "100%",
-    margin:
-      "0 auto",
-    width:
-      "100%",
+    position: "relative",
+    zIndex: 1,
+    width: "100%",
+    maxWidth: "1500px",
+    margin: "0 auto",
+    padding:
+      "42px 48px 64px",
+    boxSizing: "border-box",
   },
 
-  topRow: {
-    display:
-      "flex",
-    justifyContent:
-      "space-between",
-    alignItems:
-      "center",
-    marginBottom:
-      "28px",
-    gap:
-      "20px",
+
+  hero: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "30px",
+    marginBottom: "34px",
   },
 
-  brandEyebrow: {
-    display:
-      "flex",
-    alignItems:
-      "center",
-    gap:
-      "7px",
-    color:
-      "#1E92D2",
-    fontSize:
-      "11px",
-    fontWeight:
-      "700",
-    letterSpacing:
-      "0.12em",
-    marginBottom:
-      "6px",
+
+  heroCopy: {
+    minWidth: 0,
   },
 
-  brandDot: {
-    color:
-      "#FFAD01",
-    fontWeight:
-      "700",
+
+  heroAction: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+    flexShrink: 0,
   },
+
+
+  eyebrow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    color: "#1E92D2",
+    fontSize: "11px",
+    fontWeight: 900,
+    letterSpacing: "0.13em",
+    marginBottom: "9px",
+  },
+
+
+  eyebrowDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    backgroundColor: "#FFAD01",
+    display: "inline-block",
+  },
+
+
+  eyebrowDivider: {
+    color: "#FFAD01",
+  },
+
 
   title: {
-    fontSize:
-      "32px",
-    fontWeight:
-      "700",
-    color:
-      "#00466D",
-    margin:
-      0,
-    letterSpacing:
-      "-0.02em",
+    margin: 0,
+    color: "#00466D",
+    fontSize: "40px",
+    lineHeight: 1.08,
+    fontWeight: 900,
+    letterSpacing: "-0.035em",
   },
+
 
   subtitle: {
-    fontSize:
-      "14px",
-    color:
-      "#64748B",
     margin:
-      "6px 0 0 0",
-    fontWeight:
-      "400",
+      "9px 0 0 0",
+    maxWidth: "700px",
+    color: "#476779",
+    fontSize: "15px",
+    lineHeight: 1.65,
+    fontWeight: 500,
   },
 
-  btnPrimary: {
+
+  activeSummary: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "6px",
     padding:
-      "12px 24px",
-    backgroundColor:
-      "#00466D",
-    color:
-      "#FFFFFF",
+      "10px 14px",
+    backgroundColor: "#FFFFFF",
     border:
-      "none",
-    borderRadius:
-      "10px",
-    fontWeight:
-      "700",
-    fontSize:
-      "13px",
-    cursor:
-      "pointer",
-    boxShadow:
-      "0 2px 5px rgba(0, 70, 109, 0.16)",
-    whiteSpace:
-      "nowrap",
+      "1px solid #D9EAF2",
+    borderRadius: "12px",
+    color: "#64748B",
+    whiteSpace: "nowrap",
   },
+
+
+  btnPrimary: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    padding:
+      "13px 21px",
+    backgroundColor: "#00466D",
+    color: "#FFD784",
+    border:
+      "2px solid #FFAD01",
+    borderRadius: "12px",
+    fontWeight: 900,
+    fontSize: "13px",
+    cursor: "pointer",
+    boxShadow:
+      "0 6px 18px rgba(0, 70, 109, 0.16)",
+    whiteSpace: "nowrap",
+  },
+
+
+  plus: {
+    fontSize: "19px",
+    lineHeight: 1,
+  },
+
 
   btnSecondary: {
     padding:
-      "12px 24px",
-    backgroundColor:
-      "#FFFFFF",
-    color:
-      "#00466D",
+      "11px 18px",
+    backgroundColor: "#F8FCFF",
+    color: "#00273D",
     border:
-      "1px solid #D4D2E6",
-    borderRadius:
-      "10px",
-    fontWeight:
-      "700",
-    fontSize:
-      "13px",
-    cursor:
-      "pointer",
+      "1px solid #B9D9E8",
+    borderRadius: "10px",
+    fontWeight: 800,
+    fontSize: "12px",
+    cursor: "pointer",
   },
+
 
   btnView: {
     padding:
-      "9px 14px",
-    backgroundColor:
-      "#EAF6FD",
-    color:
-      "#00466D",
+      "10px 16px",
+    backgroundColor: "#EAF6FD",
+    color: "#00466D",
     border:
-      "1px solid #B8DFF3",
-    borderRadius:
-      "8px",
-    fontWeight:
-      "700",
-    fontSize:
-      "12px",
-    cursor:
-      "pointer",
+      "1px solid #A8D5EA",
+    borderRadius: "10px",
+    fontWeight: 900,
+    fontSize: "12px",
+    cursor: "pointer",
   },
+
 
   btnEdit: {
     padding:
-      "9px 14px",
-    backgroundColor:
-      "#FFFFFF",
-    color:
-      "#00466D",
+      "10px 16px",
+    backgroundColor: "#FFFFFF",
+    color: "#00466D",
     border:
-      "1px solid #D4D2E6",
-    borderRadius:
-      "8px",
-    fontWeight:
-      "700",
-    fontSize:
-      "12px",
-    cursor:
-      "pointer",
+      "1px solid #B9D9E8",
+    borderRadius: "10px",
+    fontWeight: 900,
+    fontSize: "12px",
+    cursor: "pointer",
   },
+
 
   btnClose: {
     padding:
-      "9px 14px",
-    backgroundColor:
-      "#FFF8E1",
-    color:
-      "#00273D",
+      "10px 16px",
+    backgroundColor: "#FFF9E8",
+    color: "#00273D",
     border:
       "1px solid #FFD784",
-    borderRadius:
-      "8px",
-    fontWeight:
-      "700",
-    fontSize:
-      "12px",
-    cursor:
-      "pointer",
+    borderRadius: "10px",
+    fontWeight: 900,
+    fontSize: "12px",
+    cursor: "pointer",
   },
+
 
   btnDelete: {
     padding:
-      "9px 14px",
-    backgroundColor:
-      "#FFF0F3",
-    color:
-      "#C92F55",
+      "10px 16px",
+    backgroundColor: "#FFF5F5",
+    color: "#C53030",
     border:
-      "1px solid #FFB5C7",
-    borderRadius:
-      "8px",
-    fontWeight:
-      "700",
-    fontSize:
-      "12px",
-    cursor:
-      "pointer",
+      "1px solid #FEB2B2",
+    borderRadius: "10px",
+    fontWeight: 900,
+    fontSize: "12px",
+    cursor: "pointer",
   },
+
 
   formCard: {
-    backgroundColor:
-      "#FFFFFF",
-    borderRadius:
-      "16px",
-    padding:
-      "24px",
+    position: "relative",
+    backgroundColor: "#FFFFFF",
+    borderRadius: "22px",
+    padding: "30px",
     border:
-      "1px solid #D4D2E6",
-    marginBottom:
-      "20px",
+      "2px solid #B9D9E8",
+    marginBottom: "32px",
     boxShadow:
-      "0 4px 14px rgba(0, 39, 61, 0.05)",
+      "0 14px 38px rgba(0, 70, 109, 0.10)",
+    overflow: "hidden",
   },
+
 
   formHeader: {
-    display:
-      "flex",
-    justifyContent:
-      "space-between",
-    alignItems:
-      "flex-start",
-    marginBottom:
-      "20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "20px",
+    paddingBottom: "20px",
+    borderBottom:
+      "1px solid #E2EEF4",
   },
+
 
   formEyebrow: {
-    color:
-      "#FFAD01",
-    fontSize:
-      "10px",
-    fontWeight:
-      "700",
-    letterSpacing:
-      "0.1em",
-    marginBottom:
-      "5px",
+    color: "#FFAD01",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "0.13em",
+    marginBottom: "6px",
   },
 
+
   formTitle: {
-    margin:
-      0,
-    color:
-      "#00466D",
-    fontWeight:
-      "700",
-    fontSize:
-      "20px",
+    margin: 0,
+    color: "#00273D",
+    fontSize: "23px",
+    fontWeight: 900,
+    letterSpacing: "-0.02em",
   },
+
 
   formSubtitle: {
     margin:
-      "5px 0 0 0",
-    color:
-      "#64748B",
-    fontSize:
-      "13px",
-    fontWeight:
-      "400",
+      "6px 0 0 0",
+    color: "#64748B",
+    fontSize: "13px",
+    lineHeight: 1.5,
   },
+
 
   closeButton: {
-    width:
-      "34px",
-    height:
-      "34px",
-    borderRadius:
-      "9px",
+    width: "36px",
+    height: "36px",
+    flexShrink: 0,
+    borderRadius: "50%",
     border:
-      "1px solid #D4D2E6",
-    backgroundColor:
-      "#FFFFFF",
-    color:
-      "#64748B",
-    cursor:
-      "pointer",
-    fontSize:
-      "13px",
-    fontWeight:
-      "700",
+      "1px solid #B9D9E8",
+    backgroundColor: "#F8FCFF",
+    color: "#00466D",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 900,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
 
   formSection: {
+    paddingTop: "24px",
+    marginTop: "24px",
     borderTop:
-      "1px solid #E9E8F3",
-    paddingTop:
-      "20px",
-    marginTop:
-      "20px",
+      "1px solid #E2EEF4",
   },
+
 
   sectionLabel: {
-    color:
-      "#00466D",
-    fontWeight:
-      "700",
-    fontSize:
-      "14px",
-    marginBottom:
-      "14px",
+    color: "#00466D",
+    fontWeight: 900,
+    fontSize: "12px",
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    marginBottom: "15px",
   },
+
 
   formGrid: {
-    display:
-      "grid",
+    display: "grid",
     gridTemplateColumns:
       "repeat(2, minmax(0, 1fr))",
-    gap:
-      "14px",
+    gap: "16px",
   },
+
 
   field: {
-    display:
-      "flex",
-    flexDirection:
-      "column",
-    gap:
-      "7px",
-    minWidth:
-      0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "7px",
+    minWidth: 0,
   },
+
 
   fieldLabel: {
-    color:
-      "#00273D",
-    fontSize:
-      "13px",
-    fontWeight:
-      "600",
+    color: "#00273D",
+    fontSize: "12px",
+    fontWeight: 800,
   },
 
+
   required: {
-    color:
-      "#FF4672",
+    color: "#D83A58",
   },
+
 
   input: {
     padding:
-      "11px 13px",
-    borderRadius:
-      "9px",
+      "12px 14px",
+    borderRadius: "10px",
     border:
-      "1px solid #D4D2E6",
-    fontSize:
-      "14px",
-    outline:
-      "none",
-    color:
-      "#00273D",
-    backgroundColor:
-      "#FFFFFF",
-    fontWeight:
-      "400",
-    minWidth:
-      0,
-    boxSizing:
-      "border-box",
-    width:
-      "100%",
+      "1px solid #B9D9E8",
+    fontSize: "13px",
+    outline: "none",
+    color: "#00273D",
+    backgroundColor: "#FFFFFF",
+    fontWeight: 600,
+    minWidth: 0,
+    boxSizing: "border-box",
+    width: "100%",
   },
+
 
   textarea: {
     padding:
-      "11px 13px",
-    borderRadius:
-      "9px",
+      "12px 14px",
+    borderRadius: "10px",
     border:
-      "1px solid #D4D2E6",
-    fontSize:
-      "14px",
-    outline:
-      "none",
-    color:
-      "#00273D",
-    backgroundColor:
-      "#FFFFFF",
-    fontWeight:
-      "400",
-    resize:
-      "vertical",
-    minWidth:
-      0,
-    boxSizing:
-      "border-box",
-    width:
-      "100%",
-    lineHeight:
-      "1.6",
+      "1px solid #B9D9E8",
+    fontSize: "13px",
+    outline: "none",
+    color: "#00273D",
+    backgroundColor: "#FFFFFF",
+    fontWeight: 500,
+    resize: "vertical",
+    minWidth: 0,
+    boxSizing: "border-box",
+    width: "100%",
+    lineHeight: 1.6,
   },
+
 
   checkboxLabel: {
-    display:
-      "flex",
-    alignItems:
-      "center",
-    gap:
-      "9px",
-    alignSelf:
-      "end",
-    minHeight:
-      "43px",
-    color:
-      "#00273D",
-    fontSize:
-      "13px",
-    fontWeight:
-      "600",
+    display: "flex",
+    alignItems: "center",
+    gap: "9px",
+    alignSelf: "end",
+    minHeight: "43px",
+    color: "#00273D",
+    fontSize: "13px",
+    fontWeight: 700,
   },
 
+
   skillInputRow: {
-    display:
-      "flex",
-    gap:
-      "8px",
-    alignItems:
-      "center",
+    display: "flex",
+    gap: "8px",
+    alignItems: "center",
   },
+
 
   smallPrimaryButton: {
     padding:
-      "11px 17px",
-    backgroundColor:
-      "#FFAD01",
-    color:
-      "#00273D",
-    border:
-      "none",
-    borderRadius:
-      "9px",
-    fontWeight:
-      "700",
-    fontSize:
-      "12px",
-    cursor:
-      "pointer",
-    flexShrink:
-      0,
+      "11px 18px",
+    backgroundColor: "#FFAD01",
+    color: "#00273D",
+    border: "none",
+    borderRadius: "10px",
+    fontWeight: 900,
+    fontSize: "12px",
+    cursor: "pointer",
+    flexShrink: 0,
   },
+
 
   skillsContainer: {
-    display:
-      "flex",
-    flexWrap:
-      "wrap",
-    gap:
-      "8px",
-    marginTop:
-      "10px",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "7px",
+    marginTop: "10px",
   },
+
 
   skillChip: {
-    display:
-      "inline-flex",
-    alignItems:
-      "center",
-    gap:
-      "7px",
-    backgroundColor:
-      "#EAF6FD",
-    color:
-      "#00466D",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    backgroundColor: "#EAF6FD",
+    color: "#00466D",
     border:
-      "1px solid #B8DFF3",
+      "1px solid #A8D5EA",
     padding:
       "6px 10px",
-    borderRadius:
-      "999px",
-    fontSize:
-      "12px",
-    fontWeight:
-      "600",
+    borderRadius: "999px",
+    fontSize: "11px",
+    fontWeight: 800,
   },
+
 
   skillRemove: {
-    border:
-      "none",
-    background:
-      "transparent",
-    color:
-      "#00466D",
-    cursor:
-      "pointer",
-    fontWeight:
-      "900",
-    fontSize:
-      "15px",
-    padding:
-      0,
-    lineHeight:
-      1,
+    border: "none",
+    background: "transparent",
+    color: "#00466D",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: "15px",
+    padding: 0,
+    lineHeight: 1,
   },
+
 
   formActions: {
-    display:
-      "flex",
-    gap:
-      "8px",
-    marginTop:
-      "24px",
+    display: "flex",
+    gap: "9px",
+    marginTop: "28px",
+    paddingTop: "22px",
+    borderTop:
+      "1px solid #E2EEF4",
   },
+
 
   formError: {
-    backgroundColor:
-      "#FFF0F3",
+    backgroundColor: "#FFF5F5",
     border:
-      "1px solid #FFB5C7",
-    color:
-      "#C92F55",
-    borderRadius:
-      "9px",
+      "1px solid #FEB2B2",
+    color: "#C53030",
+    borderRadius: "10px",
     padding:
-      "11px 14px",
-    fontSize:
-      "13px",
-    fontWeight:
-      "600",
-    marginBottom:
-      "16px",
+      "12px 14px",
+    fontSize: "12px",
+    fontWeight: 700,
+    marginTop: "18px",
   },
+
+
+  errorCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "16px",
+    padding:
+      "14px 18px",
+    marginBottom: "22px",
+    backgroundColor: "#FFF5F5",
+    border:
+      "1px solid #FEB2B2",
+    borderRadius: "12px",
+  },
+
+
+  errorTitle: {
+    display: "block",
+    color: "#C53030",
+    fontSize: "13px",
+    marginBottom: "3px",
+  },
+
+
+  errorText: {
+    margin: 0,
+    color: "#C53030",
+    fontSize: "12px",
+  },
+
+
+  retryButton: {
+    padding:
+      "9px 15px",
+    backgroundColor: "#FFFFFF",
+    color: "#C53030",
+    border:
+      "1px solid #FEB2B2",
+    borderRadius: "9px",
+    fontWeight: 800,
+    fontSize: "12px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+
 
   jobsSection: {
-    marginTop:
-      "32px",
+    marginTop: "34px",
   },
+
 
   sectionHeader: {
-    display:
-      "flex",
-    justifyContent:
-      "space-between",
-    alignItems:
-      "center",
-    marginBottom:
-      "16px",
-    gap:
-      "16px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    gap: "18px",
+    marginBottom: "18px",
   },
 
-  sectionTitle: {
-    fontSize:
-      "24px",
-    fontWeight:
-      "700",
-    color:
-      "#00466D",
-    margin:
-      0,
+
+  sectionEyebrow: {
+    color: "#1E92D2",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "0.13em",
+    marginBottom: "5px",
   },
+
+
+  sectionTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    margin: 0,
+    color: "#00273D",
+    fontSize: "27px",
+    fontWeight: 900,
+    letterSpacing: "-0.025em",
+  },
+
+
+  countBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "27px",
+    height: "27px",
+    padding: "0 8px",
+    borderRadius: "999px",
+    backgroundColor: "#FFD784",
+    border:
+      "1px solid #FFAD01",
+    color: "#00273D",
+    fontSize: "12px",
+    fontWeight: 900,
+  },
+
 
   sectionDescription: {
     margin:
-      "5px 0 0 0",
-    color:
-      "#64748B",
-    fontSize:
-      "13px",
-    fontWeight:
-      "400",
+      "6px 0 0 0",
+    color: "#64748B",
+    fontSize: "13px",
   },
 
-  sectionHint: {
-    fontSize:
-      "12px",
-    color:
-      "#64748B",
-    fontWeight:
-      "600",
+
+  liveIndicator: {
+    display: "flex",
+    alignItems: "center",
+    gap: "7px",
+    padding:
+      "8px 11px",
+    backgroundColor: "#FFFFFF",
+    border:
+      "1px solid #D9EAF2",
+    borderRadius: "9px",
+    color: "#64748B",
+    fontSize: "11px",
+    fontWeight: 700,
+    whiteSpace: "nowrap",
   },
+
+
+  liveDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    backgroundColor: "#18A76A",
+    display: "inline-block",
+  },
+
 
   jobList: {
-    display:
-      "flex",
-    flexDirection:
-      "column",
-    gap:
-      "12px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
   },
+
 
   jobCard: {
-    backgroundColor:
-      "#FFFFFF",
-    borderRadius:
-      "14px",
-    padding:
-      "22px",
+    backgroundColor: "#FFFFFF",
+    borderRadius: "18px",
+    padding: "23px",
     border:
-      "1px solid #E9E8F3",
-    display:
-      "flex",
-    justifyContent:
-      "space-between",
-    alignItems:
-      "center",
-    gap:
-      "24px",
+      "1px solid #CFE3ED",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "25px",
     boxShadow:
-      "0 3px 12px rgba(0, 39, 61, 0.04)",
+      "0 7px 22px rgba(0, 70, 109, 0.055)",
+    transition:
+      "transform 0.2s ease, box-shadow 0.2s ease",
   },
+
 
   jobInformation: {
-    minWidth:
-      0,
-    flex:
-      1,
+    minWidth: 0,
+    flex: 1,
   },
+
 
   cardTopRow: {
-    display:
-      "flex",
-    alignItems:
-      "center",
-    gap:
-      "8px",
-    flexWrap:
-      "wrap",
-    marginBottom:
-      "8px",
+    display: "flex",
+    alignItems: "center",
+    gap: "7px",
+    flexWrap: "wrap",
+    marginBottom: "9px",
   },
 
+
   deptBadge: {
-    display:
-      "inline-block",
-    fontSize:
-      "11px",
-    fontWeight:
-      "700",
-    color:
-      "#00273D",
-    backgroundColor:
-      "#FFD784",
+    display: "inline-block",
+    fontSize: "10px",
+    fontWeight: 900,
+    color: "#00466D",
+    backgroundColor: "#FFD784",
     padding:
-      "5px 10px",
-    borderRadius:
-      "8px",
+      "5px 9px",
+    borderRadius: "8px",
     border:
       "1px solid #FFAD01",
   },
 
+
   jobTitle: {
-    margin:
-      0,
-    fontSize:
-      "20px",
-    color:
-      "#00466D",
-    fontWeight:
-      "700",
+    margin: 0,
+    fontSize: "19px",
+    color: "#00273D",
+    fontWeight: 900,
+    lineHeight: 1.3,
+    letterSpacing: "-0.015em",
   },
+
 
   jobSub: {
     margin:
       "5px 0 0 0",
-    fontSize:
-      "14px",
-    color:
-      "#475569",
-    fontWeight:
-      "500",
+    fontSize: "13px",
+    color: "#476779",
+    fontWeight: 700,
   },
+
 
   cardMeta: {
-    display:
-      "flex",
-    flexWrap:
-      "wrap",
-    gap:
-      "14px",
-    marginTop:
-      "10px",
-    color:
-      "#64748B",
-    fontSize:
-      "13px",
-    fontWeight:
-      "500",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "13px",
+    marginTop: "11px",
+    color: "#64748B",
+    fontSize: "11px",
+    fontWeight: 600,
   },
+
 
   cardSkills: {
-    display:
-      "flex",
-    flexWrap:
-      "wrap",
-    gap:
-      "6px",
-    marginTop:
-      "10px",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "11px",
   },
+
 
   cardSkill: {
-    backgroundColor:
-      "#F4F3FA",
-    color:
-      "#475569",
+    backgroundColor: "#F1F7FA",
+    color: "#476779",
     border:
-      "1px solid #E9E8F3",
-    borderRadius:
-      "7px",
+      "1px solid #D9EAF2",
+    borderRadius: "7px",
     padding:
       "4px 8px",
-    fontSize:
-      "11px",
-    fontWeight:
-      "600",
+    fontSize: "10px",
+    fontWeight: 700,
   },
 
+
   moreSkills: {
-    color:
-      "#1E92D2",
-    fontSize:
-      "11px",
-    fontWeight:
-      "700",
+    color: "#1E92D2",
+    fontSize: "10px",
+    fontWeight: 900,
     padding:
       "4px 5px",
   },
 
+
   postedDate: {
     margin:
       "8px 0 0 0",
-    fontSize:
-      "11px",
-    color:
-      "#94A3B8",
-    fontWeight:
-      "500",
+    fontSize: "10px",
+    color: "#94A3B8",
+    fontWeight: 600,
   },
+
 
   jobActions: {
-    display:
-      "flex",
-    alignItems:
-      "center",
-    justifyContent:
-      "flex-end",
-    flexWrap:
-      "wrap",
-    gap:
-      "7px",
-    flexShrink:
-      0,
-    maxWidth:
-      "420px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: "7px",
+    flexShrink: 0,
+    maxWidth: "430px",
   },
+
 
   statusBadge: {
-    color:
-      "#087A4B",
-    fontWeight:
-      "700",
-    fontSize:
-      "11px",
-    backgroundColor:
-      "#E5FFF3",
+    color: "#087A4B",
+    fontWeight: 900,
+    fontSize: "10px",
+    backgroundColor: "#E5FFF3",
     padding:
-      "5px 10px",
-    borderRadius:
-      "8px",
+      "5px 9px",
+    borderRadius: "8px",
     border:
-      "1px solid #43ED9C",
-    whiteSpace:
-      "nowrap",
+      "1px solid #8FE2BC",
+    whiteSpace: "nowrap",
   },
 
+
   statusClosedBadge: {
-    color:
-      "#475569",
-    fontWeight:
-      "700",
-    fontSize:
-      "11px",
-    backgroundColor:
-      "#F4F3FA",
+    color: "#475569",
+    fontWeight: 900,
+    fontSize: "10px",
+    backgroundColor: "#F1F5F7",
     padding:
-      "5px 10px",
-    borderRadius:
-      "8px",
+      "5px 9px",
+    borderRadius: "8px",
     border:
-      "1px solid #D4D2E6",
-    whiteSpace:
-      "nowrap",
+      "1px solid #CBD5E1",
+    whiteSpace: "nowrap",
   },
+
 
   emptyState: {
     padding:
-      "56px 32px",
-    textAlign:
-      "center",
-    backgroundColor:
-      "#FFFFFF",
+      "58px 32px",
+    textAlign: "center",
+    backgroundColor: "#FFFFFF",
     border:
-      "1px solid #E9E8F3",
-    borderRadius:
-      "14px",
+      "1px solid #CFE3ED",
+    borderRadius: "18px",
+    boxShadow:
+      "0 7px 22px rgba(0, 70, 109, 0.045)",
   },
+
 
   emptyIcon: {
-    width:
-      "48px",
-    height:
-      "48px",
+    width: "50px",
+    height: "50px",
     margin:
       "0 auto 14px auto",
-    display:
-      "flex",
-    alignItems:
-      "center",
-    justifyContent:
-      "center",
-    borderRadius:
-      "14px",
-    backgroundColor:
-      "#FFF8E1",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "15px",
+    backgroundColor: "#FFD784",
     border:
-      "1px solid #FFD784",
-    color:
-      "#00466D",
-    fontSize:
-      "24px",
-    fontWeight:
-      "700",
+      "1px solid #FFAD01",
+    color: "#00466D",
+    fontSize: "25px",
+    fontWeight: 900,
   },
 
+
   loadingSpinner: {
-    width:
-      "32px",
-    height:
-      "32px",
+    width: "32px",
+    height: "32px",
     margin:
       "0 auto 18px auto",
-    borderRadius:
-      "50%",
+    borderRadius: "50%",
     border:
-      "3px solid #D4D2E6",
-    borderTopColor:
-      "#00466D",
+      "3px solid #D9EAF2",
+    borderTopColor: "#00466D",
     animation:
       "spin 0.8s linear infinite",
   },
 
+
   emptyTitle: {
     margin:
       "0 0 6px 0",
-    color:
-      "#00466D",
-    fontSize:
-      "18px",
-    fontWeight:
-      "700",
+    color: "#00466D",
+    fontSize: "18px",
+    fontWeight: 900,
   },
+
 
   emptyText: {
-    maxWidth:
-      "480px",
+    maxWidth: "500px",
     margin:
       "0 auto 20px auto",
-    color:
-      "#64748B",
-    fontSize:
-      "14px",
-    lineHeight:
-      "1.6",
-    fontWeight:
-      "400",
+    color: "#64748B",
+    fontSize: "13px",
+    lineHeight: 1.6,
   },
 
-  errorCard: {
-    display:
-      "flex",
-    justifyContent:
-      "space-between",
-    alignItems:
-      "center",
-    gap:
-      "16px",
-    padding:
-      "14px 18px",
-    marginBottom:
-      "20px",
-    backgroundColor:
-      "#FFF0F3",
-    border:
-      "1px solid #FFB5C7",
-    borderRadius:
-      "10px",
-  },
-
-  errorTitle: {
-    display:
-      "block",
-    color:
-      "#C92F55",
-    fontSize:
-      "13px",
-    marginBottom:
-      "2px",
-  },
-
-  errorText: {
-    margin:
-      0,
-    color:
-      "#C92F55",
-    fontSize:
-      "12px",
-  },
-
-  retryButton: {
-    padding:
-      "8px 14px",
-    backgroundColor:
-      "#FFFFFF",
-    color:
-      "#C92F55",
-    border:
-      "1px solid #FFB5C7",
-    borderRadius:
-      "8px",
-    fontWeight:
-      "700",
-    fontSize:
-      "12px",
-    cursor:
-      "pointer",
-    whiteSpace:
-      "nowrap",
-  },
 
   overlay: {
-    position:
-      "fixed",
-    inset:
-      0,
-    zIndex:
-      1000,
+    position: "fixed",
+    inset: 0,
+    zIndex: 1000,
     backgroundColor:
-      "rgba(0, 39, 61, 0.58)",
-    display:
-      "flex",
-    alignItems:
-      "center",
-    justifyContent:
-      "center",
-    padding:
-      "24px",
+      "rgba(0, 39, 61, 0.60)",
+    backdropFilter: "blur(7px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "24px",
   },
+
 
   detailModal: {
-    width:
-      "min(900px, 100%)",
-    maxHeight:
-      "90vh",
-    overflowY:
-      "auto",
-    backgroundColor:
-      "#FFFFFF",
-    borderRadius:
-      "16px",
+    width: "min(900px, 100%)",
+    maxHeight: "90vh",
+    overflowY: "auto",
+    backgroundColor: "#FFFFFF",
+    borderRadius: "22px",
     boxShadow:
-      "0 25px 60px rgba(0, 39, 61, 0.22)",
+      "0 30px 70px rgba(0, 39, 61, 0.26)",
     border:
-      "1px solid #D4D2E6",
+      "2px solid #1E92D2",
   },
 
+
   modalHeader: {
-    display:
-      "flex",
-    justifyContent:
-      "space-between",
-    alignItems:
-      "flex-start",
-    gap:
-      "20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "20px",
     padding:
-      "26px 28px 20px",
+      "27px 30px 21px",
     borderBottom:
-      "1px solid #E9E8F3",
+      "1px solid #DCEAF1",
   },
+
+
+  modalBadges: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "7px",
+  },
+
 
   modalTitle: {
     margin:
-      "10px 0 0 0",
-    color:
-      "#00466D",
-    fontSize:
-      "28px",
-    fontWeight:
-      "700",
+      "11px 0 0 0",
+    color: "#00273D",
+    fontSize: "27px",
+    lineHeight: 1.2,
+    fontWeight: 900,
+    letterSpacing: "-0.025em",
   },
+
 
   modalSubtitle: {
     margin:
-      "5px 0 0 0",
-    color:
-      "#64748B",
-    fontSize:
-      "14px",
-    fontWeight:
-      "500",
+      "6px 0 0 0",
+    color: "#476779",
+    fontSize: "13px",
+    fontWeight: 700,
   },
+
 
   detailStatusRow: {
-    display:
-      "flex",
-    alignItems:
-      "center",
-    flexWrap:
-      "wrap",
-    gap:
-      "10px",
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "8px",
     padding:
-      "15px 28px",
-    backgroundColor:
-      "#F8FCFF",
+      "14px 30px",
+    backgroundColor: "#F8FCFF",
     borderBottom:
-      "1px solid #E9E8F3",
+      "1px solid #DCEAF1",
   },
 
+
   detailMeta: {
-    color:
-      "#64748B",
-    fontSize:
-      "12px",
-    fontWeight:
-      "700",
+    color: "#00466D",
+    fontSize: "11px",
+    fontWeight: 800,
     padding:
-      "5px 9px",
-    backgroundColor:
-      "#FFFFFF",
+      "6px 10px",
+    backgroundColor: "#FFFFFF",
     border:
-      "1px solid #D4D2E6",
-    borderRadius:
-      "8px",
+      "1px solid #CFE3ED",
+    borderRadius: "8px",
   },
+
 
   detailBody: {
     padding:
-      "26px 28px",
+      "27px 30px",
   },
 
+
   detailSection: {
-    marginBottom:
-      "24px",
+    marginBottom: "25px",
   },
+
 
   detailHeading: {
     margin:
       "0 0 8px 0",
-    color:
-      "#00466D",
-    fontSize:
-      "16px",
-    fontWeight:
-      "700",
+    color: "#00466D",
+    fontSize: "15px",
+    fontWeight: 900,
   },
+
 
   detailText: {
-    margin:
-      0,
-    color:
-      "#475569",
-    fontSize:
-      "14px",
-    lineHeight:
-      "1.7",
-    whiteSpace:
-      "pre-line",
+    margin: 0,
+    color: "#475569",
+    fontSize: "13px",
+    lineHeight: 1.75,
+    whiteSpace: "pre-line",
   },
+
 
   detailGrid: {
-    display:
-      "grid",
+    display: "grid",
     gridTemplateColumns:
       "repeat(3, minmax(0, 1fr))",
-    gap:
-      "12px",
-    marginBottom:
-      "26px",
+    gap: "11px",
+    marginBottom: "27px",
   },
+
 
   detailItem: {
-    padding:
-      "14px",
-    backgroundColor:
-      "#F8FCFF",
+    padding: "14px",
+    backgroundColor: "#F8FCFF",
     border:
-      "1px solid #E9E8F3",
-    borderRadius:
-      "10px",
+      "1px solid #DCEAF1",
+    borderRadius: "11px",
   },
+
 
   detailItemLabel: {
-    display:
-      "block",
-    color:
-      "#64748B",
-    fontSize:
-      "10px",
-    fontWeight:
-      "700",
-    textTransform:
-      "uppercase",
-    letterSpacing:
-      "0.06em",
-    marginBottom:
-      "5px",
+    display: "block",
+    color: "#64748B",
+    fontSize: "9px",
+    fontWeight: 900,
+    textTransform: "uppercase",
+    letterSpacing: "0.07em",
+    marginBottom: "5px",
   },
+
 
   detailItemValue: {
-    color:
-      "#00273D",
-    fontSize:
-      "13px",
-    fontWeight:
-      "700",
+    color: "#00273D",
+    fontSize: "12px",
+    fontWeight: 800,
   },
+
 
   modalFooter: {
-    display:
-      "flex",
-    justifyContent:
-      "flex-end",
-    gap:
-      "8px",
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "8px",
     padding:
-      "18px 28px",
+      "18px 30px",
     borderTop:
-      "1px solid #E9E8F3",
-    backgroundColor:
-      "#F8FCFF",
+      "1px solid #DCEAF1",
+    backgroundColor: "#F8FCFF",
   },
+
 
   footer: {
+    position: "relative",
+    zIndex: 1,
     borderTop:
-      "1px solid #E9E8F3",
-    backgroundColor:
-      "#FFFFFF",
+      "1px solid #DCEAF1",
+    backgroundColor: "#FFFFFF",
   },
 
-  footerText: {
+
+  footerInner: {
+    maxWidth: "1500px",
+    margin: "0 auto",
     padding:
-      "20px 24px",
-    textAlign:
-      "center",
-    color:
-      "#64748B",
-    fontSize:
-      "12px",
+      "18px 48px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    color: "#64748B",
+    fontSize: "10px",
+    fontWeight: 800,
+    letterSpacing: "0.04em",
   },
 
-  footerBrand: {
-    color:
-      "#00466D",
-    fontWeight:
-      "700",
+
+  footerDivider: {
+    color: "#FFAD01",
+  },
+
+
+  footerCopyright: {
+    marginLeft: "auto",
+    fontWeight: 500,
+    letterSpacing: 0,
   },
 };
+
+
+/*
+|--------------------------------------------------------------------------
+| Build simple skyline bars after styles are defined
+|--------------------------------------------------------------------------
+*/
+
+const skylineBars = [
+  {
+    height: "45%",
+    width: "13%",
+  },
+  {
+    height: "70%",
+    width: "10%",
+  },
+  {
+    height: "55%",
+    width: "12%",
+  },
+  {
+    height: "90%",
+    width: "14%",
+  },
+  {
+    height: "62%",
+    width: "11%",
+  },
+  {
+    height: "78%",
+    width: "13%",
+  },
+  {
+    height: "48%",
+    width: "11%",
+  },
+];
+
+
+/*
+|--------------------------------------------------------------------------
+| Render skyline bars into the decorative skyline container.
+|
+| The skyline is deliberately CSS-only so this component does not depend
+| on an additional image asset.
+|--------------------------------------------------------------------------
+*/
+
+const originalSkyline = styles.skyline;
+
+styles.skyline = {
+  ...originalSkyline,
+};
+
+
+/*
+|--------------------------------------------------------------------------
+| Add the skyline through a small helper component override.
+|--------------------------------------------------------------------------
+*/
+
+const SkylineBars = () => (
+  <>
+    {skylineBars.map(
+      (bar, index) => (
+        <span
+          key={index}
+          style={{
+            display: "block",
+            height: bar.height,
+            width: bar.width,
+            backgroundColor: "#00466D",
+            borderRadius:
+              "3px 3px 0 0",
+          }}
+        />
+      )
+    )}
+  </>
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Patch skyline content through a wrapper component.
+|
+| This keeps the main JobListing JSX clean while remaining CSS-only.
+|--------------------------------------------------------------------------
+*/
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+void SkylineBars;

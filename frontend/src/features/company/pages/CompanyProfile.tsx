@@ -1,1476 +1,1430 @@
-import React, { useEffect, useState } from 'react';
-import companyService from '../company.service';
-import type { CompanyProfile as CompanyProfileType } from '../company.types';
-
-import logo from '../../../assets/branding/trucity-logo.png';
+import React, { useEffect, useState } from "react";
+import companyService from "../company.service";
+import type { CompanyProfile as CompanyProfileType } from "../company.types";
+import logo from "../../../assets/branding/trucity-logo.png";
 
 export default function CompanyProfile() {
-  const [profile, setProfile] =
-    useState<CompanyProfileType | null>(null);
-
-  const [formData, setFormData] =
-    useState<CompanyProfileType | null>(null);
+  const [profile, setProfile] = useState<CompanyProfileType | null>(null);
+  const [formData, setFormData] = useState<CompanyProfileType | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     loadProfile();
   }, []);
 
-  /*
-   * =========================================================
-   * LOAD REAL COMPANY PROFILE
-   * =========================================================
-   */
-
   const loadProfile = async () => {
     try {
       setLoading(true);
-      setMessage('');
+      setMessage(null);
 
-      const currentProfile =
-        await companyService.getProfile();
+      const data = await companyService.getProfile();
 
-      if (!currentProfile) {
+      if (data) {
+        setProfile(data);
+        setFormData(data);
+      } else {
         setProfile(null);
         setFormData(null);
-        setMessage(
-          'No company profile was found for this account.'
-        );
-        return;
       }
-
-      setProfile(currentProfile);
-      setFormData(currentProfile);
     } catch (error) {
-      console.error(
-        'Failed to load company profile:',
-        error
-      );
+      console.error("Failed to load company profile:", error);
 
-      setProfile(null);
-      setFormData(null);
-
-      setMessage(
-        'Unable to load the company profile.'
-      );
+      setMessage({
+        type: "error",
+        text: "Unable to load your company profile. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  /*
-   * =========================================================
-   * HANDLE FIELD CHANGE
-   * =========================================================
-   */
-
   const handleChange = (
     field: keyof CompanyProfileType,
     value: string
   ) => {
-    setFormData((previous) => {
-      if (!previous) {
-        return previous;
-      }
+    if (!formData) return;
 
-      return {
-        ...previous,
-        [field]: value,
-      };
+    setFormData({
+      ...formData,
+      [field]: value,
     });
   };
-
-  /*
-   * =========================================================
-   * EDIT
-   * =========================================================
-   */
 
   const handleEdit = () => {
-    if (!profile) {
-      return;
-    }
+    if (!profile) return;
 
-    setMessage('');
-    setFormData({
-      ...profile,
-    });
-
+    setFormData({ ...profile });
     setEditing(true);
+    setMessage(null);
   };
-
-  /*
-   * =========================================================
-   * CANCEL
-   * =========================================================
-   */
 
   const handleCancel = () => {
-    if (profile) {
-      setFormData({
-        ...profile,
-      });
-    }
-
-    setMessage('');
+    setFormData(profile ? { ...profile } : null);
     setEditing(false);
+    setMessage(null);
   };
 
-  /*
-   * =========================================================
-   * SAVE
-   * =========================================================
-   */
-
   const handleSave = async () => {
-    if (!formData) {
-      return;
-    }
+    if (!formData) return;
 
     try {
       setSaving(true);
-      setMessage('');
+      setMessage(null);
 
-      const updatedProfile: CompanyProfileType = {
+      const updatedProfile = {
         ...formData,
         updatedAt: new Date().toISOString(),
       };
 
       const savedProfile =
-        await companyService.saveProfile(
-          updatedProfile
-        );
+        await companyService.saveProfile(updatedProfile);
 
       setProfile(savedProfile);
       setFormData(savedProfile);
       setEditing(false);
 
-      setMessage(
-        'Company profile updated successfully.'
-      );
+      setMessage({
+        type: "success",
+        text: "Company profile updated successfully.",
+      });
     } catch (error) {
-      console.error(
-        'Failed to save company profile:',
-        error
-      );
+      console.error("Failed to save company profile:", error);
 
-      setMessage(
-        'Unable to save the company profile. Please try again.'
-      );
+      setMessage({
+        type: "error",
+        text: "Unable to save your changes. Please try again.",
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  /*
-   * =========================================================
-   * LOADING
-   * =========================================================
-   */
-
   if (loading) {
     return (
-      <div style={styles.loadingCard}>
-        <div style={styles.loadingSpinner} />
+      <div style={styles.page}>
+        <Watermark />
 
-        <p style={styles.loadingText}>
-          Loading company profile...
-        </p>
+        <div style={styles.loadingCard}>
+          <div style={styles.spinner} />
+
+          <h2 style={styles.loadingTitle}>
+            Loading company profile
+          </h2>
+
+          <p style={styles.loadingText}>
+            Please wait while we retrieve your company information.
+          </p>
+        </div>
       </div>
     );
   }
 
-  /*
-   * =========================================================
-   * NO PROFILE
-   * =========================================================
-   */
-
   if (!profile || !formData) {
     return (
-      <div>
-        <div style={styles.headerArea}>
-          <div>
-            <div style={styles.eyebrow}>
-              COMPANY ACCOUNT
-            </div>
-
-            <h1 style={styles.title}>
-              Company Profile
-            </h1>
-
-            <p style={styles.subtitle}>
-              View and manage your organisation's information,
-              contact details and verification status.
-            </p>
-          </div>
-        </div>
+      <div style={styles.page}>
+        <Watermark />
 
         <div style={styles.emptyCard}>
-          <div style={styles.emptyIcon}>
-            !
-          </div>
+          <div style={styles.emptyIcon}>!</div>
 
           <h2 style={styles.emptyTitle}>
-            No company profile found
+            Company profile unavailable
           </h2>
 
           <p style={styles.emptyText}>
-            There is no company profile associated with
-            the currently logged-in employer account.
+            We couldn't retrieve your company profile at the moment.
           </p>
-
-          {message && (
-            <div style={styles.errorBanner}>
-              {message}
-            </div>
-          )}
 
           <button
             type="button"
-            style={styles.primaryButton}
             onClick={loadProfile}
+            style={styles.primaryButton}
           >
-            Retry
+            Try Again
           </button>
         </div>
       </div>
     );
   }
 
-  /*
-   * =========================================================
-   * MAIN PROFILE
-   * =========================================================
-   */
+  const verification = getVerificationStatus(
+    profile.verificationStatus
+  );
 
   return (
-    <div>
+    <div style={styles.page}>
+      <Watermark />
 
-      {/* Header */}
+      {/* Decorative branding */}
+      <div style={styles.decorCircleOne} />
+      <div style={styles.decorCircleTwo} />
+      <div style={styles.decorCircleThree} />
+      <div style={styles.decorCircleFour} />
 
-      <div style={styles.headerArea}>
-
-        <div>
-          <div style={styles.eyebrow}>
-            COMPANY ACCOUNT
-          </div>
-
-          <h1 style={styles.title}>
-            Company Profile
-          </h1>
-
-          <p style={styles.subtitle}>
-            View and manage your organisation's information,
-            contact details and verification status.
-          </p>
-        </div>
-
-        <div style={styles.headerActions}>
-
-          {!editing ? (
-
-            <button
-              type="button"
-              style={styles.primaryButton}
-              onClick={handleEdit}
-            >
-              Edit Profile
-            </button>
-
-          ) : (
-
-            <>
-              <button
-                type="button"
-                style={styles.cancelButton}
-                onClick={handleCancel}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                style={styles.primaryButton}
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving
-                  ? 'Saving...'
-                  : 'Save Changes'}
-              </button>
-            </>
-
-          )}
-
-        </div>
-
-      </div>
-
-      {/* Message */}
-
-      {message && (
-        <div
-          style={{
-            ...styles.messageBanner,
-
-            ...(message.includes('Unable') ||
-            message.includes('No company')
-              ? styles.errorBanner
-              : styles.successBanner),
-          }}
-        >
-          {message}
-        </div>
-      )}
-
-      {/* Profile Overview */}
-
-      <div style={styles.profileGrid}>
-
-        {/* Company Identity */}
-
-        <section style={styles.card}>
-
-          <div style={styles.cardHeader}>
-
-            <div>
-
-              <h2 style={styles.cardTitle}>
-                Company Identity
-              </h2>
-
-              <p style={styles.cardDescription}>
-                Core information about your organisation.
-              </p>
-
-            </div>
-
-            <div
-              style={getVerificationBadgeStyle(
-                profile.verificationStatus
-              )}
-            >
-
-              <span
-                style={getVerificationDotStyle(
-                  profile.verificationStatus
-                )}
-              />
-
-              {formatVerificationStatus(
-                profile.verificationStatus
-              )}
-
-            </div>
-
-          </div>
-
-          {/* Company Logo */}
-
-          <div style={styles.logoSection}>
-
-            <div style={styles.logoWrapper}>
-
+      <div style={styles.container}>
+        {/* Header */}
+        <header style={styles.header}>
+          <div style={styles.headerLeft}>
+            <div style={styles.logoWrap}>
               <img
                 src={logo}
                 alt="TruCity"
-                style={styles.profileLogo}
+                style={styles.logo}
               />
-
             </div>
 
             <div>
-
-              <div style={styles.logoTitle}>
-                {profile.tradingName ||
-                  profile.legalName ||
-                  'Company'}
+              <div style={styles.eyebrow}>
+                COMPANY ACCOUNT
               </div>
 
-              <div style={styles.logoDescription}>
-                Company information registered on
-                the TruCity platform.
+              <h1 style={styles.title}>
+                Company Profile
+              </h1>
+
+              <p style={styles.subtitle}>
+                Manage your company's verified information and
+                contact details.
+              </p>
+            </div>
+          </div>
+
+          <div style={styles.headerActions}>
+            {!editing ? (
+              <button
+                type="button"
+                onClick={handleEdit}
+                style={styles.primaryButton}
+              >
+                <span style={styles.buttonIcon}>✎</span>
+                Edit Profile
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={saving}
+                  style={styles.secondaryButton}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  style={{
+                    ...styles.primaryButton,
+                    opacity: saving ? 0.65 : 1,
+                  }}
+                >
+                  {saving ? (
+                    <>
+                      <span style={styles.smallSpinner} />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <span style={styles.buttonIcon}>✓</span>
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </header>
+
+        {/* Message */}
+        {message && (
+          <div
+            style={{
+              ...styles.message,
+              ...(message.type === "success"
+                ? styles.successMessage
+                : styles.errorMessage),
+            }}
+          >
+            <div
+              style={{
+                ...styles.messageIcon,
+                ...(message.type === "success"
+                  ? styles.successIcon
+                  : styles.errorIcon),
+              }}
+            >
+              {message.type === "success" ? "✓" : "!"}
+            </div>
+
+            <span>{message.text}</span>
+          </div>
+        )}
+
+        {/* Profile overview */}
+        <section style={styles.profileHero}>
+          <div style={styles.heroBrand}>
+            <div style={styles.companyLogo}>
+              <img
+                src={logo}
+                alt="TruCity"
+                style={styles.heroLogo}
+              />
+            </div>
+
+            <div>
+              <div style={styles.heroLabel}>
+                VERIFIED COMPANY
               </div>
 
-            </div>
-
-          </div>
-
-          {/* Identity Fields */}
-
-          <div style={styles.formGrid}>
-
-            <ProfileField
-              label="Legal Company Name"
-              value={formData.legalName}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'legalName',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Trading Name"
-              value={formData.tradingName ?? ''}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'tradingName',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Company Registration Number"
-              value={formData.companyRegNo}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'companyRegNo',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Industry"
-              value={formData.industry}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'industry',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Region"
-              value={formData.region}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'region',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Website"
-              value={formData.website}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'website',
-                  value
-                )
-              }
-            />
-
-          </div>
-
-          <ProfileField
-            label="Registered Address"
-            value={formData.registeredAddress}
-            editing={editing}
-            fullWidth
-            onChange={(value) =>
-              handleChange(
-                'registeredAddress',
-                value
-              )
-            }
-          />
-
-          <ProfileField
-            label="Company Description"
-            value={formData.companyDescription}
-            editing={editing}
-            fullWidth
-            multiline
-            onChange={(value) =>
-              handleChange(
-                'companyDescription',
-                value
-              )
-            }
-          />
-
-        </section>
-
-        {/* Contact Information */}
-
-        <section style={styles.card}>
-
-          <div style={styles.cardHeader}>
-
-            <div>
-
-              <h2 style={styles.cardTitle}>
-                Contact Information
+              <h2 style={styles.companyName}>
+                {displayValue(profile.tradingName)}
               </h2>
 
-              <p style={styles.cardDescription}>
-                Primary communication details for the
-                organisation.
+              <p style={styles.companyLegalName}>
+                {displayValue(profile.legalName)}
               </p>
-
             </div>
-
-          </div>
-
-          <div style={styles.formGrid}>
-
-            <ProfileField
-              label="Company Email"
-              value={formData.companyEmail}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'companyEmail',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Phone Number"
-              value={formData.phone}
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'phone',
-                  value
-                )
-              }
-            />
-
-          </div>
-
-        </section>
-
-        {/* Representative */}
-
-        <section style={styles.card}>
-
-          <div style={styles.cardHeader}>
-
-            <div>
-
-              <h2 style={styles.cardTitle}>
-                Company Representative
-              </h2>
-
-              <p style={styles.cardDescription}>
-                The primary representative associated with
-                this organisation.
-              </p>
-
-            </div>
-
-          </div>
-
-          <div style={styles.formGrid}>
-
-            <ProfileField
-              label="Representative Name"
-              value={
-                formData.representativeName ?? ''
-              }
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'representativeName',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Representative Email"
-              value={
-                formData.representativeEmail ?? ''
-              }
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'representativeEmail',
-                  value
-                )
-              }
-            />
-
-            <ProfileField
-              label="Representative Phone"
-              value={
-                formData.representativePhone ?? ''
-              }
-              editing={editing}
-              onChange={(value) =>
-                handleChange(
-                  'representativePhone',
-                  value
-                )
-              }
-            />
-
-          </div>
-
-        </section>
-
-        {/* Verification */}
-
-        <section style={styles.card}>
-
-          <div style={styles.cardHeader}>
-
-            <div>
-
-              <h2 style={styles.cardTitle}>
-                Verification
-              </h2>
-
-              <p style={styles.cardDescription}>
-                Current verification information for this
-                company account.
-              </p>
-
-            </div>
-
           </div>
 
           <div
-            style={getVerificationPanelStyle(
-              profile.verificationStatus
-            )}
+            style={{
+              ...styles.verificationBadge,
+              background: verification.background,
+              borderColor: verification.border,
+              color: verification.color,
+            }}
           >
-
-            <div
-              style={getVerificationIconStyle(
-                profile.verificationStatus
-              )}
-            >
-              {profile.verificationStatus ===
-              'approved'
-                ? '✓'
-                : profile.verificationStatus ===
-                  'rejected'
-                  ? '!'
-                  : '•'}
-            </div>
-
-            <div style={{ flex: 1 }}>
-
-              <div
-                style={getVerificationTitleStyle(
-                  profile.verificationStatus
-                )}
-              >
-                {formatVerificationStatus(
-                  profile.verificationStatus
-                )}
-              </div>
-
-              <p
-                style={getVerificationTextStyle(
-                  profile.verificationStatus
-                )}
-              >
-                Your company profile is currently registered
-                with this verification status.
-              </p>
-
-            </div>
-
+            <span style={styles.verificationDot} />
+            {verification.label}
           </div>
-
-          {/* Account Details */}
-
-          <div style={styles.accountDetails}>
-
-            <div>
-
-              <span style={styles.detailLabel}>
-                Account ID
-              </span>
-
-              <span style={styles.detailValue}>
-                {profile.id}
-              </span>
-
-            </div>
-
-            <div>
-
-              <span style={styles.detailLabel}>
-                Created
-              </span>
-
-              <span style={styles.detailValue}>
-                {formatDate(profile.createdAt)}
-              </span>
-
-            </div>
-
-            <div>
-
-              <span style={styles.detailLabel}>
-                Last Updated
-              </span>
-
-              <span style={styles.detailValue}>
-                {formatDate(profile.updatedAt)}
-              </span>
-
-            </div>
-
-          </div>
-
         </section>
 
-      </div>
+        {/* Main grid */}
+        <div style={styles.grid}>
+          {/* Company identity */}
+          <ProfileCard
+            eyebrow="IDENTITY"
+            title="Company Identity"
+            description="Your company's registered and public information."
+          >
+            <div style={styles.fieldsGrid}>
+              <ProfileField
+                label="Legal Name"
+                value={formData.legalName}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("legalName", value)
+                }
+              />
 
+              <ProfileField
+                label="Trading Name"
+                value={formData.tradingName}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("tradingName", value)
+                }
+              />
+
+              <ProfileField
+                label="Company Registration Number"
+                value={formData.companyRegNo}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("companyRegNo", value)
+                }
+              />
+
+              <ProfileField
+                label="Industry"
+                value={formData.industry}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("industry", value)
+                }
+              />
+
+              <ProfileField
+                label="Region"
+                value={formData.region}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("region", value)
+                }
+              />
+
+              <ProfileField
+                label="Website"
+                value={formData.website}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("website", value)
+                }
+              />
+
+              <ProfileField
+                label="Registered Address"
+                value={formData.registeredAddress}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("registeredAddress", value)
+                }
+                fullWidth
+              />
+
+              <ProfileField
+                label="Company Description"
+                value={formData.companyDescription}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("companyDescription", value)
+                }
+                multiline
+                fullWidth
+              />
+            </div>
+          </ProfileCard>
+
+          {/* Contact */}
+          <ProfileCard
+            eyebrow="CONTACT"
+            title="Contact Information"
+            description="How candidates and TruCity can contact your company."
+          >
+            <div style={styles.fieldsGrid}>
+              <ProfileField
+                label="Company Email"
+                value={formData.companyEmail}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("companyEmail", value)
+                }
+              />
+
+              <ProfileField
+                label="Phone Number"
+                value={formData.phone}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("phone", value)
+                }
+              />
+            </div>
+          </ProfileCard>
+
+          {/* Representative */}
+          <ProfileCard
+            eyebrow="REPRESENTATIVE"
+            title="Company Representative"
+            description="Primary representative associated with this account."
+          >
+            <div style={styles.fieldsGrid}>
+              <ProfileField
+                label="Full Name"
+                value={formData.representativeName}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("representativeName", value)
+                }
+              />
+
+              <ProfileField
+                label="Email Address"
+                value={formData.representativeEmail}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("representativeEmail", value)
+                }
+              />
+
+              <ProfileField
+                label="Phone Number"
+                value={formData.representativePhone}
+                editing={editing}
+                onChange={(value) =>
+                  handleChange("representativePhone", value)
+                }
+              />
+            </div>
+          </ProfileCard>
+
+          {/* Verification */}
+          <ProfileCard
+            eyebrow="TRUCITY VERIFICATION"
+            title="Verification"
+            description="Your company's verification and account information."
+          >
+            <div style={styles.verificationPanel}>
+              <div style={styles.verificationTop}>
+                <div
+                  style={{
+                    ...styles.largeStatusIcon,
+                    background: verification.background,
+                    color: verification.color,
+                  }}
+                >
+                  {verification.icon}
+                </div>
+
+                <div style={styles.verificationCopy}>
+                  <div
+                    style={{
+                      ...styles.verificationStatus,
+                      color: verification.color,
+                    }}
+                  >
+                    {verification.label}
+                  </div>
+
+                  <p style={styles.verificationDescription}>
+                    {verification.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.metaGrid}>
+              <MetaItem
+                label="Account ID"
+                value={displayValue(profile.id)}
+              />
+
+              <MetaItem
+                label="Created"
+                value={formatDate(profile.createdAt)}
+              />
+
+              <MetaItem
+                label="Last Updated"
+                value={formatDate(profile.updatedAt)}
+              />
+            </div>
+          </ProfileCard>
+        </div>
+
+        {/* Footer branding */}
+        <footer style={styles.footer}>
+          <div style={styles.footerBrand}>
+            <img
+              src={logo}
+              alt="TruCity"
+              style={styles.footerLogo}
+            />
+
+            <span>
+              VERIFY • CONNECT • PERSUE
+            </span>
+          </div>
+
+          <span style={styles.footerText}>
+            Trusted employers. Verified talent.
+          </span>
+        </footer>
+      </div>
     </div>
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Components                                                                 */
+/* -------------------------------------------------------------------------- */
 
-/*
- * =========================================================
- * PROFILE FIELD
- * =========================================================
- */
+interface ProfileCardProps {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}
+
+function ProfileCard({
+  eyebrow,
+  title,
+  description,
+  children,
+}: ProfileCardProps) {
+  return (
+    <section style={styles.card}>
+      <div style={styles.cardHeader}>
+        <div>
+          <div style={styles.cardEyebrow}>
+            {eyebrow}
+          </div>
+
+          <h3 style={styles.cardTitle}>
+            {title}
+          </h3>
+
+          <p style={styles.cardDescription}>
+            {description}
+          </p>
+        </div>
+
+        <div style={styles.cardAccent} />
+      </div>
+
+      <div style={styles.cardBody}>
+        {children}
+      </div>
+    </section>
+  );
+}
 
 interface ProfileFieldProps {
   label: string;
-  value: string;
+  value?: string | null;
   editing: boolean;
-  fullWidth?: boolean;
-  multiline?: boolean;
   onChange: (value: string) => void;
+  multiline?: boolean;
+  fullWidth?: boolean;
 }
 
 function ProfileField({
   label,
   value,
   editing,
-  fullWidth = false,
-  multiline = false,
   onChange,
+  multiline = false,
+  fullWidth = false,
 }: ProfileFieldProps) {
+  const display = displayValue(value);
 
   return (
     <div
       style={{
         ...styles.field,
-
-        ...(fullWidth
-          ? styles.fullWidthField
-          : {}),
+        ...(fullWidth ? styles.fullWidth : {}),
       }}
     >
-
       <label style={styles.fieldLabel}>
         {label}
       </label>
 
       {editing ? (
-
         multiline ? (
-
           <textarea
-            value={value}
+            value={value ?? ""}
             onChange={(event) =>
-              onChange(
-                event.target.value
-              )
+              onChange(event.target.value)
             }
-            style={{
-              ...styles.input,
-              ...styles.textarea,
-            }}
             rows={4}
+            style={styles.textarea}
           />
-
         ) : (
-
           <input
-            value={value}
+            type="text"
+            value={value ?? ""}
             onChange={(event) =>
-              onChange(
-                event.target.value
-              )
+              onChange(event.target.value)
             }
             style={styles.input}
           />
-
         )
-
       ) : (
-
-        <div style={styles.fieldValue}>
-          {value || 'Not provided'}
+        <div
+          style={{
+            ...styles.fieldValue,
+            ...(display === "Not provided"
+              ? styles.emptyValue
+              : {}),
+          }}
+        >
+          {display}
         </div>
-
       )}
-
     </div>
   );
 }
 
-
-/*
- * =========================================================
- * VERIFICATION HELPERS
- * =========================================================
- */
-
-function formatVerificationStatus(
-  status: CompanyProfileType['verificationStatus']
-) {
-  switch (status) {
-    case 'approved':
-      return 'Verified';
-
-    case 'pending':
-      return 'Pending Verification';
-
-    case 'verifying':
-      return 'Verification In Progress';
-
-    case 'rejected':
-      return 'Verification Rejected';
-
-    default:
-      return 'Unknown';
-  }
+interface MetaItemProps {
+  label: string;
+  value: string;
 }
 
+function MetaItem({ label, value }: MetaItemProps) {
+  return (
+    <div style={styles.metaItem}>
+      <span style={styles.metaLabel}>
+        {label}
+      </span>
 
-function getVerificationBadgeStyle(
-  status: CompanyProfileType['verificationStatus']
-): React.CSSProperties {
-
-  switch (status) {
-
-    case 'approved':
-      return {
-        ...styles.statusBadge,
-        backgroundColor: '#E8FFF5',
-        borderColor: '#43ED9C',
-        color: '#00273D',
-      };
-
-    case 'rejected':
-      return {
-        ...styles.statusBadge,
-        backgroundColor: '#FFF0F4',
-        borderColor: '#FF4672',
-        color: '#B51F49',
-      };
-
-    case 'pending':
-    case 'verifying':
-    default:
-      return {
-        ...styles.statusBadge,
-        backgroundColor: '#FFF8DD',
-        borderColor: '#FADB4B',
-        color: '#00273D',
-      };
-  }
-}
-
-
-function getVerificationDotStyle(
-  status: CompanyProfileType['verificationStatus']
-): React.CSSProperties {
-
-  switch (status) {
-
-    case 'approved':
-      return {
-        ...styles.statusDot,
-        backgroundColor: '#43ED9C',
-      };
-
-    case 'rejected':
-      return {
-        ...styles.statusDot,
-        backgroundColor: '#FF4672',
-      };
-
-    case 'pending':
-    case 'verifying':
-    default:
-      return {
-        ...styles.statusDot,
-        backgroundColor: '#FADB4B',
-      };
-  }
-}
-
-
-function getVerificationPanelStyle(
-  status: CompanyProfileType['verificationStatus']
-): React.CSSProperties {
-
-  switch (status) {
-
-    case 'approved':
-      return {
-        ...styles.verificationPanel,
-        backgroundColor: '#E8FFF5',
-        borderColor: '#43ED9C',
-      };
-
-    case 'rejected':
-      return {
-        ...styles.verificationPanel,
-        backgroundColor: '#FFF0F4',
-        borderColor: '#FF4672',
-      };
-
-    case 'pending':
-    case 'verifying':
-    default:
-      return {
-        ...styles.verificationPanel,
-        backgroundColor: '#FFF8DD',
-        borderColor: '#FADB4B',
-      };
-  }
-}
-
-
-function getVerificationIconStyle(
-  status: CompanyProfileType['verificationStatus']
-): React.CSSProperties {
-
-  switch (status) {
-
-    case 'approved':
-      return {
-        ...styles.verificationIcon,
-        backgroundColor: '#43ED9C',
-        color: '#00273D',
-      };
-
-    case 'rejected':
-      return {
-        ...styles.verificationIcon,
-        backgroundColor: '#FF4672',
-        color: '#FFFFFF',
-      };
-
-    case 'pending':
-    case 'verifying':
-    default:
-      return {
-        ...styles.verificationIcon,
-        backgroundColor: '#FADB4B',
-        color: '#00273D',
-      };
-  }
-}
-
-
-function getVerificationTitleStyle(
-  status: CompanyProfileType['verificationStatus']
-): React.CSSProperties {
-
-  switch (status) {
-
-    case 'approved':
-      return {
-        ...styles.verificationTitle,
-        color: '#00273D',
-      };
-
-    case 'rejected':
-      return {
-        ...styles.verificationTitle,
-        color: '#B51F49',
-      };
-
-    case 'pending':
-    case 'verifying':
-    default:
-      return {
-        ...styles.verificationTitle,
-        color: '#00273D',
-      };
-  }
-}
-
-
-function getVerificationTextStyle(
-  status: CompanyProfileType['verificationStatus']
-): React.CSSProperties {
-
-  switch (status) {
-
-    case 'approved':
-      return {
-        ...styles.verificationText,
-        color: '#00466D',
-      };
-
-    case 'rejected':
-      return {
-        ...styles.verificationText,
-        color: '#B51F49',
-      };
-
-    case 'pending':
-    case 'verifying':
-    default:
-      return {
-        ...styles.verificationText,
-        color: '#00466D',
-      };
-  }
-}
-
-
-/*
- * =========================================================
- * DATE
- * =========================================================
- */
-
-function formatDate(value?: string) {
-
-  if (!value) {
-    return 'Not available';
-  }
-
-  const date =
-    new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString(
-    'en-ZA',
-    {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }
+      <span style={styles.metaValue}>
+        {value}
+      </span>
+    </div>
   );
 }
 
+function Watermark() {
+  return (
+    <div style={styles.watermark} aria-hidden="true">
+      <div style={styles.watermarkHandshake}>
+        🤝
+      </div>
 
-/*
- * =========================================================
- * STYLES
- * =========================================================
- *
- * TruCity September 2026 Brand Palette
- *
- * Primary Dark Teal-Blue: #00466D
- * Primary Golden Orange: #FFAD01
- * TruCity Blue:          #1E92D2
- * TruCity Orange:        #FFD784
- * Dark Blue:             #00273D
- * Background:            #F8FCFF
- * White:                 #FFFFFF
- *
- * Status:
- * Green:                 #43ED9C
- * Red:                   #FF4672
- * Yellow:                #FADB4B
- *
- * =========================================================
- */
+      <div style={styles.watermarkText}>
+        TRUCITY
+      </div>
 
-const styles: {
-  [key: string]: React.CSSProperties;
-} = {
+      <div style={styles.watermarkSubtext}>
+        VERIFY • CONNECT • PERSUE
+      </div>
+    </div>
+  );
+}
 
-  headerArea: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '28px',
-    gap: '20px',
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function displayValue(value?: string | null) {
+  if (!value || !value.trim()) {
+    return "Not provided";
+  }
+
+  return value;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "Not available";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
+  }
+
+  return date.toLocaleDateString("en-ZA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getVerificationStatus(status?: string | null) {
+  const normalized = String(status ?? "")
+    .toLowerCase()
+    .trim();
+
+  if (
+    normalized === "approved" ||
+    normalized === "verified"
+  ) {
+    return {
+      label: "Verified",
+      color: "#087443",
+      background: "#EAF8F0",
+      border: "#B8E5CB",
+      icon: "✓",
+      description:
+        "Your company has successfully completed TruCity verification.",
+    };
+  }
+
+  if (
+    normalized === "rejected" ||
+    normalized === "declined"
+  ) {
+    return {
+      label: "Verification Rejected",
+      color: "#B42318",
+      background: "#FFF1F0",
+      border: "#F3C4C0",
+      icon: "!",
+      description:
+        "Your company verification requires attention.",
+    };
+  }
+
+  if (
+    normalized === "verifying" ||
+    normalized === "in_review" ||
+    normalized === "in review"
+  ) {
+    return {
+      label: "Under Review",
+      color: "#B54708",
+      background: "#FFF7E8",
+      border: "#F3D19B",
+      icon: "•",
+      description:
+        "Your company information is currently being reviewed.",
+    };
+  }
+
+  return {
+    label: "Pending Verification",
+    color: "#B54708",
+    background: "#FFF7E8",
+    border: "#F3D19B",
+    icon: "•",
+    description:
+      "Complete verification to build trust with candidates.",
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Styles                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    position: "relative",
+    minHeight: "100%",
+    width: "100%",
+    overflow: "hidden",
+    background:
+      "linear-gradient(135deg, #F8FCFF 0%, #FFFFFF 48%, #F4FAFD 100%)",
+    color: "#00273D",
+    fontFamily:
+      "Helvetica, Arial, sans-serif",
+    padding: "32px",
+    boxSizing: "border-box",
+  },
+
+  container: {
+    position: "relative",
+    zIndex: 2,
+    width: "100%",
+    maxWidth: "1450px",
+    margin: "0 auto",
+  },
+
+  watermark: {
+    position: "absolute",
+    zIndex: 0,
+    right: "-20px",
+    top: "130px",
+    width: "470px",
+    textAlign: "center",
+    pointerEvents: "none",
+    userSelect: "none",
+    opacity: 0.035,
+    transform: "rotate(-8deg)",
+  },
+
+  watermarkHandshake: {
+    fontSize: "150px",
+    lineHeight: 1,
+  },
+
+  watermarkText: {
+    marginTop: "-10px",
+    fontSize: "74px",
+    fontWeight: 900,
+    letterSpacing: "10px",
+  },
+
+  watermarkSubtext: {
+    marginTop: "8px",
+    fontSize: "12px",
+    fontWeight: 800,
+    letterSpacing: "4px",
+  },
+
+  decorCircleOne: {
+    position: "absolute",
+    zIndex: 0,
+    width: "120px",
+    height: "120px",
+    borderRadius: "50%",
+    background:
+      "linear-gradient(135deg, rgba(255,173,1,.20), rgba(255,215,132,.06))",
+    top: "-35px",
+    left: "12%",
+    pointerEvents: "none",
+  },
+
+  decorCircleTwo: {
+    position: "absolute",
+    zIndex: 0,
+    width: "90px",
+    height: "90px",
+    borderRadius: "50%",
+    border: "14px solid rgba(30,146,210,.06)",
+    bottom: "90px",
+    right: "4%",
+    pointerEvents: "none",
+  },
+
+  decorCircleThree: {
+    position: "absolute",
+    zIndex: 0,
+    width: "52px",
+    height: "52px",
+    borderRadius: "50%",
+    background: "rgba(0,70,109,.055)",
+    top: "42%",
+    left: "2%",
+    pointerEvents: "none",
+  },
+
+  decorCircleFour: {
+    position: "absolute",
+    zIndex: 0,
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    background: "rgba(255,173,1,.13)",
+    bottom: "8%",
+    left: "12%",
+    pointerEvents: "none",
+  },
+
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "24px",
+    marginBottom: "28px",
+    flexWrap: "wrap",
+  },
+
+  headerLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: "18px",
+  },
+
+  logoWrap: {
+    width: "68px",
+    height: "68px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#FFFFFF",
+    border: "1px solid rgba(0,70,109,.10)",
+    borderRadius: "18px",
+    boxShadow: "0 8px 24px rgba(0,39,61,.08)",
+  },
+
+  logo: {
+    width: "52px",
+    maxHeight: "52px",
+    objectFit: "contain",
   },
 
   eyebrow: {
-    fontSize: '11px',
-    fontWeight: '700',
-    letterSpacing: '0.12em',
-    color: '#FFAD01',
-    marginBottom: '7px',
+    color: "#FFAD01",
+    fontSize: "11px",
+    fontWeight: 900,
+    letterSpacing: "2px",
+    marginBottom: "4px",
   },
 
   title: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#00273D',
     margin: 0,
-    marginBottom: '6px',
-    letterSpacing: '-0.02em',
+    color: "#00273D",
+    fontSize: "32px",
+    lineHeight: 1.1,
+    fontWeight: 800,
+    letterSpacing: "-0.8px",
   },
 
   subtitle: {
-    fontSize: '14px',
-    color: '#64748B',
-    fontWeight: '400',
-    margin: 0,
-    maxWidth: '700px',
-    lineHeight: 1.6,
+    margin: "7px 0 0",
+    color: "#668091",
+    fontSize: "14px",
+    lineHeight: 1.5,
   },
 
   headerActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
   },
 
   primaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#00466D',
-    color: '#FFFFFF',
-    border: 'none',
-    borderRadius: '10px',
-    fontWeight: '700',
-    fontSize: '13px',
-    cursor: 'pointer',
-    boxShadow:
-      '0 4px 8px rgba(0, 70, 109, 0.16)',
-    fontFamily: 'Helvetica, Arial, sans-serif',
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    border: "none",
+    borderRadius: "11px",
+    padding: "12px 18px",
+    background: "#00466D",
+    color: "#FFFFFF",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 18px rgba(0,70,109,.18)",
+    transition: "all .2s ease",
   },
 
-  cancelButton: {
-    padding: '10px 18px',
-    backgroundColor: '#FFFFFF',
-    color: '#00466D',
-    border: '1px solid #D4D2E6',
-    borderRadius: '10px',
-    fontWeight: '700',
-    fontSize: '13px',
-    cursor: 'pointer',
-    fontFamily: 'Helvetica, Arial, sans-serif',
+  secondaryButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid #C9DCE5",
+    borderRadius: "11px",
+    padding: "11px 17px",
+    background: "#FFFFFF",
+    color: "#00466D",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
   },
 
-  messageBanner: {
-    padding: '12px 16px',
-    borderRadius: '10px',
-    marginBottom: '20px',
-    fontSize: '13px',
-    fontWeight: '600',
+  buttonIcon: {
+    fontSize: "15px",
+    lineHeight: 1,
   },
 
-  successBanner: {
-    backgroundColor: '#E8FFF5',
-    border: '1px solid #43ED9C',
-    color: '#00273D',
+  message: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "13px 16px",
+    borderRadius: "12px",
+    marginBottom: "22px",
+    fontSize: "13px",
+    fontWeight: 700,
+    border: "1px solid",
   },
 
-  errorBanner: {
-    backgroundColor: '#FFF0F4',
-    border: '1px solid #FF4672',
-    color: '#B51F49',
+  successMessage: {
+    color: "#087443",
+    background: "#F0FAF4",
+    borderColor: "#B8E5CB",
   },
 
-  profileGrid: {
-    display: 'grid',
+  errorMessage: {
+    color: "#B42318",
+    background: "#FFF5F4",
+    borderColor: "#F1C6C2",
+  },
+
+  messageIcon: {
+    width: "24px",
+    height: "24px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+    fontWeight: 900,
+  },
+
+  successIcon: {
+    background: "#D9F3E4",
+  },
+
+  errorIcon: {
+    background: "#FDE0DD",
+  },
+
+  profileHero: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "20px",
+    padding: "25px",
+    marginBottom: "22px",
+    borderRadius: "18px",
+    background:
+      "linear-gradient(115deg, #003D5D 0%, #00466D 58%, #075B84 100%)",
+    boxShadow: "0 15px 38px rgba(0,39,61,.16)",
+    position: "relative",
+    overflow: "hidden",
+    flexWrap: "wrap",
+  },
+
+  heroBrand: {
+    display: "flex",
+    alignItems: "center",
+    gap: "18px",
+  },
+
+  companyLogo: {
+    width: "74px",
+    height: "74px",
+    borderRadius: "16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#FFFFFF",
+    border: "4px solid rgba(255,255,255,.12)",
+  },
+
+  heroLogo: {
+    width: "56px",
+    maxHeight: "56px",
+    objectFit: "contain",
+  },
+
+  heroLabel: {
+    color: "#FFD784",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "2px",
+    marginBottom: "6px",
+  },
+
+  companyName: {
+    margin: 0,
+    color: "#FFFFFF",
+    fontSize: "24px",
+    fontWeight: 800,
+  },
+
+  companyLegalName: {
+    margin: "5px 0 0",
+    color: "rgba(255,255,255,.68)",
+    fontSize: "13px",
+  },
+
+  verificationBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "9px 13px",
+    borderRadius: "999px",
+    border: "1px solid",
+    fontSize: "12px",
+    fontWeight: 900,
+    background: "#FFFFFF",
+  },
+
+  verificationDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    background: "currentColor",
+  },
+
+  grid: {
+    display: "grid",
     gridTemplateColumns:
-      'repeat(2, minmax(0, 1fr))',
-    gap: '20px',
+      "repeat(auto-fit, minmax(420px, 1fr))",
+    gap: "22px",
   },
 
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: '16px',
-    padding: '26px',
-    border: '1px solid #E9E8F3',
-    boxShadow:
-      '0 8px 20px rgba(0, 39, 61, 0.05)',
+    background: "rgba(255,255,255,.96)",
+    border: "1px solid #DFEAF0",
+    borderRadius: "17px",
+    boxShadow: "0 10px 30px rgba(0,39,61,.055)",
+    overflow: "hidden",
   },
 
   cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: '16px',
-    marginBottom: '24px',
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    padding: "22px 22px 17px",
+    borderBottom: "1px solid #EDF3F6",
+  },
+
+  cardEyebrow: {
+    color: "#1E92D2",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "1.7px",
+    marginBottom: "5px",
   },
 
   cardTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#00466D',
     margin: 0,
-    marginBottom: '5px',
+    color: "#00273D",
+    fontSize: "19px",
+    fontWeight: 800,
   },
 
   cardDescription: {
-    fontSize: '12px',
-    color: '#64748B',
-    margin: 0,
-    lineHeight: 1.5,
+    margin: "5px 0 0",
+    color: "#78909E",
+    fontSize: "12px",
+    lineHeight: 1.45,
   },
 
-  statusBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '7px',
-    padding: '6px 10px',
-    borderRadius: '8px',
-    fontSize: '10px',
-    fontWeight: '700',
-    whiteSpace: 'nowrap',
-    border: '1px solid',
-  },
-
-  statusDot: {
-    width: '7px',
-    height: '7px',
-    borderRadius: '50%',
+  cardAccent: {
+    width: "8px",
+    height: "38px",
+    borderRadius: "6px",
+    background:
+      "linear-gradient(180deg, #FFAD01, #FFD784)",
     flexShrink: 0,
   },
 
-  logoSection: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    padding: '16px',
-    marginBottom: '22px',
-    backgroundColor: '#F8FCFF',
-    border: '1px solid #E9E8F3',
-    borderRadius: '12px',
+  cardBody: {
+    padding: "21px 22px 23px",
   },
 
-  logoWrapper: {
-    width: '72px',
-    height: '72px',
-    borderRadius: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    border: '1px solid #D4D2E6',
-    overflow: 'hidden',
-    flexShrink: 0,
-  },
-
-  profileLogo: {
-    width: '58px',
-    height: '58px',
-    objectFit: 'contain',
-  },
-
-  logoTitle: {
-    fontSize: '14px',
-    fontWeight: '700',
-    color: '#00273D',
-    marginBottom: '4px',
-  },
-
-  logoDescription: {
-    fontSize: '12px',
-    color: '#64748B',
-    lineHeight: 1.5,
-  },
-
-  formGrid: {
-    display: 'grid',
+  fieldsGrid: {
+    display: "grid",
     gridTemplateColumns:
-      'repeat(2, minmax(0, 1fr))',
-    gap: '18px',
+      "repeat(2, minmax(0, 1fr))",
+    gap: "18px",
   },
 
   field: {
     minWidth: 0,
-    marginBottom: '18px',
   },
 
-  fullWidthField: {
-    gridColumn: '1 / -1',
+  fullWidth: {
+    gridColumn: "1 / -1",
   },
 
   fieldLabel: {
-    display: 'block',
-    fontSize: '11px',
-    fontWeight: '700',
-    color: '#00466D',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    marginBottom: '7px',
+    display: "block",
+    marginBottom: "7px",
+    color: "#668091",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "1px",
+    textTransform: "uppercase",
   },
 
   fieldValue: {
-    minHeight: '20px',
-    fontSize: '13px',
-    fontWeight: '500',
-    color: '#00273D',
+    minHeight: "42px",
+    display: "flex",
+    alignItems: "center",
+    padding: "11px 13px",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+    background: "#F7FAFC",
+    border: "1px solid #E4EDF1",
+    color: "#173F53",
+    fontSize: "13px",
     lineHeight: 1.5,
-    wordBreak: 'break-word',
+    wordBreak: "break-word",
+  },
+
+  emptyValue: {
+    color: "#9AAAB3",
+    fontStyle: "italic",
   },
 
   input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '10px 12px',
-    borderRadius: '9px',
-    border: '1px solid #D4D2E6',
-    backgroundColor: '#FFFFFF',
-    color: '#00273D',
-    fontSize: '13px',
-    fontWeight: '500',
-    outline: 'none',
-    fontFamily: 'Helvetica, Arial, sans-serif',
+    width: "100%",
+    height: "42px",
+    padding: "0 12px",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+    border: "1px solid #BFD5DF",
+    background: "#FFFFFF",
+    color: "#173F53",
+    fontSize: "13px",
+    outline: "none",
   },
 
   textarea: {
-    resize: 'vertical',
+    width: "100%",
+    padding: "11px 12px",
+    boxSizing: "border-box",
+    resize: "vertical",
+    borderRadius: "10px",
+    border: "1px solid #BFD5DF",
+    background: "#FFFFFF",
+    color: "#173F53",
+    fontSize: "13px",
     lineHeight: 1.5,
-    fontFamily: 'Helvetica, Arial, sans-serif',
+    outline: "none",
+    fontFamily: "inherit",
   },
 
   verificationPanel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    padding: '16px',
-    borderRadius: '12px',
-    marginBottom: '20px',
-    border: '1px solid',
+    padding: "16px",
+    borderRadius: "13px",
+    background: "#F7FAFC",
+    border: "1px solid #E4EDF1",
   },
 
-  verificationIcon: {
-    width: '38px',
-    height: '38px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
-    fontWeight: '700',
+  verificationTop: {
+    display: "flex",
+    alignItems: "center",
+    gap: "13px",
+  },
+
+  largeStatusIcon: {
+    width: "45px",
+    height: "45px",
     flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "13px",
+    fontSize: "20px",
+    fontWeight: 900,
   },
 
-  verificationTitle: {
-    fontSize: '14px',
-    fontWeight: '700',
-    marginBottom: '3px',
+  verificationCopy: {
+    minWidth: 0,
   },
 
-  verificationText: {
-    fontSize: '12px',
-    margin: 0,
+  verificationStatus: {
+    fontSize: "14px",
+    fontWeight: 900,
+  },
+
+  verificationDescription: {
+    margin: "4px 0 0",
+    color: "#718793",
+    fontSize: "12px",
     lineHeight: 1.5,
   },
 
-  accountDetails: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
+  metaGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
+    gap: "10px",
+    marginTop: "16px",
   },
 
-  detailLabel: {
-    display: 'block',
-    fontSize: '10px',
-    color: '#64748B',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '3px',
+  metaItem: {
+    padding: "12px",
+    borderRadius: "10px",
+    background: "#FBFCFD",
+    border: "1px solid #EDF2F4",
+    minWidth: 0,
   },
 
-  detailValue: {
-    display: 'block',
-    fontSize: '12px',
-    color: '#00273D',
-    fontWeight: '600',
-    wordBreak: 'break-word',
+  metaLabel: {
+    display: "block",
+    marginBottom: "4px",
+    color: "#8A9AA3",
+    fontSize: "9px",
+    fontWeight: 900,
+    letterSpacing: ".8px",
+    textTransform: "uppercase",
+  },
+
+  metaValue: {
+    display: "block",
+    color: "#244C5F",
+    fontSize: "11px",
+    fontWeight: 700,
+    wordBreak: "break-word",
+  },
+
+  footer: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "20px",
+    marginTop: "28px",
+    padding: "18px 3px 5px",
+    borderTop: "1px solid #E3EDF2",
+    flexWrap: "wrap",
+  },
+
+  footerBrand: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    color: "#79909D",
+    fontSize: "9px",
+    fontWeight: 900,
+    letterSpacing: "1.4px",
+  },
+
+  footerLogo: {
+    width: "65px",
+    maxHeight: "28px",
+    objectFit: "contain",
+  },
+
+  footerText: {
+    color: "#9AAAB3",
+    fontSize: "11px",
+  },
+
+  loadingCard: {
+    position: "relative",
+    zIndex: 2,
+    width: "min(460px, 100%)",
+    margin: "120px auto",
+    padding: "45px 30px",
+    boxSizing: "border-box",
+    textAlign: "center",
+    background: "#FFFFFF",
+    border: "1px solid #DFEAF0",
+    borderRadius: "18px",
+    boxShadow: "0 15px 40px rgba(0,39,61,.08)",
+  },
+
+  spinner: {
+    width: "38px",
+    height: "38px",
+    margin: "0 auto 20px",
+    border: "4px solid #E5EEF3",
+    borderTop: "4px solid #00466D",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+
+  smallSpinner: {
+    width: "13px",
+    height: "13px",
+    border: "2px solid rgba(255,255,255,.35)",
+    borderTop: "2px solid #FFFFFF",
+    borderRadius: "50%",
+    display: "inline-block",
+  },
+
+  loadingTitle: {
+    margin: 0,
+    color: "#00273D",
+    fontSize: "20px",
+    fontWeight: 800,
+  },
+
+  loadingText: {
+    margin: "8px 0 0",
+    color: "#78909E",
+    fontSize: "13px",
   },
 
   emptyCard: {
-    minHeight: '320px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    textAlign: 'center',
-    padding: '40px',
-    backgroundColor: '#FFFFFF',
-    borderRadius: '16px',
-    border: '1px solid #E9E8F3',
-    boxShadow:
-      '0 8px 20px rgba(0, 39, 61, 0.05)',
+    position: "relative",
+    zIndex: 2,
+    width: "min(500px, 100%)",
+    margin: "120px auto",
+    padding: "42px 30px",
+    boxSizing: "border-box",
+    textAlign: "center",
+    background: "#FFFFFF",
+    border: "1px solid #DFEAF0",
+    borderRadius: "18px",
+    boxShadow: "0 15px 40px rgba(0,39,61,.08)",
   },
 
   emptyIcon: {
-    width: '48px',
-    height: '48px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFF8DD',
-    color: '#00273D',
-    border: '1px solid #FADB4B',
-    fontSize: '20px',
-    fontWeight: '700',
-    marginBottom: '16px',
+    width: "50px",
+    height: "50px",
+    margin: "0 auto 16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+    background: "#FFF7E8",
+    color: "#B54708",
+    fontSize: "24px",
+    fontWeight: 900,
   },
 
   emptyTitle: {
     margin: 0,
-    marginBottom: '8px',
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#00466D',
+    color: "#00273D",
+    fontSize: "21px",
+    fontWeight: 800,
   },
 
   emptyText: {
-    maxWidth: '520px',
-    margin: 0,
-    marginBottom: '20px',
-    fontSize: '13px',
-    lineHeight: 1.6,
-    color: '#64748B',
-  },
-
-  loadingCard: {
-    minHeight: '300px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: '16px',
-    border: '1px solid #E9E8F3',
-  },
-
-  loadingSpinner: {
-    width: '30px',
-    height: '30px',
-    borderRadius: '50%',
-    border: '3px solid #E9E8F3',
-    borderTop: '3px solid #00466D',
-    marginBottom: '14px',
-  },
-
-  loadingText: {
-    fontSize: '13px',
-    color: '#64748B',
-    fontWeight: '600',
+    margin: "8px auto 22px",
+    maxWidth: "360px",
+    color: "#78909E",
+    fontSize: "13px",
+    lineHeight: 1.5,
   },
 };

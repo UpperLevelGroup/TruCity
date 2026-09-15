@@ -37,6 +37,18 @@ public class JobsController {
         return jobsService.getAllJobs();
     }
 
+        /*
+    |--------------------------------------------------------------------------
+    | CANDIDATE — OPEN JOBS
+    |--------------------------------------------------------------------------
+    */
+
+     @GetMapping("/open")
+     @PreAuthorize("hasRole('CANDIDATE')")
+     public List<JobsResponse> getOpenJobs() {
+     
+        return jobsService.getOpenJobs();
+     }
 
     /*
     |--------------------------------------------------------------------------
@@ -180,4 +192,7 @@ public class JobsController {
                 authentication
         );
     }
+    
+
+
 }

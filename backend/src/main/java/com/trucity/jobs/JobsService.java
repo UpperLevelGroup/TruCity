@@ -71,6 +71,22 @@ public class JobsService {
                 .toList();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | CANDIDATE — OPEN JOBS
+    |--------------------------------------------------------------------------
+    */
+
+       @Transactional(readOnly = true)
+       public List<JobsResponse> getOpenJobs() {
+
+        return jobsRepository
+                .findByStatusIgnoreCaseOrderByCreatedAtDesc("ACTIVE")
+                .stream()
+                .map(this::toResponse)
+               .toList();
+        }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -906,4 +922,6 @@ public class JobsService {
                 || status.equals("CLOSED")
                 || status.equals("SUSPENDED");
     }
+
+
 }
