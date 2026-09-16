@@ -28,9 +28,9 @@ type NotificationsContextValue = {
   unreadCount: number;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
-  addNotification: (
-    notification: CandidateNotification,
-  ) => void;
+  addNotification: (notification: CandidateNotification,) => void;
+  deleteNotification: (id: string) => void;
+  clearReadNotifications: () => void;
 };
 
 const NotificationsContext =
@@ -92,6 +92,22 @@ export function NotificationsProvider({
       })),
     );
   };
+   
+  const deleteNotification = (id: string) => {
+    setNotifications((current) =>
+      current.filter(
+        (notification) => notification.id !== id,
+      ),
+    );
+  };
+
+  const clearReadNotifications = () => {
+    setNotifications((current) =>
+      current.filter(
+        (notification) => !notification.read,
+      ),
+    );
+  };
 
   const addNotification = (
     notification: CandidateNotification,
@@ -109,8 +125,13 @@ export function NotificationsProvider({
       markAsRead,
       markAllAsRead,
       addNotification,
+      deleteNotification,
+      clearReadNotifications,
     }),
-    [notifications, unreadCount],
+    [
+     notifications, 
+     unreadCount,
+    ],
   );
 
   return (

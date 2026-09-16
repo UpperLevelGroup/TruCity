@@ -674,8 +674,8 @@ export default function Messages() {
     );
 
     addNotification({
-      type:
-        'system',
+      id: `interview-response-${Date.now()}`,
+      type: 'system',
 
       title:
         response ===
