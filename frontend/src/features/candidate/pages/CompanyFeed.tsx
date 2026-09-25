@@ -866,23 +866,19 @@ export default function CompanyFeed({
     );
 
     addNotification({
-      type:
-        'application',
+      id: `application-${job.id}-${Date.now()}`,
+      
+      type: 'application',
 
-      title:
-        'Application submitted',
+      title:'Application submitted',
 
-      message:
-        `Your TruCity profile was submitted to ${job.company} for the ${job.title} position.`,
+      message:`Your TruCity profile was submitted to ${job.company} for the ${job.title} position.`,
 
-      time:
-        'Just now',
+      time:'Just now',
 
-      read:
-        false,
+      read:false,
 
-      destination:
-        '/candidate/feed',
+      destination:'/candidate/feed',
     });
   };
 
