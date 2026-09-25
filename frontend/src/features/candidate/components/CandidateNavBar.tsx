@@ -2,29 +2,38 @@ import {
   useEffect,
   useRef,
   useState,
-} from "react";
+} from 'react';
 
 import {
   NavLink,
   useNavigate,
-} from "react-router-dom";
+} from 'react-router-dom';
 
 import {
   Bell,
+  BookOpenCheck,
   BriefcaseBusiness,
   Check,
   FileCheck2,
+  FileText,
+  Home,
   LogOut,
   MessageSquare,
   ShieldCheck,
+  UserRound,
   X,
-} from "lucide-react";
+  type LucideIcon,
+} from 'lucide-react';
 
 import {
   useNotifications,
   type CandidateNotification,
   type NotificationType,
-} from "../../../context/NotificationsContext";
+} from '../../../context/NotificationsContext';
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 export type CandidateNavTab = {
   to: string;
@@ -39,61 +48,88 @@ type CandidateNavBarProps = {
     void | Promise<void>;
 };
 
+/* =========================================================
+   DEFAULT NAVIGATION
+========================================================= */
+
 const DEFAULT_TABS: CandidateNavTab[] = [
   {
-    to: "/candidate/feed",
-    label: "Opportunities",
+    to: '/candidate/feed',
+    label: 'Home',
   },
   {
-    to: "/candidate/messages",
-    label: "Messages",
+    to: '/candidate/messages',
+    label: 'Messages',
   },
   {
-    to: "/candidate/hub",
-    label: "Guidance Hub",
+    to: '/candidate/hub',
+    label: 'Guidance Hub',
   },
   {
-    to: "/candidate/cv",
-    label: "My CV",
+    to: '/candidate/cv',
+    label: 'CV',
   },
   {
-    to: "/candidate/profile",
-    label: "Profile",
+    to: '/candidate/profile',
+    label: 'Profile',
   },
 ];
+
+/* =========================================================
+   NAVIGATION ICONS
+
+   Route-based mapping ensures icons still render when
+   CandidateLayout passes its own tabs into CandidateNavBar.
+========================================================= */
+
+const NAV_ICONS: Record<string, LucideIcon> = {
+  '/candidate/feed': Home,
+  '/candidate/messages': MessageSquare,
+  '/candidate/hub': BookOpenCheck,
+  '/candidate/cv': FileText,
+  '/candidate/profile': UserRound,
+};
+
+function getNavIcon(
+  route: string,
+): LucideIcon {
+  return (
+    NAV_ICONS[route] ??
+    BriefcaseBusiness
+  );
+}
+
+/* =========================================================
+   CANDIDATE NAVBAR
+========================================================= */
 
 export function CandidateNavBar({
   tabs = DEFAULT_TABS,
   onSignOut,
 }: CandidateNavBarProps) {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const handleSignOut = async () => {
-    try {
-      if (onSignOut) {
-        await onSignOut();
+  const handleSignOut =
+    async () => {
+      try {
+        if (onSignOut) {
+          await onSignOut();
+        }
+
+        navigate(
+          '/login',
+          {
+            replace: true,
+          },
+        );
+      } catch (error) {
+        console.error(
+          'Unable to sign out:',
+          error,
+        );
       }
-
-      /*
-       * Clear candidate-specific session state.
-       * Do not remove the authentication token here;
-       * that remains controlled by the application's
-       * authentication flow.
-       */
-      sessionStorage.removeItem(
-        "candidatePlan",
-      );
-
-      navigate("/login", {
-        replace: true,
-      });
-    } catch (error) {
-      console.error(
-        "Unable to sign out:",
-        error,
-      );
-    }
-  };
+    };
 
   return (
     <header
@@ -102,11 +138,11 @@ export function CandidateNavBar({
         inset-x-0
         top-0
         z-50
+        overflow-visible
         border-b
         border-brand-border
-        bg-white/95
-        shadow-[0_4px_18px_rgba(0,70,109,0.05)]
-        backdrop-blur-xl
+        bg-brand-bg/95
+        backdrop-blur-md
       "
     >
       <div
@@ -119,124 +155,91 @@ export function CandidateNavBar({
           items-center
           justify-between
           gap-4
+          overflow-visible
           px-5
 
           sm:px-8
+          lg:gap-6
           lg:px-10
         "
       >
+        {/* =================================================
+            LOGO
+        ================================================== */}
+
         <NavLink
           to="/candidate/feed"
-          aria-label="TruCity Opportunities"
+          aria-label="TruCity candidate home"
           className="
+            relative
             flex
+            h-[88px]
+            w-[125px]
             shrink-0
             items-center
+            overflow-visible
+            no-underline
+
+            sm:w-[150px]
+            lg:w-[195px]
           "
         >
           <img
-            src="/TruCity_Logo_RGB13.png"
+            src="/trucity-nav-logo.png"
             alt="TruCity"
+            draggable={false}
             className="
-              h-[64px]
-              w-[90px]
+              absolute
+              left-[-22px]
+              top-1/2
+              block
+              h-auto
+              w-[130px]
+              max-w-none
+              -translate-y-1/2
+              select-none
               object-contain
 
-              sm:h-[70px]
-              sm:w-[100px]
+              sm:left-[-26px]
+              sm:w-[155px]
+
+              lg:left-[-30px]
+              lg:w-[190px]
             "
           />
         </NavLink>
 
+        {/* =================================================
+            DESKTOP NAVIGATION
+        ================================================== */}
+
         <nav
+          aria-label="Candidate navigation"
           className="
             hidden
             h-full
             items-center
-            gap-7
+            gap-6
+
             lg:flex
           "
         >
-          {tabs.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              end={
-                tab.to ===
-                "/candidate/feed"
-              }
-              className={({ isActive }) =>
-                `
-                  relative
-                  flex
-                  h-full
-                  items-center
-                  text-sm
-                  transition-colors
-
-                  ${
-                    isActive
-                      ? "font-bold text-brand-primary"
-                      : "font-semibold text-brand-textMuted hover:text-brand-primary"
-                  }
-                `
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span className="relative">
-                    {tab.label}
-
-                    {tab.badgeCount !==
-                      undefined &&
-                      tab.badgeCount > 0 && (
-                        <span
-                          className="
-                            absolute
-                            -right-5
-                            -top-3
-                            grid
-                            h-[17px]
-                            min-w-[17px]
-                            place-items-center
-                            rounded-full
-                            bg-brand-gold
-                            px-1
-                            text-[9px]
-                            font-bold
-                            leading-none
-                            text-brand-dark
-                          "
-                        >
-                          {tab.badgeCount >
-                          9
-                            ? "9+"
-                            : tab.badgeCount}
-                        </span>
-                      )}
-                  </span>
-
-                  {isActive && (
-                    <span
-                      className="
-                        absolute
-                        bottom-[17px]
-                        left-1/2
-                        h-[3px]
-                        w-8
-                        -translate-x-1/2
-                        rounded-full
-                        bg-brand-gold
-                      "
-                    />
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
+          {tabs.map(
+            (tab) => (
+              <CandidateDesktopNavLink
+                key={tab.to}
+                tab={tab}
+              />
+            ),
+          )}
         </nav>
 
+        {/* =================================================
+            MOBILE / TABLET NAVIGATION
+        ================================================== */}
+
         <nav
+          aria-label="Candidate navigation"
           className="
             flex
             min-w-0
@@ -245,67 +248,23 @@ export function CandidateNavBar({
             justify-end
             gap-1
             overflow-x-auto
+
             lg:hidden
           "
         >
-          {tabs.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              end={
-                tab.to ===
-                "/candidate/feed"
-              }
-              className={({ isActive }) =>
-                `
-                  relative
-                  shrink-0
-                  rounded-xl
-                  px-3
-                  py-2
-                  text-[11px]
-                  font-bold
-                  transition-colors
-
-                  ${
-                    isActive
-                      ? "bg-brand-surface text-brand-primary"
-                      : "text-brand-textMuted hover:bg-brand-bg hover:text-brand-primary"
-                  }
-                `
-              }
-            >
-              {tab.label}
-
-              {tab.badgeCount !==
-                undefined &&
-                tab.badgeCount > 0 && (
-                  <span
-                    className="
-                      absolute
-                      -right-1
-                      -top-1
-                      grid
-                      h-4
-                      min-w-4
-                      place-items-center
-                      rounded-full
-                      bg-brand-gold
-                      px-1
-                      text-[8px]
-                      font-bold
-                      text-brand-dark
-                    "
-                  >
-                    {tab.badgeCount >
-                    9
-                      ? "9+"
-                      : tab.badgeCount}
-                  </span>
-                )}
-            </NavLink>
-          ))}
+          {tabs.map(
+            (tab) => (
+              <CandidateMobileNavLink
+                key={tab.to}
+                tab={tab}
+              />
+            ),
+          )}
         </nav>
+
+        {/* =================================================
+            ACCOUNT ACTIONS
+        ================================================== */}
 
         <div
           className="
@@ -319,7 +278,11 @@ export function CandidateNavBar({
 
           <button
             type="button"
-            onClick={handleSignOut}
+            onClick={
+              handleSignOut
+            }
+            aria-label="Sign out"
+            title="Sign out"
             className="
               hidden
               min-h-[46px]
@@ -329,22 +292,33 @@ export function CandidateNavBar({
               gap-2
               rounded-[14px]
               border
-              border-brand-border
-              bg-white
+              border-brand-primary
+              bg-brand-bg
               px-4
-              text-sm
+              text-[14px]
               font-bold
-              text-brand-textMuted
-              transition-colors
+              text-brand-primary
+              transition-all
+              duration-200
 
-              hover:border-[#ff4672]
-              hover:bg-[#fff5f7]
-              hover:text-[#c72e53]
+              hover:bg-brand-primary
+              hover:text-white
+
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-brand-accent/25
 
               sm:inline-flex
             "
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut
+              className="
+                h-[18px]
+                w-[18px]
+                shrink-0
+              "
+              strokeWidth={2}
+            />
 
             <span className="hidden xl:inline">
               Sign Out
@@ -356,8 +330,196 @@ export function CandidateNavBar({
   );
 }
 
+/* =========================================================
+   DESKTOP NAV LINK
+========================================================= */
+
+function CandidateDesktopNavLink({
+  tab,
+}: {
+  tab: CandidateNavTab;
+}) {
+  const Icon =
+    getNavIcon(
+      tab.to,
+    );
+
+  return (
+    <NavLink
+      to={tab.to}
+      end={
+        tab.to ===
+        '/candidate/feed'
+      }
+      className={({
+        isActive,
+      }) => `
+        group
+        relative
+        flex
+        h-full
+        items-center
+        gap-2
+        text-[14px]
+        no-underline
+        transition-colors
+        duration-150
+
+        ${
+          isActive
+            ? `
+              font-bold
+              text-brand-primary
+
+              after:absolute
+              after:bottom-[20px]
+              after:left-0
+              after:h-[2px]
+              after:w-full
+              after:rounded-full
+              after:bg-brand-gold
+            `
+            : `
+              font-semibold
+              text-brand-textMuted
+
+              hover:text-brand-primary
+            `
+        }
+
+        focus-visible:rounded-md
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
+      `}
+    >
+      <span
+        className="
+          grid
+          h-[30px]
+          w-[30px]
+          shrink-0
+          place-items-center
+          rounded-[9px]
+          bg-brand-accent/10
+          text-brand-primary
+          transition-all
+          duration-150
+
+          group-hover:bg-brand-primary
+          group-hover:text-white
+        "
+      >
+        <Icon
+          className="
+            h-[17px]
+            w-[17px]
+          "
+          strokeWidth={2}
+        />
+      </span>
+
+      <span>
+        {tab.label}
+      </span>
+    </NavLink>
+  );
+}
+
+/* =========================================================
+   MOBILE NAV LINK
+========================================================= */
+
+function CandidateMobileNavLink({
+  tab,
+}: {
+  tab: CandidateNavTab;
+}) {
+  const Icon =
+    getNavIcon(
+      tab.to,
+    );
+
+  return (
+    <NavLink
+      to={tab.to}
+      end={
+        tab.to ===
+        '/candidate/feed'
+      }
+      aria-label={
+        tab.label
+      }
+      title={
+        tab.label
+      }
+      className={({
+        isActive,
+      }) => `
+        group
+        relative
+        flex
+        shrink-0
+        items-center
+        justify-center
+        gap-1.5
+        rounded-[12px]
+        px-2
+        py-2
+        no-underline
+        transition-all
+        duration-150
+
+        ${
+          isActive
+            ? `
+              bg-brand-surface
+              text-brand-primary
+            `
+            : `
+              text-brand-textMuted
+
+              hover:bg-brand-bg
+              hover:text-brand-primary
+            `
+        }
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
+      `}
+    >
+      <Icon
+        className="
+          h-[19px]
+          w-[19px]
+          shrink-0
+        "
+        strokeWidth={2}
+      />
+
+      <span
+        className="
+          hidden
+          text-[11px]
+          font-bold
+
+          md:inline
+        "
+      >
+        {tab.label}
+      </span>
+    </NavLink>
+  );
+}
+
+/* =========================================================
+   NOTIFICATIONS MENU
+========================================================= */
+
 function NotificationsMenu() {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
   const containerRef =
     useRef<HTMLDivElement | null>(
@@ -367,71 +529,101 @@ function NotificationsMenu() {
   const [
     isOpen,
     setIsOpen,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const {
     notifications,
     unreadCount,
     markAsRead,
     markAllAsRead,
-  } = useNotifications();
+  } =
+    useNotifications();
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
+  /* ---------------------------------------------------------
+     CLOSE WHEN CLICKING OUTSIDE
+  --------------------------------------------------------- */
 
-    const handleOutsideClick = (
-      event: MouseEvent,
-    ) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(
-          event.target as Node,
-        )
-      ) {
-        setIsOpen(false);
+  useEffect(
+    () => {
+      if (!isOpen) {
+        return;
       }
-    };
 
-    const handleEscape = (
-      event: KeyboardEvent,
-    ) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
+      const handleOutsideClick = (
+        event: MouseEvent,
+      ) => {
+        if (
+          containerRef.current &&
+          !containerRef.current.contains(
+            event.target as Node,
+          )
+        ) {
+          setIsOpen(
+            false,
+          );
+        }
+      };
 
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick,
-    );
+      const handleEscape = (
+        event: KeyboardEvent,
+      ) => {
+        if (
+          event.key ===
+          'Escape'
+        ) {
+          setIsOpen(
+            false,
+          );
+        }
+      };
 
-    document.addEventListener(
-      "keydown",
-      handleEscape,
-    );
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
+      document.addEventListener(
+        'mousedown',
         handleOutsideClick,
       );
 
-      document.removeEventListener(
-        "keydown",
+      document.addEventListener(
+        'keydown',
         handleEscape,
       );
-    };
-  }, [isOpen]);
+
+      return () => {
+        document.removeEventListener(
+          'mousedown',
+          handleOutsideClick,
+        );
+
+        document.removeEventListener(
+          'keydown',
+          handleEscape,
+        );
+      };
+    },
+    [
+      isOpen,
+    ],
+  );
+
+  /* ---------------------------------------------------------
+     OPEN NOTIFICATION
+  --------------------------------------------------------- */
 
   const handleNotificationClick = (
-    notification: CandidateNotification,
+    notification:
+      CandidateNotification,
   ) => {
-    markAsRead(notification.id);
-    setIsOpen(false);
+    markAsRead(
+      notification.id,
+    );
 
-    if (notification.destination) {
+    setIsOpen(
+      false,
+    );
+
+    if (
+      notification.destination
+    ) {
       navigate(
         notification.destination,
       );
@@ -439,55 +631,68 @@ function NotificationsMenu() {
       return;
     }
 
-    switch (notification.type) {
-      case "message":
+    switch (
+      notification.type
+    ) {
+      case 'message':
         navigate(
-          "/candidate/messages",
+          '/candidate/messages',
         );
         break;
 
-      case "application":
+      case 'application':
         navigate(
-          "/candidate/feed",
+          '/candidate/feed',
         );
         break;
 
-      case "profile":
-      case "verification":
+      case 'profile':
+      case 'verification':
         navigate(
-          "/candidate/profile",
+          '/candidate/profile',
         );
         break;
 
-      case "system":
+      case 'system':
       default:
         navigate(
-          "/candidate/notifications",
+          '/candidate/notifications',
         );
         break;
     }
   };
 
   const recentNotifications =
-    notifications.slice(0, 5);
+    notifications.slice(
+      0,
+      5,
+    );
 
   return (
     <div
-      ref={containerRef}
+      ref={
+        containerRef
+      }
       className="relative"
     >
+      {/* ===================================================
+          BELL BUTTON
+      ==================================================== */}
+
       <button
         type="button"
-        aria-label={
-          unreadCount > 0
-            ? `Notifications, ${unreadCount} unread`
-            : "Notifications"
+        aria-label="Notifications"
+        aria-expanded={
+          isOpen
         }
-        aria-expanded={isOpen}
         aria-haspopup="dialog"
+        title="Notifications"
         onClick={() =>
           setIsOpen(
-            (current) => !current,
+            (
+              current,
+            ) =>
+              !current,
           )
         }
         className={`
@@ -499,47 +704,61 @@ function NotificationsMenu() {
           place-items-center
           rounded-[14px]
           border
-          transition-colors
+          transition-all
+          duration-200
 
           ${
             isOpen
-              ? "border-brand-primary bg-brand-surface text-brand-primary"
-              : "border-brand-border bg-white text-brand-primary hover:border-brand-accent hover:bg-brand-bg"
+              ? `
+                border-brand-primary
+                bg-brand-primary
+                text-white
+              `
+              : `
+                border-brand-primary
+                bg-brand-bg
+                text-brand-primary
+
+                hover:bg-brand-primary
+                hover:text-white
+              `
           }
+
+          focus-visible:outline-none
+          focus-visible:ring-4
+          focus-visible:ring-brand-accent/25
         `}
       >
         <Bell
-          className="h-[19px] w-[19px]"
+          className="
+            h-[19px]
+            w-[19px]
+          "
           strokeWidth={2}
         />
 
-        {unreadCount > 0 && (
+        {unreadCount >
+          0 && (
           <span
+            aria-hidden="true"
             className="
               absolute
-              -right-1.5
-              -top-1.5
-              grid
-              h-[19px]
-              min-w-[19px]
-              place-items-center
+              right-[5px]
+              top-[5px]
+              h-[7px]
+              w-[7px]
               rounded-full
-              border-2
-              border-white
+              border
+              border-brand-bg
               bg-brand-gold
-              px-1
-              text-[9px]
-              font-bold
-              leading-none
-              text-brand-dark
             "
-          >
-            {unreadCount > 9
-              ? "9+"
-              : unreadCount}
-          </span>
+          />
         )}
       </button>
+
+      {/* ===================================================
+          DROPDOWN
+      ==================================================== */}
 
       {isOpen && (
         <div
@@ -549,7 +768,7 @@ function NotificationsMenu() {
             fixed
             left-4
             right-4
-            top-[80px]
+            top-[96px]
             z-[70]
             overflow-hidden
             rounded-[20px]
@@ -565,6 +784,8 @@ function NotificationsMenu() {
             sm:w-[390px]
           "
         >
+          {/* HEADER */}
+
           <div
             className="
               flex
@@ -581,7 +802,7 @@ function NotificationsMenu() {
               <h2
                 className="
                   !m-0
-                  text-[17px]
+                  text-[18px]
                   font-bold
                   text-brand-dark
                 "
@@ -593,18 +814,14 @@ function NotificationsMenu() {
                 className="
                   !mb-0
                   mt-1
-                  text-xs
+                  text-[12px]
                   text-brand-textMuted
                 "
               >
-                {unreadCount > 0
-                  ? `${unreadCount} unread notification${
-                      unreadCount ===
-                      1
-                        ? ""
-                        : "s"
-                    }`
-                  : "You are all caught up"}
+                {unreadCount >
+                0
+                  ? 'You have new notifications'
+                  : 'You are all caught up'}
               </p>
             </div>
 
@@ -612,25 +829,35 @@ function NotificationsMenu() {
               type="button"
               aria-label="Close notifications"
               onClick={() =>
-                setIsOpen(false)
+                setIsOpen(
+                  false,
+                )
               }
               className="
                 grid
                 h-9
                 w-9
                 place-items-center
-                rounded-xl
+                rounded-[12px]
                 text-brand-textMuted
                 transition-colors
+
                 hover:bg-brand-bg
                 hover:text-brand-primary
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/20
               "
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {unreadCount > 0 && (
+          {/* MARK ALL */}
+
+          {unreadCount >
+            0 && (
             <div
               className="
                 flex
@@ -651,11 +878,17 @@ function NotificationsMenu() {
                   inline-flex
                   items-center
                   gap-1.5
-                  text-xs
+                  text-[12px]
                   font-bold
                   text-brand-primary
                   transition-colors
+
                   hover:text-brand-accent
+
+                  focus-visible:rounded-md
+                  focus-visible:outline-none
+                  focus-visible:ring-4
+                  focus-visible:ring-brand-accent/20
                 "
               >
                 <Check className="h-3.5 w-3.5" />
@@ -664,6 +897,8 @@ function NotificationsMenu() {
               </button>
             </div>
           )}
+
+          {/* NOTIFICATION LIST */}
 
           <div
             className="
@@ -674,7 +909,9 @@ function NotificationsMenu() {
             {recentNotifications.length >
             0 ? (
               recentNotifications.map(
-                (notification) => (
+                (
+                  notification,
+                ) => (
                   <NotificationItem
                     key={
                       notification.id
@@ -695,6 +932,8 @@ function NotificationsMenu() {
             )}
           </div>
 
+          {/* FOOTER */}
+
           <div
             className="
               border-t
@@ -706,10 +945,12 @@ function NotificationsMenu() {
             <button
               type="button"
               onClick={() => {
-                setIsOpen(false);
+                setIsOpen(
+                  false,
+                );
 
                 navigate(
-                  "/candidate/notifications",
+                  '/candidate/notifications',
                 );
               }}
               className="
@@ -719,11 +960,16 @@ function NotificationsMenu() {
                 items-center
                 justify-center
                 rounded-[12px]
-                text-sm
+                text-[14px]
                 font-bold
                 text-brand-primary
                 transition-colors
+
                 hover:bg-brand-bg
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/20
               "
             >
               View all notifications
@@ -735,8 +981,14 @@ function NotificationsMenu() {
   );
 }
 
+/* =========================================================
+   NOTIFICATION ITEM
+========================================================= */
+
 type NotificationItemProps = {
-  notification: CandidateNotification;
+  notification:
+    CandidateNotification;
+
   onClick: () => void;
 };
 
@@ -747,7 +999,9 @@ function NotificationItem({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={
+        onClick
+      }
       className={`
         relative
         flex
@@ -763,9 +1017,20 @@ function NotificationItem({
 
         ${
           notification.read
-            ? "bg-white hover:bg-brand-bg"
-            : "bg-brand-bg hover:bg-[#f1f9fd]"
+            ? `
+              bg-white
+              hover:bg-brand-bg
+            `
+            : `
+              bg-brand-accent/5
+              hover:bg-brand-accent/10
+            `
         }
+
+        focus-visible:outline-none
+        focus-visible:ring-2
+        focus-visible:ring-inset
+        focus-visible:ring-brand-accent
       `}
     >
       {!notification.read && (
@@ -784,10 +1049,17 @@ function NotificationItem({
       )}
 
       <NotificationIcon
-        type={notification.type}
+        type={
+          notification.type
+        }
       />
 
-      <div className="min-w-0 flex-1">
+      <div
+        className="
+          min-w-0
+          flex-1
+        "
+      >
         <div
           className="
             flex
@@ -804,8 +1076,8 @@ function NotificationItem({
 
               ${
                 notification.read
-                  ? "font-semibold"
-                  : "font-bold"
+                  ? 'font-semibold'
+                  : 'font-bold'
               }
             `}
           >
@@ -829,7 +1101,7 @@ function NotificationItem({
             !mb-0
             mt-1
             line-clamp-2
-            text-xs
+            text-[12px]
             leading-5
             text-brand-textMuted
           "
@@ -841,71 +1113,82 @@ function NotificationItem({
   );
 }
 
+/* =========================================================
+   NOTIFICATION ICON
+========================================================= */
+
 function NotificationIcon({
   type,
 }: {
-  type: NotificationType;
+  type:
+    NotificationType;
 }) {
   const iconClass =
-    "h-[17px] w-[17px]";
+    'h-[17px] w-[17px]';
 
-  const wrapperClass =
-    `
-      grid
-      h-9
-      w-9
-      shrink-0
-      place-items-center
-      rounded-full
-    `;
+  const wrapperClass = `
+    grid
+    h-9
+    w-9
+    shrink-0
+    place-items-center
+    rounded-full
+  `;
 
   switch (type) {
-    case "message":
+    case 'message':
       return (
         <span
           className={`
             ${wrapperClass}
-            bg-[#e8f5fc]
+            bg-brand-accent/10
             text-brand-accent
           `}
         >
           <MessageSquare
-            className={iconClass}
+            className={
+              iconClass
+            }
           />
         </span>
       );
 
-    case "profile":
+    case 'profile':
       return (
         <span
           className={`
             ${wrapperClass}
-            bg-[#fff6df]
+            bg-brand-gold/15
             text-brand-primary
           `}
         >
           <FileCheck2
-            className={iconClass}
+            className={
+              iconClass
+            }
           />
         </span>
       );
 
-    case "verification":
+    case 'verification':
       return (
         <span
           className={`
             ${wrapperClass}
-            bg-[#ebfff5]
-            text-[#167a50]
+            bg-brand-emerald/15
+            text-brand-dark
           `}
         >
           <ShieldCheck
-            className={iconClass}
+            className={`
+              ${iconClass}
+              text-brand-emerald
+            `}
           />
         </span>
       );
 
-    case "system":
+    case 'system':
       return (
         <span
           className={`
@@ -915,12 +1198,14 @@ function NotificationIcon({
           `}
         >
           <Bell
-            className={iconClass}
+            className={
+              iconClass
+            }
           />
         </span>
       );
 
-    case "application":
+    case 'application':
     default:
       return (
         <span
@@ -931,12 +1216,18 @@ function NotificationIcon({
           `}
         >
           <BriefcaseBusiness
-            className={iconClass}
+            className={
+              iconClass
+            }
           />
         </span>
       );
   }
 }
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
 
 function EmptyNotifications() {
   return (
@@ -969,7 +1260,7 @@ function EmptyNotifications() {
       <p
         className="
           !m-0
-          text-sm
+          text-[14px]
           font-bold
           text-brand-dark
         "
@@ -982,14 +1273,14 @@ function EmptyNotifications() {
           !mb-0
           mt-1
           max-w-[260px]
-          text-xs
+          text-[12px]
           leading-5
           text-brand-textMuted
         "
       >
         Updates about applications,
-        messages and your TruCity
-        account will appear here.
+        messages and your TruCity account
+        will appear here.
       </p>
     </div>
   );

@@ -2,6 +2,11 @@ import { useRef, useState } from 'react';
 import html2pdf from 'html2pdf.js';
 
 import {
+  NavLink,
+  Link,
+} from 'react-router-dom';
+
+import {
   BriefcaseBusiness,
   Check,
   ChevronLeft,
@@ -35,6 +40,12 @@ type Question = {
 };
 
 type Answers = Record<QuestionKey, string>;
+
+interface PublicNavLinkProps {
+  to: string;
+  label: string;
+  end?: boolean;
+}
 
 /* =========================================================
    QUESTIONS
@@ -113,9 +124,7 @@ export default function CVBuilder() {
 
   const progressPercent =
     Math.round(
-      ((step + 1) /
-        QUESTIONS.length) *
-        100,
+      ((step + 1) / QUESTIONS.length) * 100,
     );
 
   /* =========================================================
@@ -135,82 +144,78 @@ export default function CVBuilder() {
      DOWNLOAD CV ONLY
   ========================================================= */
 
-  const handleDownloadPDF =
-    async () => {
-      const cvElement =
-        cvRef.current;
+  const handleDownloadPDF = async () => {
+    const cvElement =
+      cvRef.current;
 
-      if (
-        !cvElement ||
-        isDownloading
-      ) {
-        return;
-      }
+    if (
+      !cvElement ||
+      isDownloading
+    ) {
+      return;
+    }
 
-      setIsDownloading(true);
+    setIsDownloading(true);
 
-      try {
-        const pdfOptions = {
-          margin: 0,
+    try {
+      const pdfOptions = {
+        margin: 0,
 
-          filename:
-            'TruCity_Professional_CV.pdf',
+        filename:
+          'TruCity_Professional_CV.pdf',
 
-          image: {
-            type: 'jpeg',
-            quality: 1,
-          },
+        image: {
+          type: 'jpeg',
+          quality: 1,
+        },
 
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor:
-              '#ffffff',
-            windowWidth: 1200,
-          },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor:
+            '#ffffff',
+          windowWidth: 1200,
+        },
 
-          jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation:
-              'portrait',
-          },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+        },
 
-          pagebreak: {
-            mode: [
-              'css',
-              'legacy',
-            ],
-          },
-        } as any;
+        pagebreak: {
+          mode: [
+            'css',
+            'legacy',
+          ],
+        },
+      } as any;
 
-        await html2pdf()
-          .set(pdfOptions)
-          .from(cvElement)
-          .save();
-      } catch (error) {
-        console.error(
-          'CV PDF generation failed:',
-          error,
-        );
+      await html2pdf()
+        .set(pdfOptions)
+        .from(cvElement)
+        .save();
+    } catch (error) {
+      console.error(
+        'CV PDF generation failed:',
+        error,
+      );
 
-        window.alert(
-          'Your CV could not be downloaded. Please try again.',
-        );
-      } finally {
-        setIsDownloading(false);
-      }
-    };
+      window.alert(
+        'Your CV could not be downloaded. Please try again.',
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   /* =========================================================
      NAVIGATION
   ========================================================= */
 
   const handleNext = () => {
-    if (
-      !currentAnswer.trim()
-    ) {
+    if (!currentAnswer.trim()) {
       return;
     }
 
@@ -229,15 +234,14 @@ export default function CVBuilder() {
     setGenerated(true);
   };
 
-  const handlePrevious =
-    () => {
-      if (step > 0) {
-        setStep(
-          (previous) =>
-            previous - 1,
-        );
-      }
-    };
+  const handlePrevious = () => {
+    if (step > 0) {
+      setStep(
+        (previous) =>
+          previous - 1,
+      );
+    }
+  };
 
   const handleReset = () => {
     setStep(0);
@@ -271,6 +275,151 @@ export default function CVBuilder() {
       "
     >
       {/* =====================================================
+          ROLECHOICE NAVBAR
+      ====================================================== */}
+
+      <header
+        className="
+          fixed
+          inset-x-0
+          top-0
+          z-50
+          overflow-visible
+          border-b
+          border-brand-border
+          bg-brand-bg/95
+          shadow-[0_4px_18px_rgba(0,70,109,0.04)]
+          backdrop-blur-md
+        "
+      >
+        <div
+          className="
+            mx-auto
+            flex
+            h-[88px]
+            w-full
+            max-w-[1480px]
+            items-center
+            justify-between
+            gap-6
+            overflow-visible
+            px-5
+            sm:px-8
+            lg:px-10
+          "
+        >
+          {/* LOGO */}
+
+          <Link
+            to="/"
+            aria-label="TruCity home"
+            className="
+              relative
+              flex
+              h-[88px]
+              w-[150px]
+              shrink-0
+              items-center
+              overflow-visible
+              no-underline
+              sm:w-[170px]
+              lg:w-[195px]
+            "
+          >
+            <img
+              src="/public/trucity-nav-logo.png"
+              alt="TruCity"
+              draggable={false}
+              className="
+                absolute
+                left-[-22px]
+                top-1/2
+                block
+                h-auto
+                w-[145px]
+                max-w-none
+                -translate-y-1/2
+                select-none
+                object-contain
+                sm:left-[-26px]
+                sm:w-[165px]
+                lg:left-[-30px]
+                lg:w-[190px]
+              "
+            />
+          </Link>
+
+          {/* DESKTOP NAV */}
+
+          <nav
+            aria-label="Public navigation"
+            className="
+              hidden
+              items-center
+              gap-9
+              lg:flex
+            "
+          >
+            <PublicNavLink
+              to="/"
+              label="Home"
+              end
+            />
+
+            <PublicNavLink
+              to="/guidance"
+              label="Guidance Hub"
+            />
+
+            <PublicNavLink
+              to="/about"
+              label="About"
+            />
+
+            <PublicNavLink
+              to="/contact"
+              label="Contact"
+            />
+          </nav>
+
+          {/* SIGN IN */}
+
+          <Link
+            to="/login"
+            className="
+              inline-flex
+              min-h-[46px]
+              shrink-0
+              items-center
+              justify-center
+              rounded-[14px]
+              border
+              border-brand-primary
+              bg-brand-bg
+              px-5
+              text-[14px]
+              font-bold
+              text-brand-primary
+              no-underline
+              transition-all
+              duration-200
+
+              hover:bg-brand-primary
+              hover:text-white
+
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-brand-accent/25
+
+              sm:px-6
+            "
+          >
+            Sign In
+          </Link>
+        </div>
+      </header>
+
+      {/* =====================================================
           BRAND DECORATIONS
       ====================================================== */}
 
@@ -284,31 +433,71 @@ export default function CVBuilder() {
           overflow-hidden
         "
       >
-        <div
-          className="
-            absolute
-            -right-45
-            -top-32.5
-            hidden
-            h-107.5
-            w-107.5
-            rounded-full
-            border-64
-            border-brand-gold/70
-            lg:block
-          "
-        />
+        {/* TOP-RIGHT ORANGE RING */}
 
         <div
           className="
             absolute
-            -bottom-65
-            -left-52.5
+            -right-[175px]
+            top-[-175px]
             hidden
-            h-125
-            w-125
+            h-[500px]
+            w-[500px]
             rounded-full
-            bg-brand-orange/35
+            lg:block
+          "
+          style={{
+            background:
+              'linear-gradient(135deg, #FFAD01 0%, #FFD784 100%)',
+          }}
+        >
+          <div
+            className="
+              absolute
+              left-1/2
+              top-1/2
+              h-[70%]
+              w-[70%]
+              -translate-x-1/2
+              -translate-y-1/2
+              rounded-full
+              bg-brand-bg
+            "
+          />
+        </div>
+
+        {/* BOTTOM-LEFT BLUE CIRCLE */}
+
+        <div
+          className="
+            absolute
+            -bottom-[260px]
+            -left-[210px]
+            hidden
+            h-[500px]
+            w-[500px]
+            rounded-full
+            lg:block
+          "
+          style={{
+            background:
+              'linear-gradient(145deg, #00466D 0%, #00466D 58%, #1E92D2 100%)',
+          }}
+        />
+
+        {/* GOLD OUTLINE */}
+
+        <div
+          className="
+            absolute
+            -bottom-[305px]
+            -left-[255px]
+            hidden
+            h-[590px]
+            w-[590px]
+            rounded-full
+            border-[3px]
+            border-brand-gold
             lg:block
           "
         />
@@ -325,12 +514,15 @@ export default function CVBuilder() {
           mx-auto
           min-h-[100dvh]
           w-full
-          max-w-295
+          max-w-[1180px]
           bg-transparent
           px-4
-          py-8
+          pb-10
+          pt-[122px]
+
           sm:px-8
-          sm:py-10
+          sm:pb-12
+          sm:pt-[132px]
         "
       >
         {/* =================================================
@@ -344,6 +536,7 @@ export default function CVBuilder() {
             flex-col
             justify-between
             gap-5
+
             md:flex-row
             md:items-end
           "
@@ -364,24 +557,33 @@ export default function CVBuilder() {
                 text-[10px]
                 font-bold
                 uppercase
-                tracking-[0.18em]
+                tracking-[0.16em]
                 text-brand-primary
                 shadow-sm
                 backdrop-blur-sm
               "
             >
-              <Sparkles className="h-3.5 w-3.5 text-brand-gold" />
+              <Sparkles
+                className="
+                  h-3.5
+                  w-3.5
+                  text-brand-gold
+                "
+              />
+
               Career Tools
             </div>
 
             <h1
               className="
-                m-0!
+                !m-0
                 text-[32px]
                 font-bold
                 tracking-[-0.035em]
-                text-brand-primary!
+                !text-brand-primary
+
                 sm:text-[40px]
+                lg:text-[44px]
               "
             >
               Professional{' '}
@@ -392,15 +594,18 @@ export default function CVBuilder() {
 
             <p
               className="
-                mt-2
-                max-w-162.5
-                text-sm
+                mt-3
+                max-w-[650px]
+                text-[14px]
                 leading-6
                 text-brand-textMuted
+
+                sm:text-[15px]
               "
             >
-              Create a clean, structured CV that presents your
-              professional profile, work experience, skills and
+              Create a clean, structured CV that
+              presents your professional profile,
+              work experience, skills and
               qualifications clearly to employers.
             </p>
           </div>
@@ -418,10 +623,10 @@ export default function CVBuilder() {
                 bg-brand-gold/10
                 px-4
                 py-2
-                text-xs
+                text-[12px]
                 font-bold
                 text-brand-dark
-                backdrop-blur-sm
+
                 md:self-auto
               "
             >
@@ -439,6 +644,7 @@ export default function CVBuilder() {
             className="
               grid
               gap-6
+
               lg:grid-cols-[minmax(0,1fr)_310px]
             "
           >
@@ -455,12 +661,11 @@ export default function CVBuilder() {
                 p-5
                 shadow-[0_20px_50px_rgba(0,70,109,0.09)]
                 backdrop-blur-xl
+
                 sm:p-7
               "
             >
-              {/* =================================================
-                  PROGRESS
-              ================================================== */}
+              {/* PROGRESS */}
 
               <div className="mb-8">
                 <div
@@ -478,7 +683,7 @@ export default function CVBuilder() {
                         text-[10px]
                         font-bold
                         uppercase
-                        tracking-[0.17em]
+                        tracking-[0.16em]
                         text-brand-accent
                       "
                     >
@@ -488,7 +693,7 @@ export default function CVBuilder() {
                     <p
                       className="
                         mt-1
-                        text-sm
+                        text-[14px]
                         font-bold
                         text-brand-primary
                       "
@@ -506,7 +711,7 @@ export default function CVBuilder() {
                       bg-brand-accent/10
                       px-3.5
                       py-1.5
-                      text-xs
+                      text-[12px]
                       font-bold
                       text-brand-primary
                     "
@@ -529,9 +734,7 @@ export default function CVBuilder() {
 
                       return (
                         <div
-                          key={
-                            question.key
-                          }
+                          key={question.key}
                           className="
                             flex
                             flex-1
@@ -548,15 +751,29 @@ export default function CVBuilder() {
                               items-center
                               justify-center
                               rounded-full
-                              text-xs
+                              text-[12px]
                               font-bold
                               transition-all
+
                               ${
                                 completed
-                                  ? 'bg-brand-primary text-white'
+                                  ? `
+                                    bg-brand-primary
+                                    text-white
+                                  `
                                   : active
-                                    ? 'border-2 border-brand-accent bg-brand-accent/10 text-brand-primary'
-                                    : 'border border-brand-border bg-brand-surface text-brand-textMuted'
+                                    ? `
+                                      border-2
+                                      border-brand-accent
+                                      bg-brand-accent/10
+                                      text-brand-primary
+                                    `
+                                    : `
+                                      border
+                                      border-brand-border
+                                      bg-brand-surface
+                                      text-brand-textMuted
+                                    `
                               }
                             `}
                           >
@@ -572,12 +789,11 @@ export default function CVBuilder() {
                               className={`
                                 text-[10px]
                                 font-bold
+
                                 ${
                                   active
                                     ? 'text-brand-primary'
-                                    : completed
-                                      ? 'text-brand-textMuted'
-                                      : 'text-brand-textMuted/70'
+                                    : 'text-brand-textMuted'
                                 }
                               `}
                             >
@@ -596,6 +812,7 @@ export default function CVBuilder() {
                               className={`
                                 h-px
                                 flex-1
+
                                 ${
                                   completed
                                     ? 'bg-brand-accent'
@@ -611,9 +828,7 @@ export default function CVBuilder() {
                 </div>
               </div>
 
-              {/* =================================================
-                  QUESTION
-              ================================================== */}
+              {/* QUESTION */}
 
               <div className="mb-7">
                 <div
@@ -632,7 +847,7 @@ export default function CVBuilder() {
                       shrink-0
                       items-center
                       justify-center
-                      rounded-2xl
+                      rounded-[16px]
                       border
                       border-brand-accent/30
                       bg-brand-accent/10
@@ -662,12 +877,13 @@ export default function CVBuilder() {
 
                     <h2
                       className="
-                        m-0!
-                        text-lg
+                        !m-0
+                        text-[20px]
                         font-bold
                         leading-7
-                        text-brand-primary!
-                        sm:text-xl
+                        !text-brand-primary
+
+                        sm:text-[22px]
                       "
                     >
                       {current.q}
@@ -675,13 +891,15 @@ export default function CVBuilder() {
                   </div>
                 </div>
 
+                {/* HINT */}
+
                 <div
                   className="
                     mb-4
                     rounded-[14px]
                     border
                     border-brand-border
-                    bg-brand-surface/85
+                    bg-brand-surface
                     px-4
                     py-3
                   "
@@ -699,7 +917,7 @@ export default function CVBuilder() {
 
                     <p
                       className="
-                        text-xs
+                        text-[12px]
                         leading-5
                         text-brand-textMuted
                       "
@@ -710,38 +928,32 @@ export default function CVBuilder() {
                 </div>
 
                 <textarea
-                  value={
-                    currentAnswer
-                  }
-                  onChange={(
-                    event,
-                  ) =>
+                  value={currentAnswer}
+                  onChange={(event) =>
                     updateAnswer(
-                      event.target
-                        .value,
+                      event.target.value,
                     )
                   }
-                  placeholder={
-                    current.ph
-                  }
+                  placeholder={current.ph}
                   className="
-                    min-h-47.5
+                    min-h-[190px]
                     w-full
                     resize-none
                     rounded-[18px]
                     border
                     border-brand-border
-                    bg-white/90
+                    bg-white
                     p-4
-                    text-sm
-                    font-medium
+                    text-[14px]
+                    font-normal
                     leading-6
                     text-brand-dark
                     outline-none
                     transition
+
                     placeholder:text-brand-textMuted/60
+
                     focus:border-brand-accent
-                    focus:bg-white
                     focus:ring-4
                     focus:ring-brand-accent/15
                   "
@@ -756,26 +968,23 @@ export default function CVBuilder() {
                     gap-1
                     text-[10px]
                     text-brand-textMuted
+
                     sm:flex-row
                   "
                 >
                   <span>
-                    Enter accurate,
-                    professional information.
+                    Enter accurate, professional
+                    information.
                   </span>
 
                   <span>
-                    {
-                      currentAnswer.length
-                    }{' '}
+                    {currentAnswer.length}{' '}
                     characters
                   </span>
                 </div>
               </div>
 
-              {/* =================================================
-                  ACTIONS
-              ================================================== */}
+              {/* ACTIONS */}
 
               <div
                 className="
@@ -785,18 +994,17 @@ export default function CVBuilder() {
                   border-t
                   border-brand-border
                   pt-5
+
                   sm:flex-row
                 "
               >
                 {step > 0 && (
                   <button
                     type="button"
-                    onClick={
-                      handlePrevious
-                    }
+                    onClick={handlePrevious}
                     className="
                       inline-flex
-                      min-h-12.5
+                      min-h-[50px]
                       items-center
                       justify-center
                       gap-2
@@ -805,7 +1013,7 @@ export default function CVBuilder() {
                       border-brand-border
                       bg-white
                       px-5
-                      text-xs
+                      text-[12px]
                       font-bold
                       text-brand-textMuted
                       transition
@@ -819,48 +1027,51 @@ export default function CVBuilder() {
                     "
                   >
                     <ChevronLeft className="h-4 w-4" />
+
                     Previous
                   </button>
                 )}
 
                 <button
                   type="button"
-                  onClick={
-                    handleNext
-                  }
+                  onClick={handleNext}
                   disabled={
                     !currentAnswer.trim()
                   }
                   className="
                     group
                     flex
-                    min-h-12.5
+                    min-h-[50px]
                     flex-1
                     items-center
                     justify-center
                     gap-2
                     rounded-[14px]
-                    bg-brand-primary
                     px-5
-                    text-xs
+                    text-[12px]
                     font-bold
                     text-white
                     shadow-[0_10px_25px_rgba(0,70,109,0.17)]
                     transition-all
 
                     hover:-translate-y-0.5
-                    hover:bg-brand-dark
+                    hover:opacity-95
 
                     focus-visible:outline-none
                     focus-visible:ring-4
                     focus-visible:ring-brand-accent/25
 
                     disabled:cursor-not-allowed
-                    disabled:bg-brand-border
-                    disabled:text-brand-textMuted
+                    disabled:opacity-40
                     disabled:shadow-none
                     disabled:hover:translate-y-0
                   "
+                  style={{
+                    background:
+                      currentAnswer.trim()
+                        ? 'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)'
+                        : '#00466D',
+                  }}
                 >
                   {step <
                   QUESTIONS.length -
@@ -891,10 +1102,9 @@ export default function CVBuilder() {
                   rounded-[24px]
                   border
                   border-brand-accent/30
-                  bg-white/90
+                  bg-white/95
                   p-5
                   shadow-[0_12px_30px_rgba(0,70,109,0.07)]
-                  backdrop-blur-sm
                 "
               >
                 <div
@@ -913,21 +1123,29 @@ export default function CVBuilder() {
                   <FileText className="h-5 w-5" />
                 </div>
 
-                <h3 className="text-sm font-bold text-brand-primary">
+                <h3
+                  className="
+                    text-[16px]
+                    font-bold
+                    text-brand-primary
+                  "
+                >
                   Professional structure
                 </h3>
 
                 <p
                   className="
                     mt-2
-                    text-xs
+                    text-[12px]
                     leading-5
                     text-brand-textMuted
                   "
                 >
-                  The builder organises your information into a clean
-                  CV structure that is easy for employers and recruiters
-                  to review.
+                  The builder organises your
+                  information into a clean CV
+                  structure that is easy for
+                  employers and recruiters to
+                  review.
                 </p>
               </div>
 
@@ -939,7 +1157,6 @@ export default function CVBuilder() {
                   bg-white/95
                   p-5
                   shadow-[0_12px_30px_rgba(0,70,109,0.06)]
-                  backdrop-blur-sm
                 "
               >
                 <p
@@ -965,7 +1182,11 @@ export default function CVBuilder() {
                   ].map((item) => (
                     <div
                       key={item}
-                      className="flex items-center gap-3"
+                      className="
+                        flex
+                        items-center
+                        gap-3
+                      "
                     >
                       <span
                         className="
@@ -983,7 +1204,12 @@ export default function CVBuilder() {
                         <Check className="h-3 w-3" />
                       </span>
 
-                      <span className="text-xs text-brand-textMuted">
+                      <span
+                        className="
+                          text-[12px]
+                          text-brand-textMuted
+                        "
+                      >
                         {item}
                       </span>
                     </div>
@@ -996,9 +1222,8 @@ export default function CVBuilder() {
                   rounded-[20px]
                   border
                   border-brand-border
-                  bg-brand-surface/85
+                  bg-brand-surface
                   p-4
-                  backdrop-blur-sm
                 "
               >
                 <div className="flex gap-3">
@@ -1013,7 +1238,13 @@ export default function CVBuilder() {
                   />
 
                   <div>
-                    <p className="text-xs font-bold text-brand-primary">
+                    <p
+                      className="
+                        text-[12px]
+                        font-bold
+                        text-brand-primary
+                      "
+                    >
                       Review before sharing
                     </p>
 
@@ -1025,8 +1256,10 @@ export default function CVBuilder() {
                         text-brand-textMuted
                       "
                     >
-                      Make sure your employment dates, qualifications
-                      and experience are accurate before sending your CV.
+                      Make sure your employment
+                      dates, qualifications and
+                      experience are accurate
+                      before sending your CV.
                     </p>
                   </div>
                 </div>
@@ -1039,9 +1272,7 @@ export default function CVBuilder() {
           ================================================== */
 
           <div className="space-y-6">
-            {/* =================================================
-                SUCCESS
-            ================================================== */}
+            {/* SUCCESS */}
 
             <div
               className="
@@ -1051,7 +1282,6 @@ export default function CVBuilder() {
                 bg-white/95
                 p-5
                 shadow-[0_16px_40px_rgba(0,70,109,0.08)]
-                backdrop-blur-sm
               "
             >
               <div
@@ -1059,6 +1289,7 @@ export default function CVBuilder() {
                   flex
                   flex-col
                   gap-4
+
                   sm:flex-row
                   sm:items-center
                   sm:justify-between
@@ -1098,7 +1329,7 @@ export default function CVBuilder() {
                       className="
                         !m-0
                         mt-1
-                        text-lg
+                        text-[20px]
                         font-bold
                         !text-brand-primary
                       "
@@ -1106,8 +1337,16 @@ export default function CVBuilder() {
                       Review your document
                     </h2>
 
-                    <p className="mt-1 text-xs text-brand-textMuted">
-                      Check your information before downloading and sharing.
+                    <p
+                      className="
+                        mt-1
+                        text-[12px]
+                        text-brand-textMuted
+                      "
+                    >
+                      Check your information
+                      before downloading and
+                      sharing.
                     </p>
                   </div>
                 </div>
@@ -1126,6 +1365,7 @@ export default function CVBuilder() {
                     uppercase
                     tracking-[0.12em]
                     text-brand-dark
+
                     sm:self-auto
                   "
                 >
@@ -1146,10 +1386,10 @@ export default function CVBuilder() {
                 rounded-[28px]
                 border
                 border-brand-border
-                bg-brand-surface/90
+                bg-brand-surface
                 p-4
                 shadow-inner
-                backdrop-blur-sm
+
                 sm:p-6
               "
             >
@@ -1168,12 +1408,10 @@ export default function CVBuilder() {
                   color: '#00273D',
                   padding: '18mm 18mm 16mm',
                   fontFamily:
-                    'Helvetica, Arial, sans-serif',
+                    'Helvetica, "Helvetica Neue", Arial, sans-serif',
                 }}
               >
-                {/* =============================================
-                    DOCUMENT HEADER
-                ============================================== */}
+                {/* DOCUMENT HEADER */}
 
                 <div
                   style={{
@@ -1217,7 +1455,7 @@ export default function CVBuilder() {
                         fontWeight: 700,
                         letterSpacing: '-0.5px',
                         fontFamily:
-                          'Helvetica, Arial, sans-serif',
+                          'Helvetica, "Helvetica Neue", Arial, sans-serif',
                       }}
                     >
                       Professional Profile
@@ -1272,9 +1510,7 @@ export default function CVBuilder() {
                   </div>
                 </div>
 
-                {/* =============================================
-                    DOCUMENT CONTENT
-                ============================================== */}
+                {/* DOCUMENT CONTENT */}
 
                 <div
                   style={{
@@ -1283,36 +1519,26 @@ export default function CVBuilder() {
                 >
                   <PDFCVSection
                     title="Professional Summary"
-                    value={
-                      answers.summary
-                    }
+                    value={answers.summary}
                   />
 
                   <PDFCVSection
                     title="Professional Experience"
-                    value={
-                      answers.lastJob
-                    }
+                    value={answers.lastJob}
                   />
 
                   <PDFCVSection
                     title="Core Skills & Competencies"
-                    value={
-                      answers.skills
-                    }
+                    value={answers.skills}
                   />
 
                   <PDFCVSection
                     title="Education & Qualifications"
-                    value={
-                      answers.education
-                    }
+                    value={answers.education}
                   />
                 </div>
 
-                {/* =============================================
-                    DOCUMENT FOOTER
-                ============================================== */}
+                {/* DOCUMENT FOOTER */}
 
                 <div
                   style={{
@@ -1343,25 +1569,20 @@ export default function CVBuilder() {
               </div>
             </div>
 
-            {/* =================================================
-                ACTIONS
-            ================================================== */}
+            {/* ACTIONS */}
 
             <div
               className="
                 grid
                 gap-3
+
                 sm:grid-cols-[1fr_auto]
               "
             >
               <button
                 type="button"
-                onClick={
-                  handleDownloadPDF
-                }
-                disabled={
-                  isDownloading
-                }
+                onClick={handleDownloadPDF}
+                disabled={isDownloading}
                 className="
                   flex
                   min-h-[56px]
@@ -1369,16 +1590,15 @@ export default function CVBuilder() {
                   justify-center
                   gap-2
                   rounded-[16px]
-                  bg-brand-primary
                   px-6
-                  text-sm
+                  text-[14px]
                   font-bold
                   text-white
                   shadow-[0_12px_28px_rgba(0,70,109,0.18)]
                   transition
 
                   hover:-translate-y-0.5
-                  hover:bg-brand-dark
+                  hover:opacity-95
 
                   focus-visible:outline-none
                   focus-visible:ring-4
@@ -1387,6 +1607,10 @@ export default function CVBuilder() {
                   disabled:cursor-not-allowed
                   disabled:opacity-60
                 "
+                style={{
+                  background:
+                    'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+                }}
               >
                 {isDownloading ? (
                   <>
@@ -1403,6 +1627,7 @@ export default function CVBuilder() {
                 ) : (
                   <>
                     <Download className="h-4 w-4" />
+
                     Download CV
                   </>
                 )}
@@ -1410,9 +1635,7 @@ export default function CVBuilder() {
 
               <button
                 type="button"
-                onClick={
-                  handleReset
-                }
+                onClick={handleReset}
                 className="
                   flex
                   min-h-[56px]
@@ -1424,7 +1647,7 @@ export default function CVBuilder() {
                   border-brand-border
                   bg-white
                   px-6
-                  text-sm
+                  text-[14px]
                   font-bold
                   text-brand-textMuted
                   transition
@@ -1438,6 +1661,7 @@ export default function CVBuilder() {
                 "
               >
                 <ChevronLeft className="h-4 w-4" />
+
                 Edit Information
               </button>
             </div>
@@ -1447,9 +1671,8 @@ export default function CVBuilder() {
                 rounded-[20px]
                 border
                 border-brand-border
-                bg-white/90
+                bg-white/95
                 p-4
-                backdrop-blur-sm
               "
             >
               <div className="flex items-start gap-3">
@@ -1465,14 +1688,16 @@ export default function CVBuilder() {
 
                 <p
                   className="
-                    text-xs
+                    text-[12px]
                     leading-5
                     text-brand-textMuted
                   "
                 >
-                  Review your dates, job titles, qualifications and
-                  experience before sharing the document with employers.
-                  You can return and edit the information at any time.
+                  Review your dates, job titles,
+                  qualifications and experience before
+                  sharing the document with employers.
+                  You can return and edit the
+                  information at any time.
                 </p>
               </div>
             </div>
@@ -1480,6 +1705,58 @@ export default function CVBuilder() {
         )}
       </main>
     </div>
+  );
+}
+
+/* =========================================================
+   ROLECHOICE NAV LINK
+========================================================= */
+
+function PublicNavLink({
+  to,
+  label,
+  end = false,
+}: PublicNavLinkProps) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) => `
+        relative
+        text-[14px]
+        no-underline
+        transition-colors
+        duration-150
+
+        ${
+          isActive
+            ? `
+              font-bold
+              text-brand-primary
+
+              after:absolute
+              after:-bottom-2
+              after:left-0
+              after:h-[2px]
+              after:w-full
+              after:rounded-full
+              after:bg-brand-gold
+            `
+            : `
+              font-semibold
+              text-brand-textMuted
+              hover:text-brand-primary
+            `
+        }
+
+        focus-visible:rounded-md
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
+      `}
+    >
+      {label}
+    </NavLink>
   );
 }
 
@@ -1523,7 +1800,7 @@ function PDFCVSection({
             letterSpacing: '1.2px',
             textTransform: 'uppercase',
             fontFamily:
-              'Helvetica, Arial, sans-serif',
+              'Helvetica, "Helvetica Neue", Arial, sans-serif',
           }}
         >
           {title}
@@ -1547,7 +1824,7 @@ function PDFCVSection({
           lineHeight: '1.65',
           fontWeight: 400,
           fontFamily:
-            'Helvetica, Arial, sans-serif',
+            'Helvetica, "Helvetica Neue", Arial, sans-serif',
         }}
       >
         {value || 'Not specified'}

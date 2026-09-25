@@ -32,4 +32,18 @@ public class AuthController {
     ) {
         return CurrentUserResponse.from(user);
     }
+
+    @PostMapping("/forgot-password")
+    public PasswordResetResponse forgotPassword(
+            @RequestBody ForgotPasswordRequest request
+    ) {
+        return service.forgotPassword(request);
+    }
+
+    @PostMapping("/reset-password")
+    public PasswordResetResponse resetPassword(
+            @RequestBody ResetPasswordRequest request
+    ) {
+        return service.resetPassword(request);
+    }
 }

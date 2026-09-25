@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
-import { useChoosePlan } from '../../../hooks/useChoosePlan';
-import AuthShell from '../../../components/auth/AuthShell';
+
+import { useChoosePlan } from './useChoosePlan';
+import AuthShell from '../../components/auth/AuthShell';
 
 /* =========================================================
    TYPES
@@ -166,7 +167,11 @@ export default function ChoosePlan() {
   const selectedPlanDetails =
     PLANS.find((plan) => plan.id === selectedPlan) ?? null;
 
-  
+  const selectedPaymentMethod =
+    PAYMENT_METHODS.find(
+      (method) => method.id === paymentMethod,
+    ) ?? PAYMENT_METHODS[0];
+
   /* =======================================================
      FORM
   ======================================================= */

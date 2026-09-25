@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 
 import {
@@ -44,12 +45,7 @@ type ProfileTab =
 interface DocItem {
   id: number;
   name: string;
-
-  status:
-    | 'verified'
-    | 'pending'
-    | 'none';
-
+  status: 'verified' | 'pending' | 'none';
   fileName?: string;
   fileSize?: string;
 }
@@ -95,7 +91,7 @@ interface GalleryImage {
 }
 
 /* =========================================================
-   STORAGE KEYS
+   STORAGE
 ========================================================= */
 
 const FACE_PHOTO_STORAGE_KEY =
@@ -162,74 +158,50 @@ const DEFAULT_PROJECTS: ProjectItem[] = [
 ];
 
 /* =========================================================
-   STORAGE HELPERS
+   HELPERS
 ========================================================= */
 
-function getStoredValue(
-  key: string,
-) {
+function getStoredValue(key: string) {
   try {
-    return localStorage.getItem(
-      key,
-    );
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function imageFileToDataUrl(
-  file: File,
-) {
-  return new Promise<string>(
-    (
-      resolve,
-      reject,
-    ) => {
-      const reader =
-        new FileReader();
+function imageFileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
 
-      reader.onload =
-        () => {
-          if (
-            typeof reader.result ===
-            'string'
-          ) {
-            resolve(
-              reader.result,
-            );
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
 
-            return;
-          }
-
-          reject(
-            new Error(
-              'Unable to read image file.',
-            ),
-          );
-        };
-
-      reader.onerror =
-        () => {
-          reject(
-            new Error(
-              'Unable to read image file.',
-            ),
-          );
-        };
-
-      reader.readAsDataURL(
-        file,
+      reject(
+        new Error(
+          'Unable to read image file.',
+        ),
       );
-    },
-  );
+    };
+
+    reader.onerror = () => {
+      reject(
+        new Error(
+          'Unable to read image file.',
+        ),
+      );
+    };
+
+    reader.readAsDataURL(file);
+  });
 }
 
 function createGalleryId() {
   if (
-    typeof crypto !==
-      'undefined' &&
-    'randomUUID' in
-      crypto
+    typeof crypto !== 'undefined' &&
+    'randomUUID' in crypto
   ) {
     return crypto.randomUUID();
   }
@@ -246,42 +218,26 @@ function createGalleryId() {
 export function Profile({
   onLogout: _onLogout,
 }: ProfileProps) {
-  const [
-    activeTab,
-    setActiveTab,
-  ] =
-    useState<ProfileTab>(
-      'profile',
-    );
+  const [activeTab, setActiveTab] =
+    useState<ProfileTab>('profile');
 
   /* =======================================================
      PROFILE PHOTO
   ======================================================= */
 
-  const [
-    facePhoto,
-    setFacePhoto,
-  ] =
-    useState<
-      string | null
-    >(
-      () =>
-        getStoredValue(
-          FACE_PHOTO_STORAGE_KEY,
-        ),
+  const [facePhoto, setFacePhoto] =
+    useState<string | null>(() =>
+      getStoredValue(
+        FACE_PHOTO_STORAGE_KEY,
+      ),
     );
 
   /* =======================================================
      GALLERY
   ======================================================= */
 
-  const [
-    galleryImages,
-    setGalleryImages,
-  ] =
-    useState<
-      GalleryImage[]
-    >(() => {
+  const [galleryImages, setGalleryImages] =
+    useState<GalleryImage[]>(() => {
       try {
         const stored =
           localStorage.getItem(
@@ -292,17 +248,10 @@ export function Profile({
           return [];
         }
 
-        const parsed:
-          unknown =
-          JSON.parse(
-            stored,
-          );
+        const parsed: unknown =
+          JSON.parse(stored);
 
-        if (
-          !Array.isArray(
-            parsed,
-          )
-        ) {
+        if (!Array.isArray(parsed)) {
           return [];
         }
 
@@ -312,8 +261,7 @@ export function Profile({
           ): item is GalleryImage => {
             if (
               !item ||
-              typeof item !==
-                'object'
+              typeof item !== 'object'
             ) {
               return false;
             }
@@ -340,52 +288,35 @@ export function Profile({
       }
     });
 
-  useEffect(
-    () => {
-      try {
-        localStorage.setItem(
-          GALLERY_STORAGE_KEY,
-          JSON.stringify(
-            galleryImages,
-          ),
-        );
-      } catch (
-        error
-      ) {
-        console.error(
-          'Unable to persist gallery images:',
-          error,
-        );
-      }
-    },
-    [
-      galleryImages,
-    ],
-  );
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        GALLERY_STORAGE_KEY,
+        JSON.stringify(
+          galleryImages,
+        ),
+      );
+    } catch (error) {
+      console.error(
+        'Unable to persist gallery images:',
+        error,
+      );
+    }
+  }, [galleryImages]);
 
   /* =======================================================
      DOCUMENTS
   ======================================================= */
 
-  const [
-    docs,
-    setDocs,
-  ] =
-    useState<DocItem[]>(
-      DEFAULT_DOCS,
-    );
+  const [docs, setDocs] =
+    useState<DocItem[]>(DEFAULT_DOCS);
 
   /* =======================================================
      PROJECTS
   ======================================================= */
 
-  const [
-    projects,
-    setProjects,
-  ] =
-    useState<
-      ProjectItem[]
-    >(
+  const [projects, setProjects] =
+    useState<ProjectItem[]>(
       DEFAULT_PROJECTS,
     );
 
@@ -393,86 +324,60 @@ export function Profile({
      INTRO REEL
   ======================================================= */
 
-  const [
-    reelMeta,
-    setReelMeta,
-  ] =
-    useState<
-      IntroReelMeta | null
-    >(() => {
-      try {
-        const stored =
-          localStorage.getItem(
-            INTRO_REEL_META_STORAGE_KEY,
-          );
+  const [reelMeta, setReelMeta] =
+    useState<IntroReelMeta | null>(
+      () => {
+        try {
+          const stored =
+            localStorage.getItem(
+              INTRO_REEL_META_STORAGE_KEY,
+            );
 
-        return stored
-          ? JSON.parse(
-              stored,
-            )
-          : null;
-      } catch {
-        return null;
-      }
-    });
+          return stored
+            ? JSON.parse(stored)
+            : null;
+        } catch {
+          return null;
+        }
+      },
+    );
 
   const [
     reelPreviewUrl,
     setReelPreviewUrl,
-  ] =
-    useState<
-      string | null
-    >(null);
+  ] = useState<string | null>(null);
 
-  useEffect(
-    () => {
-      try {
-        if (
-          reelMeta
-        ) {
-          localStorage.setItem(
-            INTRO_REEL_META_STORAGE_KEY,
-            JSON.stringify(
-              reelMeta,
-            ),
-          );
-
-          return;
-        }
-
-        localStorage.removeItem(
+  useEffect(() => {
+    try {
+      if (reelMeta) {
+        localStorage.setItem(
           INTRO_REEL_META_STORAGE_KEY,
+          JSON.stringify(reelMeta),
         );
-      } catch (
-        error
-      ) {
-        console.error(
-          'Unable to persist intro reel metadata:',
-          error,
+
+        return;
+      }
+
+      localStorage.removeItem(
+        INTRO_REEL_META_STORAGE_KEY,
+      );
+    } catch (error) {
+      console.error(
+        'Unable to persist intro reel metadata:',
+        error,
+      );
+    }
+  }, [reelMeta]);
+
+  useEffect(() => {
+    return () => {
+      if (reelPreviewUrl) {
+        URL.revokeObjectURL(
+          reelPreviewUrl,
         );
       }
-    },
-    [
-      reelMeta,
-    ],
-  );
-
-  useEffect(
-    () => {
-      return () => {
-        if (
-          reelPreviewUrl
-        ) {
-          URL.revokeObjectURL(
-            reelPreviewUrl,
-          );
-        }
-      };
-    },
-    [
-      reelPreviewUrl,
-    ],
-  );
+    };
+  }, [reelPreviewUrl]);
 
   /* =======================================================
      COUNTS
@@ -480,18 +385,13 @@ export function Profile({
 
   const uploadedDocuments =
     docs.filter(
-      (
-        document,
-      ) =>
-        document.status !==
-        'none',
+      (document) =>
+        document.status !== 'none',
     ).length;
 
   const activeProjectsCount =
     projects.filter(
-      (
-        project,
-      ) =>
+      (project) =>
         project.status ===
         'Active Development',
     ).length;
@@ -508,15 +408,13 @@ export function Profile({
     {
       id: 'documents',
       label: 'Documents',
-      badge:
-        `${uploadedDocuments}/${docs.length}`,
+      badge: `${uploadedDocuments}/${docs.length}`,
     },
     {
       id: 'gallery',
       label: 'Gallery',
       badge:
-        galleryImages.length >
-        0
+        galleryImages.length > 0
           ? String(
               galleryImages.length,
             )
@@ -527,9 +425,7 @@ export function Profile({
       label: 'Projects',
       badge:
         projects.length > 0
-          ? String(
-              projects.length,
-            )
+          ? String(projects.length)
           : undefined,
     },
     {
@@ -542,59 +438,14 @@ export function Profile({
     <div
       className="
         relative
-        min-h-screen
-        overflow-hidden
-        bg-brand-bg
+        min-h-[100dvh]
+        overflow-x-hidden
+        bg-transparent
         pb-16
+        font-sans
         text-brand-text
       "
     >
-      {/* =====================================================
-          BACKGROUND DECORATION
-      ====================================================== */}
-
-      <div
-        className="
-          pointer-events-none
-          fixed
-          inset-0
-          overflow-hidden
-        "
-      >
-        <div
-          className="
-            absolute
-            -right-[190px]
-            -top-[140px]
-            hidden
-            h-[430px]
-            w-[430px]
-            rounded-full
-            border-[64px]
-            border-brand-gold/55
-            lg:block
-          "
-        />
-
-        <div
-          className="
-            absolute
-            -bottom-[260px]
-            -left-[220px]
-            hidden
-            h-[500px]
-            w-[500px]
-            rounded-full
-            bg-brand-orange/35
-            lg:block
-          "
-        />
-      </div>
-
-      {/* =====================================================
-          PAGE
-      ====================================================== */}
-
       <div
         className="
           relative
@@ -609,20 +460,12 @@ export function Profile({
           lg:px-8
         "
       >
-        {/* =================================================
-            PROFILE HEADER
-        ================================================== */}
-
         <ProfileHeader
-          facePhoto={
-            facePhoto
-          }
+          facePhoto={facePhoto}
           setFacePhoto={
             setFacePhoto
           }
-          reelMeta={
-            reelMeta
-          }
+          reelMeta={reelMeta}
           setReelMeta={
             setReelMeta
           }
@@ -635,7 +478,7 @@ export function Profile({
         />
 
         {/* =================================================
-            INTERNAL PROFILE NAV
+            PROFILE NAV
         ================================================== */}
 
         <nav
@@ -653,26 +496,16 @@ export function Profile({
             backdrop-blur-xl
           "
         >
-          <div
-            className="
-              flex
-              gap-2
-              overflow-x-auto
-            "
-          >
+          <div className="flex gap-2 overflow-x-auto">
             {sections.map(
-              (
-                section,
-              ) => {
+              (section) => {
                 const isActive =
                   activeTab ===
                   section.id;
 
                 return (
                   <button
-                    key={
-                      section.id
-                    }
+                    key={section.id}
                     type="button"
                     onClick={() =>
                       setActiveTab(
@@ -681,6 +514,7 @@ export function Profile({
                     }
                     className={`
                       flex
+                      min-h-[42px]
                       shrink-0
                       items-center
                       justify-center
@@ -688,20 +522,38 @@ export function Profile({
                       rounded-[13px]
                       px-4
                       py-2.5
-                      text-xs
+                      text-[12px]
                       font-bold
-                      transition
+                      transition-all
+                      duration-200
 
                       ${
                         isActive
-                          ? 'bg-brand-primary text-white shadow-sm'
-                          : 'text-brand-textMuted hover:bg-brand-bg hover:text-brand-primary'
+                          ? `
+                            text-white
+                            shadow-[0_7px_18px_rgba(0,70,109,0.15)]
+                          `
+                          : `
+                            text-brand-textMuted
+                            hover:bg-brand-bg
+                            hover:text-brand-primary
+                          `
                       }
+
+                      focus-visible:outline-none
+                      focus-visible:ring-4
+                      focus-visible:ring-brand-accent/20
                     `}
-                  >
-                    {
-                      section.label
+                    style={
+                      isActive
+                        ? {
+                            background:
+                              'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+                          }
+                        : undefined
                     }
+                  >
+                    {section.label}
 
                     {section.badge && (
                       <span
@@ -709,13 +561,13 @@ export function Profile({
                           rounded-full
                           px-2
                           py-0.5
-                          text-[9px]
+                          text-[10px]
                           font-bold
 
                           ${
                             isActive
                               ? 'bg-white/15 text-white'
-                              : 'bg-[#eef8fd] text-brand-primary'
+                              : 'bg-brand-accent/10 text-brand-primary'
                           }
                         `}
                       >
@@ -731,10 +583,6 @@ export function Profile({
           </div>
         </nav>
 
-        {/* =================================================
-            TAB CONTENT
-        ================================================== */}
-
         <main className="min-h-[420px]">
           {activeTab ===
             'profile' && (
@@ -744,12 +592,8 @@ export function Profile({
           {activeTab ===
             'documents' && (
             <DocumentsSection
-              docs={
-                docs
-              }
-              setDocs={
-                setDocs
-              }
+              docs={docs}
+              setDocs={setDocs}
             />
           )}
 
@@ -795,12 +639,10 @@ export function Profile({
 ========================================================= */
 
 interface ProfileHeaderProps {
-  facePhoto:
-    string | null;
+  facePhoto: string | null;
 
   setFacePhoto: (
-    value:
-      string | null,
+    value: string | null,
   ) => void;
 
   reelMeta:
@@ -842,24 +684,16 @@ function ProfileHeader({
       null,
     );
 
-  /* =======================================================
-     FACE PHOTO
-  ======================================================= */
-
   const handleFaceChange =
     async (
       event:
         React.ChangeEvent<HTMLInputElement>,
     ) => {
       const file =
-        event.target
-          .files?.[0];
-
-      if (!file) {
-        return;
-      }
+        event.target.files?.[0];
 
       if (
+        !file ||
         !file.type.startsWith(
           'image/',
         )
@@ -873,41 +707,31 @@ function ProfileHeader({
             file,
           );
 
-        setFacePhoto(
-          image,
-        );
+        setFacePhoto(image);
 
         localStorage.setItem(
           FACE_PHOTO_STORAGE_KEY,
           image,
         );
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
           'Unable to update profile photo:',
           error,
         );
       }
-    };
 
-  /* =======================================================
-     INTRO REEL COVER
-  ======================================================= */
+      event.target.value = '';
+    };
 
   const handleReelChange = (
     event:
       React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file =
-      event.target
-        .files?.[0];
-
-    if (!file) {
-      return;
-    }
+      event.target.files?.[0];
 
     if (
+      !file ||
       !file.type.startsWith(
         'video/',
       )
@@ -915,64 +739,44 @@ function ProfileHeader({
       return;
     }
 
-    if (
-      reelPreviewUrl
-    ) {
+    if (reelPreviewUrl) {
       URL.revokeObjectURL(
         reelPreviewUrl,
       );
     }
 
     const previewUrl =
-      URL.createObjectURL(
-        file,
-      );
+      URL.createObjectURL(file);
 
     setReelPreviewUrl(
       previewUrl,
     );
 
     setReelMeta({
-      fileName:
-        file.name,
+      fileName: file.name,
 
-      fileSize:
-        `${(
-          file.size /
-          (1024 * 1024)
-        ).toFixed(
-          1,
-        )} MB`,
+      fileSize: `${(
+        file.size /
+        (1024 * 1024)
+      ).toFixed(1)} MB`,
 
       uploadedAt:
         new Date().toISOString(),
     });
 
-    if (
-      reelInputRef.current
-    ) {
-      reelInputRef.current.value =
-        '';
-    }
+    event.target.value = '';
   };
 
   const handleRemoveReel =
     () => {
-      if (
-        reelPreviewUrl
-      ) {
+      if (reelPreviewUrl) {
         URL.revokeObjectURL(
           reelPreviewUrl,
         );
       }
 
-      setReelPreviewUrl(
-        null,
-      );
-
-      setReelMeta(
-        null,
-      );
+      setReelPreviewUrl(null);
+      setReelMeta(null);
 
       if (
         reelInputRef.current
@@ -993,9 +797,7 @@ function ProfileHeader({
         shadow-[0_18px_50px_rgba(0,70,109,0.08)]
       "
     >
-      {/* =====================================================
-          INTRO REEL BACKGROUND
-      ====================================================== */}
+      {/* INTRO REEL */}
 
       <div
         className="
@@ -1008,9 +810,7 @@ function ProfileHeader({
         "
       >
         <input
-          ref={
-            reelInputRef
-          }
+          ref={reelInputRef}
           type="file"
           accept="video/*"
           onChange={
@@ -1021,9 +821,7 @@ function ProfileHeader({
 
         {reelPreviewUrl ? (
           <video
-            src={
-              reelPreviewUrl
-            }
+            src={reelPreviewUrl}
             autoPlay
             muted
             loop
@@ -1047,13 +845,7 @@ function ProfileHeader({
               bg-brand-primary
             "
           >
-            <div
-              className="
-                px-6
-                text-center
-                text-white
-              "
-            >
+            <div className="px-6 text-center text-white">
               <div
                 className="
                   mx-auto
@@ -1070,25 +862,13 @@ function ProfileHeader({
                 <Video className="h-6 w-6" />
               </div>
 
-              <p
-                className="
-                  mt-4
-                  text-sm
-                  font-bold
-                "
-              >
+              <p className="mt-4 text-[14px] font-bold">
                 {reelMeta
                   ? 'Intro reel saved'
                   : 'Add your intro reel'}
               </p>
 
-              <p
-                className="
-                  mt-1
-                  text-xs
-                  text-white/75
-                "
-              >
+              <p className="mt-1 text-[12px] text-white/75">
                 Your intro reel appears as your profile cover.
               </p>
             </div>
@@ -1096,14 +876,12 @@ function ProfileHeader({
         )}
 
         <div
+          aria-hidden="true"
           className="
             pointer-events-none
             absolute
             inset-0
-            bg-gradient-to-t
-            from-brand-dark/75
-            via-brand-dark/5
-            to-black/10
+            bg-brand-dark/20
           "
         />
 
@@ -1123,15 +901,15 @@ function ProfileHeader({
             }
             className="
               inline-flex
+              min-h-[40px]
               items-center
               gap-2
               rounded-[12px]
               border
               border-white/70
-              bg-white/90
+              bg-white/95
               px-3
-              py-2
-              text-xs
+              text-[12px]
               font-bold
               text-brand-primary
               shadow-sm
@@ -1139,6 +917,10 @@ function ProfileHeader({
               transition
               sm:opacity-0
               sm:group-hover:opacity-100
+
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-brand-accent/25
             "
           >
             <Video className="h-4 w-4" />
@@ -1157,19 +939,23 @@ function ProfileHeader({
               aria-label="Remove intro reel"
               className="
                 grid
-                h-9
-                w-9
+                h-10
+                w-10
                 place-items-center
                 rounded-[12px]
                 border
                 border-white/70
-                bg-white/90
+                bg-white/95
                 text-brand-crimson
                 shadow-sm
                 backdrop-blur-md
                 transition
                 sm:opacity-0
                 sm:group-hover:opacity-100
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-crimson/20
               "
             >
               <Trash2 className="h-4 w-4" />
@@ -1185,7 +971,7 @@ function ProfileHeader({
             rounded-full
             border
             border-white/30
-            bg-brand-dark/60
+            bg-brand-dark/70
             px-3
             py-1.5
             text-[10px]
@@ -1198,17 +984,9 @@ function ProfileHeader({
         </div>
       </div>
 
-      {/* =====================================================
-          PROFILE IDENTITY
-      ====================================================== */}
+      {/* PROFILE IDENTITY */}
 
-      <div
-        className="
-          px-5
-          pb-6
-          sm:px-7
-        "
-      >
+      <div className="px-5 pb-6 sm:px-7">
         <div
           className="
             flex
@@ -1218,8 +996,6 @@ function ProfileHeader({
             sm:items-end
           "
         >
-          {/* FACE PROFILE PICTURE */}
-
           <div
             className="
               relative
@@ -1228,9 +1004,7 @@ function ProfileHeader({
             "
           >
             <input
-              ref={
-                faceInputRef
-              }
+              ref={faceInputRef}
               type="file"
               accept="image/*"
               onChange={
@@ -1251,18 +1025,20 @@ function ProfileHeader({
                 h-28
                 w-28
                 overflow-hidden
-                rounded-[24px]
+                rounded-full
                 border-4
                 border-white
                 bg-brand-bg
                 shadow-[0_12px_30px_rgba(0,70,109,0.18)]
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/25
               "
             >
               {facePhoto ? (
                 <img
-                  src={
-                    facePhoto
-                  }
+                  src={facePhoto}
                   alt="Profile"
                   className="
                     h-full
@@ -1278,7 +1054,7 @@ function ProfileHeader({
                     w-full
                     items-center
                     justify-center
-                    text-xl
+                    text-[20px]
                     font-bold
                     text-brand-primary
                   "
@@ -1305,8 +1081,6 @@ function ProfileHeader({
             </button>
           </div>
 
-          {/* USER INFORMATION */}
-
           <div
             className="
               min-w-0
@@ -1317,7 +1091,7 @@ function ProfileHeader({
             <h1
               className="
                 !m-0
-                text-2xl
+                text-[28px]
                 font-bold
                 tracking-[-0.025em]
                 !text-brand-primary
@@ -1329,7 +1103,7 @@ function ProfileHeader({
             <p
               className="
                 mt-1
-                text-sm
+                text-[14px]
                 font-bold
                 text-brand-textMuted
               "
@@ -1345,31 +1119,17 @@ function ProfileHeader({
                 items-center
                 gap-x-4
                 gap-y-1.5
-                text-xs
+                text-[12px]
                 text-brand-textMuted
               "
             >
-              <span
-                className="
-                  flex
-                  items-center
-                  gap-1.5
-                "
-              >
+              <span className="flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
-
                 Johannesburg, Gauteng
               </span>
 
-              <span
-                className="
-                  flex
-                  items-center
-                  gap-1.5
-                "
-              >
+              <span className="flex items-center gap-1.5">
                 <BriefcaseBusiness className="h-3.5 w-3.5" />
-
                 Open to opportunities
               </span>
             </div>
@@ -1385,16 +1145,10 @@ function ProfileHeader({
 ========================================================= */
 
 function ProfileDetails() {
-  const [
-    editing,
-    setEditing,
-  ] =
+  const [editing, setEditing] =
     useState(false);
 
-  const [
-    form,
-    setForm,
-  ] =
+  const [form, setForm] =
     useState<ProfileForm>({
       headline:
         'Software Developer · Full-Stack & Embedded Systems',
@@ -1402,8 +1156,7 @@ function ProfileDetails() {
       email:
         'luthando.dev@gmail.com',
 
-      phone:
-        '081 234 5678',
+      phone: '081 234 5678',
 
       location:
         'Johannesburg, Gauteng',
@@ -1422,69 +1175,50 @@ function ProfileDetails() {
       ],
     });
 
-  const [
-    newSkill,
-    setNewSkill,
-  ] =
+  const [newSkill, setNewSkill] =
     useState('');
 
-  const handleAddSkill =
-    () => {
-      const value =
-        newSkill.trim();
+  const handleAddSkill = () => {
+    const value =
+      newSkill.trim();
 
-      if (
-        !value ||
-        form.skills.includes(
-          value,
-        )
-      ) {
-        return;
-      }
+    if (
+      !value ||
+      form.skills.includes(value)
+    ) {
+      return;
+    }
 
-      setForm({
-        ...form,
+    setForm({
+      ...form,
+      skills: [
+        ...form.skills,
+        value,
+      ],
+    });
 
-        skills: [
-          ...form.skills,
-          value,
-        ],
-      });
+    setNewSkill('');
+  };
 
-      setNewSkill('');
-    };
+  const handleRemoveSkill = (
+    skill: string,
+  ) => {
+    setForm({
+      ...form,
+      skills:
+        form.skills.filter(
+          (item) =>
+            item !== skill,
+        ),
+    });
+  };
 
-  const handleRemoveSkill =
-    (
-      skill: string,
-    ) => {
-      setForm({
-        ...form,
-
-        skills:
-          form.skills.filter(
-            (
-              item,
-            ) =>
-              item !==
-              skill,
-          ),
-      });
-    };
-
-  if (
-    editing
-  ) {
+  if (editing) {
     return (
       <form
-        onSubmit={(
-          event,
-        ) => {
+        onSubmit={(event) => {
           event.preventDefault();
-
-          setEditing(
-            false,
-          );
+          setEditing(false);
         }}
         className="
           max-w-[820px]
@@ -1513,7 +1247,7 @@ function ProfileDetails() {
             <h2
               className="
                 !m-0
-                text-lg
+                text-[20px]
                 font-bold
                 !text-brand-primary
               "
@@ -1521,36 +1255,33 @@ function ProfileDetails() {
               Edit profile
             </h2>
 
-            <p
-              className="
-                mt-1
-                text-xs
-                text-brand-textMuted
-              "
-            >
+            <p className="mt-1 text-[12px] text-brand-textMuted">
               Keep your employment information accurate and up to date.
             </p>
           </div>
 
           <button
             type="button"
+            aria-label="Close profile editor"
             onClick={() =>
-              setEditing(
-                false,
-              )
+              setEditing(false)
             }
             className="
               grid
               h-9
               w-9
               place-items-center
-              rounded-xl
+              rounded-[11px]
               border
               border-brand-border
               text-brand-textMuted
               transition
               hover:border-brand-primary
               hover:text-brand-primary
+
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-brand-accent/15
             "
           >
             <X className="h-4 w-4" />
@@ -1560,17 +1291,11 @@ function ProfileDetails() {
         <div className="space-y-5">
           <FormField
             label="Professional headline"
-            value={
-              form.headline
-            }
-            onChange={(
-              value,
-            ) =>
+            value={form.headline}
+            onChange={(value) =>
               setForm({
                 ...form,
-
-                headline:
-                  value,
+                headline: value,
               })
             }
           />
@@ -1580,7 +1305,7 @@ function ProfileDetails() {
               className="
                 mb-1.5
                 block
-                text-xs
+                text-[12px]
                 font-bold
                 text-brand-textMuted
               "
@@ -1589,15 +1314,10 @@ function ProfileDetails() {
             </label>
 
             <textarea
-              value={
-                form.bio
-              }
-              onChange={(
-                event,
-              ) =>
+              value={form.bio}
+              onChange={(event) =>
                 setForm({
                   ...form,
-
                   bio:
                     event.target.value,
                 })
@@ -1612,55 +1332,38 @@ function ProfileDetails() {
                 bg-brand-bg
                 px-4
                 py-3
-                text-sm
+                text-[14px]
                 leading-6
                 text-brand-text
                 outline-none
                 transition
+
                 focus:border-brand-accent
                 focus:ring-4
-                focus:ring-[#1e92d2]/10
+                focus:ring-brand-accent/10
               "
             />
           </div>
 
-          <div
-            className="
-              grid
-              gap-4
-              sm:grid-cols-2
-            "
-          >
+          <div className="grid gap-4 sm:grid-cols-2">
             <FormField
               label="Email"
-              value={
-                form.email
-              }
-              onChange={(
-                value,
-              ) =>
+              value={form.email}
+              onChange={(value) =>
                 setForm({
                   ...form,
-
-                  email:
-                    value,
+                  email: value,
                 })
               }
             />
 
             <FormField
               label="Phone"
-              value={
-                form.phone
-              }
-              onChange={(
-                value,
-              ) =>
+              value={form.phone}
+              onChange={(value) =>
                 setForm({
                   ...form,
-
-                  phone:
-                    value,
+                  phone: value,
                 })
               }
             />
@@ -1668,17 +1371,11 @@ function ProfileDetails() {
 
           <FormField
             label="Location"
-            value={
-              form.location
-            }
-            onChange={(
-              value,
-            ) =>
+            value={form.location}
+            onChange={(value) =>
               setForm({
                 ...form,
-
-                location:
-                  value,
+                location: value,
               })
             }
           />
@@ -1688,7 +1385,7 @@ function ProfileDetails() {
               className="
                 mb-1.5
                 block
-                text-xs
+                text-[12px]
                 font-bold
                 text-brand-textMuted
               "
@@ -1698,30 +1395,24 @@ function ProfileDetails() {
 
             <div className="flex gap-2">
               <input
-                value={
-                  newSkill
-                }
-                onChange={(
-                  event,
-                ) =>
+                value={newSkill}
+                onChange={(event) =>
                   setNewSkill(
                     event.target.value,
                   )
                 }
-                onKeyDown={(
-                  event,
-                ) => {
+                onKeyDown={(event) => {
                   if (
                     event.key ===
                     'Enter'
                   ) {
                     event.preventDefault();
-
                     handleAddSkill();
                   }
                 }}
                 placeholder="Add a skill"
                 className="
+                  min-h-[46px]
                   min-w-0
                   flex-1
                   rounded-[14px]
@@ -1729,13 +1420,15 @@ function ProfileDetails() {
                   border-brand-border
                   bg-brand-bg
                   px-4
-                  py-3
-                  text-sm
+                  text-[14px]
+                  text-brand-text
                   outline-none
                   transition
+
+                  placeholder:text-brand-textMuted/70
                   focus:border-brand-accent
                   focus:ring-4
-                  focus:ring-[#1e92d2]/10
+                  focus:ring-brand-accent/10
                 "
               />
 
@@ -1745,50 +1438,45 @@ function ProfileDetails() {
                   handleAddSkill
                 }
                 className="
+                  min-h-[46px]
                   rounded-[14px]
                   border
                   border-brand-primary
                   bg-white
                   px-4
-                  text-xs
+                  text-[12px]
                   font-bold
                   text-brand-primary
                   transition
+
                   hover:bg-brand-primary
                   hover:text-white
+
+                  focus-visible:outline-none
+                  focus-visible:ring-4
+                  focus-visible:ring-brand-accent/15
                 "
               >
                 Add
               </button>
             </div>
 
-            <div
-              className="
-                mt-3
-                flex
-                flex-wrap
-                gap-2
-              "
-            >
+            <div className="mt-3 flex flex-wrap gap-2">
               {form.skills.map(
-                (
-                  skill,
-                ) => (
+                (skill) => (
                   <span
-                    key={
-                      skill
-                    }
+                    key={skill}
                     className="
                       inline-flex
                       items-center
                       gap-2
                       rounded-full
                       border
-                      border-[#b9d9ea]
-                      bg-[#eef8fd]
+                      border-brand-accent/30
+                      bg-brand-accent/10
                       px-3
                       py-1.5
-                      text-xs
+                      text-[12px]
                       font-bold
                       text-brand-primary
                     "
@@ -1797,6 +1485,7 @@ function ProfileDetails() {
 
                     <button
                       type="button"
+                      aria-label={`Remove ${skill}`}
                       onClick={() =>
                         handleRemoveSkill(
                           skill,
@@ -1804,6 +1493,7 @@ function ProfileDetails() {
                       }
                       className="
                         text-brand-textMuted
+                        transition
                         hover:text-brand-crimson
                       "
                     >
@@ -1826,28 +1516,10 @@ function ProfileDetails() {
             pt-5
           "
         >
-          <button
-            type="submit"
-            className="
-              inline-flex
-              min-h-[46px]
-              items-center
-              justify-center
-              gap-2
-              rounded-[14px]
-              bg-brand-primary
-              px-5
-              text-sm
-              font-bold
-              text-white
-              transition
-              hover:bg-brand-dark
-            "
-          >
+          <PrimaryButton type="submit">
             <Save className="h-4 w-4" />
-
             Save changes
-          </button>
+          </PrimaryButton>
         </div>
       </form>
     );
@@ -1862,26 +1534,8 @@ function ProfileDetails() {
       "
     >
       <div className="space-y-5">
-        <section
-          className="
-            rounded-[24px]
-            border
-            border-brand-border
-            bg-white
-            p-5
-            shadow-[0_14px_34px_rgba(0,70,109,0.06)]
-            sm:p-6
-          "
-        >
-          <div
-            className="
-              mb-4
-              flex
-              items-center
-              justify-between
-              gap-4
-            "
-          >
+        <section className="rounded-[24px] border border-brand-border bg-white p-5 shadow-[0_14px_34px_rgba(0,70,109,0.06)] sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-4">
             <SectionTitle
               icon={
                 <UserRound className="h-4 w-4" />
@@ -1893,71 +1547,46 @@ function ProfileDetails() {
             <button
               type="button"
               onClick={() =>
-                setEditing(
-                  true,
-                )
+                setEditing(true)
               }
               className="
                 inline-flex
+                min-h-[38px]
                 items-center
                 gap-1.5
-                rounded-xl
+                rounded-[12px]
                 border
                 border-brand-border
                 bg-white
                 px-3
-                py-2
-                text-xs
+                text-[12px]
                 font-bold
                 text-brand-textMuted
                 transition
+
                 hover:border-brand-primary
                 hover:text-brand-primary
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/15
               "
             >
               <Pencil className="h-3.5 w-3.5" />
-
               Edit
             </button>
           </div>
 
-          <h3
-            className="
-              text-sm
-              font-bold
-              text-brand-primary
-            "
-          >
-            {
-              form.headline
-            }
+          <h3 className="text-[14px] font-bold text-brand-primary">
+            {form.headline}
           </h3>
 
-          <p
-            className="
-              mt-3
-              text-sm
-              leading-6
-              text-brand-textMuted
-            "
-          >
-            {
-              form.bio
-            }
+          <p className="mt-3 text-[14px] leading-6 text-brand-textMuted">
+            {form.bio}
           </p>
         </section>
 
-        <section
-          className="
-            rounded-[24px]
-            border
-            border-brand-border
-            bg-white
-            p-5
-            shadow-[0_14px_34px_rgba(0,70,109,0.06)]
-            sm:p-6
-          "
-        >
+        <section className="rounded-[24px] border border-brand-border bg-white p-5 shadow-[0_14px_34px_rgba(0,70,109,0.06)] sm:p-6">
           <SectionTitle
             icon={
               <Code2 className="h-4 w-4" />
@@ -1966,22 +1595,11 @@ function ProfileDetails() {
             Skills & Competencies
           </SectionTitle>
 
-          <div
-            className="
-              mt-4
-              flex
-              flex-wrap
-              gap-2
-            "
-          >
+          <div className="mt-4 flex flex-wrap gap-2">
             {form.skills.map(
-              (
-                skill,
-              ) => (
+              (skill) => (
                 <span
-                  key={
-                    skill
-                  }
+                  key={skill}
                   className="
                     rounded-[10px]
                     border
@@ -1989,7 +1607,7 @@ function ProfileDetails() {
                     bg-brand-bg
                     px-3
                     py-2
-                    text-xs
+                    text-[12px]
                     font-bold
                     text-brand-textMuted
                   "
@@ -2002,17 +1620,7 @@ function ProfileDetails() {
         </section>
       </div>
 
-      <aside
-        className="
-          rounded-[24px]
-          border
-          border-brand-border
-          bg-white
-          p-5
-          shadow-[0_14px_34px_rgba(0,70,109,0.06)]
-          sm:p-6
-        "
-      >
+      <aside className="rounded-[24px] border border-brand-border bg-white p-5 shadow-[0_14px_34px_rgba(0,70,109,0.06)] sm:p-6">
         <SectionTitle
           icon={
             <Mail className="h-4 w-4" />
@@ -2027,9 +1635,7 @@ function ProfileDetails() {
               <Mail className="h-4 w-4" />
             }
             label="Email"
-            value={
-              form.email
-            }
+            value={form.email}
           />
 
           <ContactRow
@@ -2037,9 +1643,7 @@ function ProfileDetails() {
               <Phone className="h-4 w-4" />
             }
             label="Phone"
-            value={
-              form.phone
-            }
+            value={form.phone}
           />
 
           <ContactRow
@@ -2047,9 +1651,7 @@ function ProfileDetails() {
               <MapPin className="h-4 w-4" />
             }
             label="Location"
-            value={
-              form.location
-            }
+            value={form.location}
           />
         </div>
       </aside>
@@ -2062,8 +1664,7 @@ function ProfileDetails() {
 ========================================================= */
 
 interface GallerySectionProps {
-  images:
-    GalleryImage[];
+  images: GalleryImage[];
 
   setImages:
     React.Dispatch<
@@ -2094,65 +1695,41 @@ function GallerySection({
     selectedImage,
     setSelectedImage,
   ] =
-    useState<
-      GalleryImage | null
-    >(null);
+    useState<GalleryImage | null>(
+      null,
+    );
 
   const categories: {
-    value:
-      GalleryImageCategory;
-
-    label:
-      string;
+    value: GalleryImageCategory;
+    label: string;
   }[] = [
     {
-      value:
-        'professional',
-
-      label:
-        'Professional',
+      value: 'professional',
+      label: 'Professional',
     },
     {
-      value:
-        'front',
-
-      label:
-        'Full Body · Front',
+      value: 'front',
+      label: 'Full Body · Front',
     },
     {
-      value:
-        'side',
-
-      label:
-        'Full Body · Side',
+      value: 'side',
+      label: 'Full Body · Side',
     },
     {
-      value:
-        'back',
-
-      label:
-        'Full Body · Back',
+      value: 'back',
+      label: 'Full Body · Back',
     },
     {
-      value:
-        'project',
-
-      label:
-        'Project',
+      value: 'project',
+      label: 'Project',
     },
     {
-      value:
-        'certificate',
-
-      label:
-        'Certificate',
+      value: 'certificate',
+      label: 'Certificate',
     },
     {
-      value:
-        'other',
-
-      label:
-        'Other',
+      value: 'other',
+      label: 'Other',
     },
   ];
 
@@ -2161,13 +1738,9 @@ function GallerySection({
       GalleryImageCategory,
   ) =>
     categories.find(
-      (
-        item,
-      ) =>
-        item.value ===
-        category,
-    )?.label ??
-    'Other';
+      (item) =>
+        item.value === category,
+    )?.label ?? 'Other';
 
   const handleUpload =
     async (
@@ -2176,32 +1749,21 @@ function GallerySection({
     ) => {
       const files =
         Array.from(
-          event.target
-            .files ??
-            [],
+          event.target.files ?? [],
         );
 
-      if (
-        files.length ===
-        0
-      ) {
+      if (!files.length) {
         return;
       }
 
       const imageFiles =
-        files.filter(
-          (
-            file,
-          ) =>
-            file.type.startsWith(
-              'image/',
-            ),
+        files.filter((file) =>
+          file.type.startsWith(
+            'image/',
+          ),
         );
 
-      if (
-        imageFiles.length ===
-        0
-      ) {
+      if (!imageFiles.length) {
         return;
       }
 
@@ -2211,78 +1773,55 @@ function GallerySection({
             imageFiles.map(
               async (
                 file,
-              ): Promise<GalleryImage> => {
-                const image =
+              ): Promise<GalleryImage> => ({
+                id:
+                  createGalleryId(),
+
+                name: file.name,
+
+                category:
+                  selectedCategory,
+
+                image:
                   await imageFileToDataUrl(
                     file,
-                  );
+                  ),
 
-                return {
-                  id:
-                    createGalleryId(),
-
-                  name:
-                    file.name,
-
-                  category:
-                    selectedCategory,
-
-                  image,
-
-                  uploadedAt:
-                    new Date().toISOString(),
-                };
-              },
+                uploadedAt:
+                  new Date().toISOString(),
+              }),
             ),
           );
 
         setImages(
-          (
-            current,
-          ) => [
+          (current) => [
             ...uploaded,
             ...current,
           ],
         );
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
           'Unable to upload gallery images:',
           error,
         );
       }
 
-      if (
-        fileInputRef.current
-      ) {
-        fileInputRef.current.value =
-          '';
-      }
+      event.target.value = '';
     };
 
   const handleDelete = (
     id: string,
   ) => {
-    setImages(
-      (
-        current,
-      ) =>
-        current.filter(
-          (
-            image,
-          ) =>
-            image.id !==
-            id,
-        ),
+    setImages((current) =>
+      current.filter(
+        (image) =>
+          image.id !== id,
+      ),
     );
 
     setSelectedImage(
-      (
-        current,
-      ) =>
-        current?.id ===
-        id
+      (current) =>
+        current?.id === id
           ? null
           : current,
     );
@@ -2293,34 +1832,22 @@ function GallerySection({
     category:
       GalleryImageCategory,
   ) => {
-    setImages(
-      (
-        current,
-      ) =>
-        current.map(
-          (
-            image,
-          ) =>
-            image.id ===
-            id
-              ? {
-                  ...image,
-
-                  category,
-                }
-              : image,
-        ),
+    setImages((current) =>
+      current.map((image) =>
+        image.id === id
+          ? {
+              ...image,
+              category,
+            }
+          : image,
+      ),
     );
 
     setSelectedImage(
-      (
-        current,
-      ) =>
-        current?.id ===
-        id
+      (current) =>
+        current?.id === id
           ? {
               ...current,
-
               category,
             }
           : current,
@@ -2329,45 +1856,28 @@ function GallerySection({
 
   const frontCount =
     images.filter(
-      (
-        image,
-      ) =>
+      (image) =>
         image.category ===
         'front',
     ).length;
 
   const sideCount =
     images.filter(
-      (
-        image,
-      ) =>
+      (image) =>
         image.category ===
         'side',
     ).length;
 
   const backCount =
     images.filter(
-      (
-        image,
-      ) =>
+      (image) =>
         image.category ===
         'back',
     ).length;
 
   return (
     <>
-      <section
-        className="
-          overflow-hidden
-          rounded-[26px]
-          border
-          border-brand-border
-          bg-white
-          shadow-[0_16px_40px_rgba(0,70,109,0.07)]
-        "
-      >
-        {/* HEADER */}
-
+      <section className="overflow-hidden rounded-[26px] border border-brand-border bg-white shadow-[0_16px_40px_rgba(0,70,109,0.07)]">
         <div
           className="
             flex
@@ -2395,27 +1905,11 @@ function GallerySection({
               Profile Media
             </p>
 
-            <h2
-              className="
-                !m-0
-                mt-1
-                text-xl
-                font-bold
-                !text-brand-primary
-              "
-            >
+            <h2 className="!m-0 mt-1 text-[24px] font-bold !text-brand-primary">
               Gallery
             </h2>
 
-            <p
-              className="
-                mt-2
-                max-w-[680px]
-                text-sm
-                leading-6
-                text-brand-textMuted
-              "
-            >
+            <p className="mt-2 max-w-[680px] text-[14px] leading-6 text-brand-textMuted">
               Store all professional profile images here, including
               front, side and back full-body images, professional
               photos, project images, certificates and other relevant
@@ -2423,24 +1917,9 @@ function GallerySection({
             </p>
           </div>
 
-          <span
-            className="
-              shrink-0
-              rounded-full
-              border
-              border-brand-border
-              bg-brand-bg
-              px-3
-              py-1.5
-              text-[10px]
-              font-bold
-              text-brand-primary
-            "
-          >
+          <span className="shrink-0 rounded-full border border-brand-border bg-brand-bg px-3 py-1.5 text-[10px] font-bold text-brand-primary">
             {images.length}{' '}
-
-            {images.length ===
-            1
+            {images.length === 1
               ? 'image'
               : 'images'}
           </span>
@@ -2448,26 +1927,13 @@ function GallerySection({
 
         {/* BODY PHOTO STATUS */}
 
-        <div
-          className="
-            grid
-            gap-3
-            border-b
-            border-brand-border
-            bg-brand-bg
-            p-5
-            sm:grid-cols-3
-            sm:p-6
-          "
-        >
+        <div className="grid gap-3 border-b border-brand-border bg-brand-bg p-5 sm:grid-cols-3 sm:p-6">
           <BodyViewStatus
             label="Front View"
             complete={
               frontCount > 0
             }
-            count={
-              frontCount
-            }
+            count={frontCount}
           />
 
           <BodyViewStatus
@@ -2475,9 +1941,7 @@ function GallerySection({
             complete={
               sideCount > 0
             }
-            count={
-              sideCount
-            }
+            count={sideCount}
           />
 
           <BodyViewStatus
@@ -2485,26 +1949,15 @@ function GallerySection({
             complete={
               backCount > 0
             }
-            count={
-              backCount
-            }
+            count={backCount}
           />
         </div>
 
-        {/* UPLOAD CONTROLS */}
+        {/* UPLOAD */}
 
-        <div
-          className="
-            border-b
-            border-brand-border
-            p-5
-            sm:p-6
-          "
-        >
+        <div className="border-b border-brand-border p-5 sm:p-6">
           <input
-            ref={
-              fileInputRef
-            }
+            ref={fileInputRef}
             type="file"
             accept="image/*"
             multiple
@@ -2514,30 +1967,9 @@ function GallerySection({
             className="hidden"
           />
 
-          <div
-            className="
-              flex
-              flex-col
-              gap-3
-              sm:flex-row
-              sm:items-end
-            "
-          >
-            <div
-              className="
-                min-w-0
-                flex-1
-              "
-            >
-              <label
-                className="
-                  mb-1.5
-                  block
-                  text-xs
-                  font-bold
-                  text-brand-primary
-                "
-              >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label className="mb-1.5 block text-[12px] font-bold text-brand-primary">
                 Image type
               </label>
 
@@ -2545,9 +1977,7 @@ function GallerySection({
                 value={
                   selectedCategory
                 }
-                onChange={(
-                  event,
-                ) =>
+                onChange={(event) =>
                   setSelectedCategory(
                     event.target
                       .value as GalleryImageCategory,
@@ -2561,19 +1991,18 @@ function GallerySection({
                   border-brand-border
                   bg-white
                   px-4
-                  text-sm
+                  text-[14px]
                   text-brand-text
                   outline-none
                   transition
+
                   focus:border-brand-accent
                   focus:ring-4
-                  focus:ring-[#1e92d2]/10
+                  focus:ring-brand-accent/10
                 "
               >
                 {categories.map(
-                  (
-                    category,
-                  ) => (
+                  (category) => (
                     <option
                       key={
                         category.value
@@ -2591,52 +2020,26 @@ function GallerySection({
               </select>
             </div>
 
-            <button
-              type="button"
+            <PrimaryButton
               onClick={() =>
                 fileInputRef.current?.click()
               }
-              className="
-                inline-flex
-                min-h-[46px]
-                items-center
-                justify-center
-                gap-2
-                rounded-[14px]
-                bg-brand-primary
-                px-5
-                text-sm
-                font-bold
-                text-white
-                shadow-[0_8px_20px_rgba(0,70,109,0.14)]
-                transition
-                hover:bg-brand-dark
-              "
             >
               <Upload className="h-4 w-4" />
-
               Upload images
-            </button>
+            </PrimaryButton>
           </div>
 
-          <p
-            className="
-              mt-3
-              text-xs
-              leading-5
-              text-brand-textMuted
-            "
-          >
+          <p className="mt-3 text-[12px] leading-5 text-brand-textMuted">
             Multiple images can be selected at once. Choose the image
             type first so uploaded images are organised correctly.
           </p>
         </div>
 
-        {/* IMAGE GRID */}
+        {/* GRID */}
 
         <div className="p-5 sm:p-6">
-          {images.length ===
-          0 ? (
+          {images.length === 0 ? (
             <button
               type="button"
               onClick={() =>
@@ -2657,46 +2060,23 @@ function GallerySection({
                 px-6
                 text-center
                 transition
+
                 hover:border-brand-accent
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/15
               "
             >
-              <div
-                className="
-                  grid
-                  h-16
-                  w-16
-                  place-items-center
-                  rounded-[20px]
-                  border
-                  border-brand-border
-                  bg-white
-                  text-brand-primary
-                "
-              >
+              <div className="grid h-16 w-16 place-items-center rounded-[20px] border border-brand-border bg-white text-brand-primary">
                 <Image className="h-7 w-7" />
               </div>
 
-              <h3
-                className="
-                  !m-0
-                  mt-5
-                  text-lg
-                  font-bold
-                  !text-brand-primary
-                "
-              >
+              <h3 className="!m-0 mt-5 text-[18px] font-bold !text-brand-primary">
                 Build your gallery
               </h3>
 
-              <p
-                className="
-                  mt-2
-                  max-w-[470px]
-                  text-sm
-                  leading-6
-                  text-brand-textMuted
-                "
-              >
+              <p className="mt-2 max-w-[470px] text-[14px] leading-6 text-brand-textMuted">
                 Upload professional photos, front, side and back
                 full-body images, project images, certificates and
                 other profile media.
@@ -2706,40 +2086,30 @@ function GallerySection({
                 className="
                   mt-5
                   inline-flex
+                  min-h-[44px]
                   items-center
                   gap-2
                   rounded-[13px]
-                  bg-brand-primary
                   px-5
-                  py-3
-                  text-xs
+                  text-[12px]
                   font-bold
                   text-white
                 "
+                style={{
+                  background:
+                    'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+                }}
               >
                 <Plus className="h-4 w-4" />
-
                 Add images
               </span>
             </button>
           ) : (
-            <div
-              className="
-                grid
-                grid-cols-2
-                gap-3
-                sm:grid-cols-3
-                lg:grid-cols-4
-              "
-            >
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {images.map(
-                (
-                  image,
-                ) => (
+                (image) => (
                   <article
-                    key={
-                      image.id
-                    }
+                    key={image.id}
                     className="
                       group
                       relative
@@ -2764,15 +2134,16 @@ function GallerySection({
                         aspect-[4/5]
                         w-full
                         overflow-hidden
+
+                        focus-visible:outline-none
+                        focus-visible:ring-4
+                        focus-visible:ring-inset
+                        focus-visible:ring-brand-accent/30
                       "
                     >
                       <img
-                        src={
-                          image.image
-                        }
-                        alt={
-                          image.name
-                        }
+                        src={image.image}
+                        alt={image.name}
                         className="
                           h-full
                           w-full
@@ -2783,44 +2154,14 @@ function GallerySection({
                         "
                       />
 
-                      <div
-                        className="
-                          absolute
-                          inset-0
-                          bg-brand-dark/0
-                          transition
-                          group-hover:bg-brand-dark/15
-                        "
-                      />
+                      <div className="absolute inset-0 bg-brand-dark/0 transition group-hover:bg-brand-dark/15" />
                     </button>
 
-                    <div
-                      className="
-                        absolute
-                        left-2.5
-                        top-2.5
-                      "
-                    >
-                      <span
-                        className="
-                          rounded-full
-                          border
-                          border-white/60
-                          bg-white/90
-                          px-2.5
-                          py-1
-                          text-[9px]
-                          font-bold
-                          text-brand-primary
-                          shadow-sm
-                          backdrop-blur
-                        "
-                      >
-                        {
-                          categoryLabel(
-                            image.category,
-                          )
-                        }
+                    <div className="absolute left-2.5 top-2.5">
+                      <span className="rounded-full border border-white/60 bg-white/95 px-2.5 py-1 text-[10px] font-bold text-brand-primary shadow-sm backdrop-blur">
+                        {categoryLabel(
+                          image.category,
+                        )}
                       </span>
                     </div>
 
@@ -2843,39 +2184,29 @@ function GallerySection({
                         rounded-full
                         border
                         border-white/60
-                        bg-white/90
+                        bg-white/95
                         text-brand-crimson
                         shadow-sm
                         backdrop-blur
                         transition
                         sm:opacity-0
                         sm:group-hover:opacity-100
+
+                        focus-visible:opacity-100
+                        focus-visible:outline-none
+                        focus-visible:ring-4
+                        focus-visible:ring-brand-crimson/20
                       "
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
 
                     <div className="p-3">
-                      <p
-                        className="
-                          truncate
-                          text-xs
-                          font-bold
-                          text-brand-primary
-                        "
-                      >
-                        {
-                          image.name
-                        }
+                      <p className="truncate text-[12px] font-bold text-brand-primary">
+                        {image.name}
                       </p>
 
-                      <p
-                        className="
-                          mt-1
-                          text-[10px]
-                          text-brand-textMuted
-                        "
-                      >
+                      <p className="mt-1 text-[10px] text-brand-textMuted">
                         {new Date(
                           image.uploadedAt,
                         ).toLocaleDateString(
@@ -2883,10 +2214,8 @@ function GallerySection({
                           {
                             day:
                               '2-digit',
-
                             month:
                               'short',
-
                             year:
                               'numeric',
                           },
@@ -2900,49 +2229,15 @@ function GallerySection({
           )}
         </div>
 
-        {/* VISIBILITY */}
-
-        <div
-          className="
-            flex
-            items-start
-            gap-3
-            border-t
-            border-brand-border
-            bg-brand-bg
-            p-4
-            sm:px-6
-          "
-        >
-          <ShieldCheck
-            className="
-              mt-0.5
-              h-4
-              w-4
-              shrink-0
-              text-brand-primary
-            "
-          />
+        <div className="flex items-start gap-3 border-t border-brand-border bg-brand-bg p-4 sm:px-6">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" />
 
           <div>
-            <p
-              className="
-                text-xs
-                font-bold
-                text-brand-primary
-              "
-            >
+            <p className="text-[12px] font-bold text-brand-primary">
               Gallery visibility
             </p>
 
-            <p
-              className="
-                mt-1
-                text-[10px]
-                leading-5
-                text-brand-textMuted
-              "
-            >
+            <p className="mt-1 text-[10px] leading-5 text-brand-textMuted">
               Gallery media forms part of your TruCity profile and may
               be visible to employers when you apply through Express
               Interest.
@@ -2951,9 +2246,7 @@ function GallerySection({
         </div>
       </section>
 
-      {/* =====================================================
-          FULL SIZE VIEWER
-      ====================================================== */}
+      {/* VIEWER */}
 
       {selectedImage && (
         <div
@@ -2961,9 +2254,7 @@ function GallerySection({
           aria-modal="true"
           aria-label="Gallery image"
           onClick={() =>
-            setSelectedImage(
-              null,
-            )
+            setSelectedImage(null)
           }
           className="
             fixed
@@ -2978,9 +2269,7 @@ function GallerySection({
           "
         >
           <div
-            onClick={(
-              event,
-            ) =>
+            onClick={(event) =>
               event.stopPropagation()
             }
             className="
@@ -3015,20 +2304,16 @@ function GallerySection({
                 bg-brand-dark/75
                 text-white
                 backdrop-blur
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-white/40
               "
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div
-              className="
-                flex
-                max-h-[72vh]
-                items-center
-                justify-center
-                bg-brand-dark
-              "
-            >
+            <div className="flex max-h-[72vh] items-center justify-center bg-brand-dark">
               <img
                 src={
                   selectedImage.image
@@ -3036,48 +2321,21 @@ function GallerySection({
                 alt={
                   selectedImage.name
                 }
-                className="
-                  max-h-[72vh]
-                  w-full
-                  object-contain
-                "
+                className="max-h-[72vh] w-full object-contain"
               />
             </div>
 
             <div className="p-5">
-              <div
-                className="
-                  flex
-                  flex-col
-                  gap-4
-                  sm:flex-row
-                  sm:items-center
-                  sm:justify-between
-                "
-              >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <h3
-                    className="
-                      truncate
-                      text-sm
-                      font-bold
-                      text-brand-primary
-                    "
-                  >
+                  <h3 className="truncate text-[14px] font-bold text-brand-primary">
                     {
                       selectedImage.name
                     }
                   </h3>
 
-                  <p
-                    className="
-                      mt-1
-                      text-xs
-                      text-brand-textMuted
-                    "
-                  >
+                  <p className="mt-1 text-[12px] text-brand-textMuted">
                     Uploaded{' '}
-
                     {new Date(
                       selectedImage.uploadedAt,
                     ).toLocaleDateString(
@@ -3085,10 +2343,8 @@ function GallerySection({
                       {
                         day:
                           '2-digit',
-
                         month:
                           'long',
-
                         year:
                           'numeric',
                       },
@@ -3100,12 +2356,9 @@ function GallerySection({
                   value={
                     selectedImage.category
                   }
-                  onChange={(
-                    event,
-                  ) =>
+                  onChange={(event) =>
                     updateCategory(
                       selectedImage.id,
-
                       event.target
                         .value as GalleryImageCategory,
                     )
@@ -3117,17 +2370,18 @@ function GallerySection({
                     border-brand-border
                     bg-white
                     px-3
-                    text-xs
+                    text-[12px]
                     font-bold
                     text-brand-primary
                     outline-none
+
                     focus:border-brand-accent
+                    focus:ring-4
+                    focus:ring-brand-accent/10
                   "
                 >
                   {categories.map(
-                    (
-                      category,
-                    ) => (
+                    (category) => (
                       <option
                         key={
                           category.value
@@ -3155,15 +2409,21 @@ function GallerySection({
                 className="
                   mt-4
                   inline-flex
+                  min-h-[38px]
                   items-center
                   gap-2
-                  text-xs
+                  rounded-[10px]
+                  px-2
+                  text-[12px]
                   font-bold
                   text-brand-crimson
+
+                  focus-visible:outline-none
+                  focus-visible:ring-4
+                  focus-visible:ring-brand-crimson/15
                 "
               >
                 <Trash2 className="h-4 w-4" />
-
                 Remove from gallery
               </button>
             </div>
@@ -3201,7 +2461,7 @@ function BodyViewStatus({
 
         ${
           complete
-            ? 'border-brand-emerald bg-[#effff7]'
+            ? 'border-brand-emerald bg-brand-emerald/10'
             : 'border-brand-border bg-white'
         }
       `}
@@ -3217,7 +2477,7 @@ function BodyViewStatus({
 
           ${
             complete
-              ? 'bg-brand-emerald/15 text-[#167a50]'
+              ? 'bg-brand-emerald/15 text-brand-primary'
               : 'bg-brand-bg text-brand-textMuted'
           }
         `}
@@ -3230,23 +2490,11 @@ function BodyViewStatus({
       </div>
 
       <div>
-        <p
-          className="
-            text-xs
-            font-bold
-            text-brand-primary
-          "
-        >
+        <p className="text-[12px] font-bold text-brand-primary">
           {label}
         </p>
 
-        <p
-          className="
-            mt-0.5
-            text-[10px]
-            text-brand-textMuted
-          "
-        >
+        <p className="mt-0.5 text-[10px] text-brand-textMuted">
           {complete
             ? `${count} uploaded`
             : 'Not uploaded'}
@@ -3261,8 +2509,7 @@ function BodyViewStatus({
 ========================================================= */
 
 interface DocumentsSectionProps {
-  docs:
-    DocItem[];
+  docs: DocItem[];
 
   setDocs:
     React.Dispatch<
@@ -3290,107 +2537,50 @@ function DocumentsSection({
       React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file =
-      event.target
-        .files?.[0];
+      event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    const size =
-      `${(
-        file.size /
-        (1024 * 1024)
-      ).toFixed(
-        2,
-      )} MB`;
+    const size = `${(
+      file.size /
+      (1024 * 1024)
+    ).toFixed(2)} MB`;
 
-    setDocs(
-      (
-        current,
-      ) =>
-        current.map(
-          (
-            document,
-          ) =>
-            document.id ===
-            id
-              ? {
-                  ...document,
-
-                  status:
-                    'pending',
-
-                  fileName:
-                    file.name,
-
-                  fileSize:
-                    size,
-                }
-              : document,
-        ),
+    setDocs((current) =>
+      current.map((document) =>
+        document.id === id
+          ? {
+              ...document,
+              status: 'pending',
+              fileName:
+                file.name,
+              fileSize: size,
+            }
+          : document,
+      ),
     );
+
+    event.target.value = '';
   };
 
   return (
-    <div
-      className="
-        max-w-[900px]
-        space-y-5
-      "
-    >
+    <div className="max-w-[900px] space-y-5">
       <div>
-        <h2
-          className="
-            !m-0
-            text-xl
-            font-bold
-            !text-brand-primary
-          "
-        >
+        <h2 className="!m-0 text-[24px] font-bold !text-brand-primary">
           Documents
         </h2>
 
-        <p
-          className="
-            mt-1
-            text-sm
-            text-brand-textMuted
-          "
-        >
+        <p className="mt-1 text-[14px] text-brand-textMuted">
           Manage supporting documents associated with your profile.
         </p>
       </div>
 
-      <div
-        className="
-          flex
-          items-start
-          gap-3
-          rounded-[18px]
-          border
-          border-[#b9d9ea]
-          bg-[#eef8fd]
-          p-4
-        "
-      >
-        <ShieldCheck
-          className="
-            mt-0.5
-            h-5
-            w-5
-            shrink-0
-            text-brand-primary
-          "
-        />
+      <div className="flex items-start gap-3 rounded-[18px] border border-brand-accent/30 bg-brand-accent/10 p-4">
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-primary" />
 
-        <p
-          className="
-            text-xs
-            leading-5
-            text-brand-textMuted
-          "
-        >
+        <p className="text-[12px] leading-5 text-brand-textMuted">
           Upload only documents relevant to employment or verification.
           Accepted formats are PDF, PNG and JPEG.
         </p>
@@ -3398,13 +2588,9 @@ function DocumentsSection({
 
       <div className="space-y-3">
         {docs.map(
-          (
-            document,
-          ) => (
+          (document) => (
             <article
-              key={
-                document.id
-              }
+              key={document.id}
               className="
                 flex
                 flex-col
@@ -3423,17 +2609,12 @@ function DocumentsSection({
             >
               <input
                 type="file"
-                ref={(
-                  element,
-                ) => {
+                ref={(element) => {
                   fileInputRefs.current[
                     document.id
-                  ] =
-                    element;
+                  ] = element;
                 }}
-                onChange={(
-                  event,
-                ) =>
+                onChange={(event) =>
                   handleFileUpload(
                     document.id,
                     event,
@@ -3443,14 +2624,7 @@ function DocumentsSection({
                 accept=".pdf,.png,.jpg,.jpeg"
               />
 
-              <div
-                className="
-                  flex
-                  min-w-0
-                  items-center
-                  gap-4
-                "
-              >
+              <div className="flex min-w-0 items-center gap-4">
                 <div
                   className={`
                     grid
@@ -3464,10 +2638,10 @@ function DocumentsSection({
                     ${
                       document.status ===
                       'verified'
-                        ? 'border-brand-emerald bg-[#effff7] text-[#167a50]'
+                        ? 'border-brand-emerald bg-brand-emerald/10 text-brand-primary'
                         : document.status ===
                             'pending'
-                          ? 'border-brand-warning bg-[#fffbea] text-[#8a6a00]'
+                          ? 'border-brand-warning bg-brand-warning/10 text-brand-dark'
                           : 'border-brand-border bg-brand-bg text-brand-textMuted'
                     }
                   `}
@@ -3476,58 +2650,25 @@ function DocumentsSection({
                 </div>
 
                 <div className="min-w-0">
-                  <h3
-                    className="
-                      truncate
-                      text-sm
-                      font-bold
-                      text-brand-primary
-                    "
-                  >
-                    {
-                      document.name
-                    }
+                  <h3 className="truncate text-[14px] font-bold text-brand-primary">
+                    {document.name}
                   </h3>
 
                   {document.fileName ? (
-                    <p
-                      className="
-                        mt-1
-                        truncate
-                        text-xs
-                        text-brand-textMuted
-                      "
-                    >
-                      {
-                        document.fileName
-                      }
-
+                    <p className="mt-1 truncate text-[12px] text-brand-textMuted">
+                      {document.fileName}
                       {document.fileSize &&
                         ` · ${document.fileSize}`}
                     </p>
                   ) : (
-                    <p
-                      className="
-                        mt-1
-                        text-xs
-                        text-brand-textMuted
-                      "
-                    >
+                    <p className="mt-1 text-[12px] text-brand-textMuted">
                       No document uploaded
                     </p>
                   )}
                 </div>
               </div>
 
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-3
-                  self-end
-                  sm:self-auto
-                "
-              >
+              <div className="flex items-center gap-3 self-end sm:self-auto">
                 {document.status ===
                   'none' && (
                   <button
@@ -3539,6 +2680,7 @@ function DocumentsSection({
                     }
                     className="
                       inline-flex
+                      min-h-[42px]
                       items-center
                       gap-2
                       rounded-[12px]
@@ -3546,17 +2688,20 @@ function DocumentsSection({
                       border-brand-primary
                       bg-white
                       px-4
-                      py-2.5
-                      text-xs
+                      text-[12px]
                       font-bold
                       text-brand-primary
                       transition
+
                       hover:bg-brand-primary
                       hover:text-white
+
+                      focus-visible:outline-none
+                      focus-visible:ring-4
+                      focus-visible:ring-brand-accent/15
                     "
                   >
                     <Upload className="h-4 w-4" />
-
                     Upload
                   </button>
                 )}
@@ -3564,19 +2709,7 @@ function DocumentsSection({
                 {document.status ===
                   'pending' && (
                   <>
-                    <span
-                      className="
-                        rounded-full
-                        border
-                        border-brand-warning
-                        bg-[#fffbea]
-                        px-3
-                        py-1.5
-                        text-[10px]
-                        font-bold
-                        text-[#8a6a00]
-                      "
-                    >
+                    <span className="rounded-full border border-brand-warning bg-brand-warning/10 px-3 py-1.5 text-[10px] font-bold text-brand-dark">
                       Under review
                     </span>
 
@@ -3587,12 +2720,7 @@ function DocumentsSection({
                           document.id
                         ]?.click()
                       }
-                      className="
-                        text-xs
-                        font-bold
-                        text-brand-primary
-                        hover:underline
-                      "
+                      className="text-[12px] font-bold text-brand-primary hover:underline"
                     >
                       Replace
                     </button>
@@ -3601,24 +2729,8 @@ function DocumentsSection({
 
                 {document.status ===
                   'verified' && (
-                  <span
-                    className="
-                      inline-flex
-                      items-center
-                      gap-1.5
-                      rounded-full
-                      border
-                      border-brand-emerald
-                      bg-[#effff7]
-                      px-3
-                      py-1.5
-                      text-xs
-                      font-bold
-                      text-[#167a50]
-                    "
-                  >
-                    <FileCheck2 className="h-4 w-4" />
-
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-emerald bg-brand-emerald/10 px-3 py-1.5 text-[12px] font-bold text-brand-primary">
+                    <FileCheck2 className="h-4 w-4 text-brand-emerald" />
                     Verified
                   </span>
                 )}
@@ -3636,8 +2748,7 @@ function DocumentsSection({
 ========================================================= */
 
 interface ProjectsSectionProps {
-  projects:
-    ProjectItem[];
+  projects: ProjectItem[];
 
   setProjects:
     React.Dispatch<
@@ -3646,8 +2757,7 @@ interface ProjectsSectionProps {
       >
     >;
 
-  activeCount:
-    number;
+  activeCount: number;
 }
 
 function ProjectsSection({
@@ -3655,28 +2765,16 @@ function ProjectsSection({
   setProjects,
   activeCount,
 }: ProjectsSectionProps) {
-  const [
-    showForm,
-    setShowForm,
-  ] =
+  const [showForm, setShowForm] =
     useState(false);
 
-  const [
-    newProject,
-    setNewProject,
-  ] =
+  const [newProject, setNewProject] =
     useState({
-      name:
-        '',
-
-      tech:
-        '',
-
+      name: '',
+      tech: '',
       status:
         'Active Development',
-
-      desc:
-        '',
+      desc: '',
     });
 
   const handleCreateProject = (
@@ -3692,123 +2790,53 @@ function ProjectsSection({
       return;
     }
 
-    setProjects(
-      (
-        current,
-      ) => [
-        {
-          id:
-            Date.now(),
-
-          ...newProject,
-        },
-
-        ...current,
-      ],
-    );
+    setProjects((current) => [
+      {
+        id: Date.now(),
+        ...newProject,
+      },
+      ...current,
+    ]);
 
     setNewProject({
-      name:
-        '',
-      tech:
-        '',
+      name: '',
+      tech: '',
       status:
         'Active Development',
-      desc:
-        '',
+      desc: '',
     });
 
-    setShowForm(
-      false,
-    );
+    setShowForm(false);
   };
 
   return (
     <div className="space-y-6">
-      <div
-        className="
-          flex
-          flex-col
-          justify-between
-          gap-4
-          sm:flex-row
-          sm:items-center
-        "
-      >
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h2
-            className="
-              !m-0
-              text-xl
-              font-bold
-              !text-brand-primary
-            "
-          >
+          <h2 className="!m-0 text-[24px] font-bold !text-brand-primary">
             Portfolio Projects
           </h2>
 
-          <p
-            className="
-              mt-1
-              text-sm
-              text-brand-textMuted
-            "
-          >
+          <p className="mt-1 text-[14px] text-brand-textMuted">
             Showcase selected work that supports your experience and skills.
           </p>
         </div>
 
-        <button
-          type="button"
+        <PrimaryButton
           onClick={() =>
-            setShowForm(
-              true,
-            )
+            setShowForm(true)
           }
-          className="
-            inline-flex
-            min-h-[44px]
-            items-center
-            justify-center
-            gap-2
-            rounded-[13px]
-            bg-brand-primary
-            px-4
-            text-xs
-            font-bold
-            text-white
-            transition
-            hover:bg-brand-dark
-          "
         >
           <Plus className="h-4 w-4" />
-
           Add project
-        </button>
+        </PrimaryButton>
       </div>
 
-      {activeCount >
-        0 && (
-        <div
-          className="
-            inline-flex
-            rounded-full
-            border
-            border-[#b9d9ea]
-            bg-[#eef8fd]
-            px-3
-            py-1.5
-            text-[10px]
-            font-bold
-            text-brand-primary
-          "
-        >
+      {activeCount > 0 && (
+        <div className="inline-flex rounded-full border border-brand-accent/30 bg-brand-accent/10 px-3 py-1.5 text-[10px] font-bold text-brand-primary">
           {activeCount}{' '}
-
           active
-
-          {activeCount ===
-          1
+          {activeCount === 1
             ? ' project'
             : ' projects'}
         </div>
@@ -3822,72 +2850,51 @@ function ProjectsSection({
           className="
             rounded-[24px]
             border
-            border-[#b9d9ea]
+            border-brand-accent/30
             bg-white
             p-5
             shadow-[0_16px_40px_rgba(0,70,109,0.07)]
           "
         >
-          <div
-            className="
-              mb-5
-              flex
-              items-center
-              justify-between
-            "
-          >
-            <h3
-              className="
-                !m-0
-                text-base
-                font-bold
-                !text-brand-primary
-              "
-            >
+          <div className="mb-5 flex items-center justify-between">
+            <h3 className="!m-0 text-[16px] font-bold !text-brand-primary">
               Add portfolio project
             </h3>
 
             <button
               type="button"
+              aria-label="Close project form"
               onClick={() =>
-                setShowForm(
-                  false,
-                )
+                setShowForm(false)
               }
               className="
                 grid
                 h-8
                 w-8
                 place-items-center
-                rounded-lg
+                rounded-[9px]
                 text-brand-textMuted
                 hover:bg-brand-bg
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/15
               "
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div
-            className="
-              grid
-              gap-4
-              sm:grid-cols-2
-            "
-          >
+          <div className="grid gap-4 sm:grid-cols-2">
             <FormField
               label="Project name"
               value={
                 newProject.name
               }
-              onChange={(
-                value,
-              ) =>
+              onChange={(value) =>
                 setNewProject({
                   ...newProject,
-
-                  name:
-                    value,
+                  name: value,
                 })
               }
             />
@@ -3897,29 +2904,17 @@ function ProjectsSection({
               value={
                 newProject.tech
               }
-              onChange={(
-                value,
-              ) =>
+              onChange={(value) =>
                 setNewProject({
                   ...newProject,
-
-                  tech:
-                    value,
+                  tech: value,
                 })
               }
             />
           </div>
 
           <div className="mt-4">
-            <label
-              className="
-                mb-1.5
-                block
-                text-xs
-                font-bold
-                text-brand-textMuted
-              "
-            >
+            <label className="mb-1.5 block text-[12px] font-bold text-brand-textMuted">
               Project summary
             </label>
 
@@ -3927,12 +2922,9 @@ function ProjectsSection({
               value={
                 newProject.desc
               }
-              onChange={(
-                event,
-              ) =>
+              onChange={(event) =>
                 setNewProject({
                   ...newProject,
-
                   desc:
                     event.target.value,
                 })
@@ -3946,58 +2938,33 @@ function ProjectsSection({
                 border-brand-border
                 bg-brand-bg
                 p-4
-                text-sm
+                text-[14px]
+                text-brand-text
                 outline-none
                 transition
+
+                placeholder:text-brand-textMuted/70
                 focus:border-brand-accent
                 focus:ring-4
-                focus:ring-[#1e92d2]/10
+                focus:ring-brand-accent/10
               "
             />
           </div>
 
-          <div
-            className="
-              mt-5
-              flex
-              justify-end
-            "
-          >
-            <button
-              type="submit"
-              className="
-                rounded-[13px]
-                bg-brand-primary
-                px-5
-                py-2.5
-                text-xs
-                font-bold
-                text-white
-                transition
-                hover:bg-brand-dark
-              "
-            >
+          <div className="mt-5 flex justify-end">
+            <PrimaryButton type="submit">
+              <Save className="h-4 w-4" />
               Save project
-            </button>
+            </PrimaryButton>
           </div>
         </form>
       )}
 
-      <div
-        className="
-          grid
-          gap-4
-          md:grid-cols-2
-        "
-      >
+      <div className="grid gap-4 md:grid-cols-2">
         {projects.map(
-          (
-            project,
-          ) => (
+          (project) => (
             <article
-              key={
-                project.id
-              }
+              key={project.id}
               className="
                 flex
                 h-full
@@ -4010,26 +2977,8 @@ function ProjectsSection({
                 shadow-[0_12px_32px_rgba(0,70,109,0.06)]
               "
             >
-              <div
-                className="
-                  mb-4
-                  flex
-                  items-start
-                  justify-between
-                  gap-3
-                "
-              >
-                <div
-                  className="
-                    grid
-                    h-11
-                    w-11
-                    place-items-center
-                    rounded-[14px]
-                    bg-[#eef8fd]
-                    text-brand-primary
-                  "
-                >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-[14px] bg-brand-accent/10 text-brand-primary">
                   <Code2 className="h-5 w-5" />
                 </div>
 
@@ -4045,54 +2994,25 @@ function ProjectsSection({
                     ${
                       project.status ===
                       'Active Development'
-                        ? 'border-[#b9d9ea] bg-[#eef8fd] text-brand-primary'
-                        : 'border-brand-emerald bg-[#effff7] text-[#167a50]'
+                        ? 'border-brand-accent/30 bg-brand-accent/10 text-brand-primary'
+                        : 'border-brand-emerald bg-brand-emerald/10 text-brand-primary'
                     }
                   `}
                 >
-                  {
-                    project.status
-                  }
+                  {project.status}
                 </span>
               </div>
 
-              <h3
-                className="
-                  !m-0
-                  text-base
-                  font-bold
-                  !text-brand-primary
-                "
-              >
-                {
-                  project.name
-                }
+              <h3 className="!m-0 text-[16px] font-bold !text-brand-primary">
+                {project.name}
               </h3>
 
-              <p
-                className="
-                  mt-1
-                  text-xs
-                  font-bold
-                  text-brand-accent
-                "
-              >
-                {
-                  project.tech
-                }
+              <p className="mt-1 text-[12px] font-bold text-brand-accent">
+                {project.tech}
               </p>
 
-              <p
-                className="
-                  mt-3
-                  text-sm
-                  leading-6
-                  text-brand-textMuted
-                "
-              >
-                {
-                  project.desc
-                }
+              <p className="mt-3 text-[14px] leading-6 text-brand-textMuted">
+                {project.desc}
               </p>
             </article>
           ),
@@ -4110,39 +3030,23 @@ function PreferencesSection() {
   const [
     availability,
     setAvailability,
-  ] =
-    useState(
-      'full-time',
-    );
+  ] = useState('full-time');
 
-  const [
-    saved,
-    setSaved,
-  ] =
+  const [saved, setSaved] =
     useState(false);
 
-  const handleSave =
-    () => {
-      setSaved(
-        true,
-      );
+  const handleSave = () => {
+    setSaved(true);
 
-      window.setTimeout(
-        () =>
-          setSaved(
-            false,
-          ),
-        2500,
-      );
-    };
+    window.setTimeout(
+      () =>
+        setSaved(false),
+      2500,
+    );
+  };
 
   return (
-    <div
-      className="
-        max-w-[760px]
-        space-y-5
-      "
-    >
+    <div className="max-w-[760px] space-y-5">
       <section
         className="
           rounded-[24px]
@@ -4154,35 +3058,15 @@ function PreferencesSection() {
           sm:p-6
         "
       >
-        <h2
-          className="
-            !m-0
-            text-lg
-            font-bold
-            !text-brand-primary
-          "
-        >
+        <h2 className="!m-0 text-[20px] font-bold !text-brand-primary">
           Opportunity preferences
         </h2>
 
-        <p
-          className="
-            mt-1
-            text-sm
-            text-brand-textMuted
-          "
-        >
+        <p className="mt-1 text-[14px] text-brand-textMuted">
           Choose the type of work you are currently open to.
         </p>
 
-        <div
-          className="
-            mt-5
-            grid
-            gap-3
-            sm:grid-cols-2
-          "
-        >
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <PreferenceCard
             selected={
               availability ===
@@ -4213,52 +3097,35 @@ function PreferencesSection() {
         </div>
       </section>
 
-      <div
-        className="
-          flex
-          items-center
-          gap-4
-        "
-      >
-        <button
-          type="button"
-          onClick={
-            handleSave
-          }
-          className="
-            inline-flex
-            min-h-[46px]
-            items-center
-            gap-2
-            rounded-[14px]
-            bg-brand-primary
-            px-5
-            text-sm
-            font-bold
-            text-white
-            transition
-            hover:bg-brand-dark
-          "
+      <div className="flex flex-wrap items-center gap-4">
+        <PrimaryButton
+          onClick={handleSave}
         >
-          <Save className="h-4 w-4" />
+          {saved ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
 
-          Save preferences
-        </button>
+          {saved
+            ? 'Preferences saved'
+            : 'Save preferences'}
+        </PrimaryButton>
 
         {saved && (
           <span
+            role="status"
             className="
               inline-flex
               items-center
-              gap-1.5
-              text-xs
+              gap-2
+              text-[12px]
               font-bold
-              text-[#167a50]
+              text-brand-primary
             "
           >
-            <CheckCircle2 className="h-4 w-4" />
-
-            Preferences updated
+            <CheckCircle2 className="h-4 w-4 text-brand-emerald" />
+            Your preferences have been updated.
           </span>
         )}
       </div>
@@ -4267,13 +3134,69 @@ function PreferencesSection() {
 }
 
 /* =========================================================
-   SHARED COMPONENTS
+   SHARED PRIMARY BUTTON
+========================================================= */
+
+interface PrimaryButtonProps {
+  children: ReactNode;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+  disabled?: boolean;
+}
+
+function PrimaryButton({
+  children,
+  onClick,
+  type = 'button',
+  disabled = false,
+}: PrimaryButtonProps) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className="
+        inline-flex
+        min-h-[46px]
+        items-center
+        justify-center
+        gap-2
+        rounded-[14px]
+        px-5
+        text-[14px]
+        font-bold
+        text-white
+        shadow-[0_8px_20px_rgba(0,70,109,0.14)]
+        transition-all
+        duration-200
+
+        hover:-translate-y-0.5
+        hover:shadow-[0_12px_24px_rgba(0,70,109,0.18)]
+
+        disabled:pointer-events-none
+        disabled:opacity-45
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
+      "
+      style={{
+        background:
+          'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* =========================================================
+   FORM FIELD
 ========================================================= */
 
 interface FormFieldProps {
   label: string;
   value: string;
-
   onChange: (
     value: string,
   ) => void;
@@ -4290,7 +3213,7 @@ function FormField({
         className="
           mb-1.5
           block
-          text-xs
+          text-[12px]
           font-bold
           text-brand-textMuted
         "
@@ -4299,46 +3222,44 @@ function FormField({
       </label>
 
       <input
-        value={
-          value
-        }
-        onChange={(
-          event,
-        ) =>
+        value={value}
+        onChange={(event) =>
           onChange(
             event.target.value,
           )
         }
         className="
+          min-h-[46px]
           w-full
           rounded-[14px]
           border
           border-brand-border
           bg-brand-bg
           px-4
-          py-3
-          text-sm
+          text-[14px]
           text-brand-text
           outline-none
           transition
+
           focus:border-brand-accent
           focus:ring-4
-          focus:ring-[#1e92d2]/10
+          focus:ring-brand-accent/10
         "
       />
     </div>
   );
 }
 
+/* =========================================================
+   SECTION TITLE
+========================================================= */
+
 function SectionTitle({
   icon,
   children,
 }: {
-  icon:
-    React.ReactNode;
-
-  children:
-    React.ReactNode;
+  icon: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div
@@ -4346,22 +3267,23 @@ function SectionTitle({
         flex
         items-center
         gap-2
-        text-sm
+        text-[14px]
         font-bold
         text-brand-primary
       "
     >
       {icon}
-
       {children}
     </div>
   );
 }
 
-interface ContactRowProps {
-  icon:
-    React.ReactNode;
+/* =========================================================
+   CONTACT ROW
+========================================================= */
 
+interface ContactRowProps {
+  icon: ReactNode;
   label: string;
   value: string;
 }
@@ -4372,13 +3294,7 @@ function ContactRow({
   value,
 }: ContactRowProps) {
   return (
-    <div
-      className="
-        flex
-        items-start
-        gap-3
-      "
-    >
+    <div className="flex items-start gap-3">
       <div
         className="
           grid
@@ -4387,7 +3303,7 @@ function ContactRow({
           shrink-0
           place-items-center
           rounded-[11px]
-          bg-[#eef8fd]
+          bg-brand-accent/10
           text-brand-primary
         "
       >
@@ -4397,7 +3313,7 @@ function ContactRow({
       <div className="min-w-0">
         <div
           className="
-            text-[9px]
+            text-[10px]
             font-bold
             uppercase
             tracking-[0.14em]
@@ -4411,7 +3327,7 @@ function ContactRow({
           className="
             mt-1
             break-words
-            text-sm
+            text-[14px]
             font-bold
             text-brand-text
           "
@@ -4422,6 +3338,10 @@ function ContactRow({
     </div>
   );
 }
+
+/* =========================================================
+   PREFERENCE CARD
+========================================================= */
 
 interface PreferenceCardProps {
   selected: boolean;
@@ -4439,24 +3359,38 @@ function PreferenceCard({
   return (
     <button
       type="button"
-      onClick={
-        onClick
-      }
+      aria-pressed={selected}
+      onClick={onClick}
       className={`
         flex
+        min-h-[92px]
         items-start
         gap-3
         rounded-[18px]
-        border-2
+        border
         p-4
         text-left
-        transition
+        transition-all
+        duration-200
 
         ${
           selected
-            ? 'border-brand-accent bg-[#eef8fd]'
-            : 'border-brand-border bg-brand-bg hover:border-[#b9d9ea]'
+            ? `
+              border-brand-accent
+              bg-brand-accent/10
+              shadow-[0_8px_22px_rgba(0,70,109,0.06)]
+            `
+            : `
+              border-brand-border
+              bg-white
+              hover:border-brand-accent/50
+              hover:bg-brand-bg
+            `
         }
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/15
       `}
     >
       <span
@@ -4493,7 +3427,7 @@ function PreferenceCard({
         <span
           className="
             block
-            text-sm
+            text-[14px]
             font-bold
             text-brand-primary
           "
@@ -4505,7 +3439,8 @@ function PreferenceCard({
           className="
             mt-1
             block
-            text-xs
+            text-[12px]
+            font-normal
             leading-5
             text-brand-textMuted
           "
@@ -4516,3 +3451,5 @@ function PreferenceCard({
     </button>
   );
 }
+
+export default Profile;

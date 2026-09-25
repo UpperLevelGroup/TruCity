@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import companyService from "../company.service";
 import type { CompanyProfile as CompanyProfileType } from "../company.types";
-import logo from "../../../assets/branding/trucity-logo.png";
+import logo from "../../../assets/trucity-logo.png";
 
 export default function CompanyProfile() {
   const [profile, setProfile] = useState<CompanyProfileType | null>(null);

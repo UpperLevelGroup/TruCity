@@ -381,10 +381,10 @@ export default function Messages() {
   /* =========================================================
      COMPANY CONTACT CONTEXT
 
-     Applying is no longer performed from Messages.
+     Applying remains separate from Messages.
 
      CompanyFeed:
-     Express Interest -> application submitted -> profile shared.
+     Express Interest -> application submitted.
 
      Messages:
      communication -> optional CV attachment -> interviews.
@@ -564,12 +564,10 @@ export default function Messages() {
      * Production backend:
      *
      * If attachment exists:
-     * 1. Upload the actual file to Supabase Storage.
-     * 2. Store its storage path on the message attachment.
+     * 1. Upload the actual CV to private Supabase Storage.
+     * 2. Store only the storage path / metadata on the message.
      * 3. Insert the message into the messages table.
-     *
-     * The current frontend prototype stores attachment metadata
-     * only. It does not upload the binary file yet.
+     * 4. Use signed URLs when an authorised user needs access.
      */
 
     setDraft('');
@@ -590,9 +588,6 @@ export default function Messages() {
 
   /* =========================================================
      INTERVIEW RESPONSE
-
-     Employer schedules.
-     Candidate can only accept or decline.
   ========================================================= */
 
   const handleInterviewResponse = (
@@ -674,8 +669,8 @@ export default function Messages() {
     );
 
     addNotification({
-      id: `interview-response-${Date.now()}`,
-      type: 'system',
+      type:
+        'system',
 
       title:
         response ===
@@ -702,13 +697,10 @@ export default function Messages() {
     /*
      * Production backend:
      *
-     * Update the SAME employer-created interview record:
+     * Update the SAME employer-created interview:
      *
      * interview.id = interview.interviewId
      * status = response
-     *
-     * This allows the employer dashboard to immediately see
-     * whether the candidate accepted or declined.
      */
   };
 
@@ -719,10 +711,13 @@ export default function Messages() {
   return (
     <div
       className="
-        min-h-[calc(100vh-88px)]
-        bg-brand-bg
+        relative
+        min-h-[calc(100dvh-88px)]
+        overflow-x-hidden
+        bg-transparent
         px-4
         py-6
+        font-sans
         text-brand-text
 
         sm:px-6
@@ -731,9 +726,11 @@ export default function Messages() {
     >
       <div
         className="
+          relative
+          z-10
           mx-auto
           flex
-          h-[calc(100vh-136px)]
+          h-[calc(100dvh-136px)]
           min-h-[620px]
           w-full
           max-w-[1480px]
@@ -741,8 +738,9 @@ export default function Messages() {
           rounded-[28px]
           border
           border-brand-border
-          bg-white
+          bg-white/95
           shadow-[0_22px_55px_rgba(0,70,109,0.10)]
+          backdrop-blur-sm
         "
       >
         {/* =====================================================
@@ -756,7 +754,7 @@ export default function Messages() {
             flex-col
             border-r
             border-brand-border
-            bg-white
+            bg-white/95
 
             md:w-[340px]
             lg:w-[380px]
@@ -790,7 +788,7 @@ export default function Messages() {
                     text-[10px]
                     font-bold
                     uppercase
-                    tracking-[0.18em]
+                    tracking-[0.16em]
                     text-brand-accent
                   "
                 >
@@ -801,7 +799,7 @@ export default function Messages() {
                   className="
                     !m-0
                     mt-1
-                    text-xl
+                    text-[24px]
                     font-bold
                     tracking-[-0.025em]
                     !text-brand-primary
@@ -832,7 +830,7 @@ export default function Messages() {
             <p
               className="
                 mt-2
-                text-xs
+                text-[12px]
                 leading-5
                 text-brand-textMuted
               "
@@ -888,36 +886,34 @@ export default function Messages() {
                         p-3.5
                         text-left
                         transition-all
+                        duration-200
 
                         ${
                           isActive
-                            ? 'border-[#b9d9ea] bg-[#eef8fd] shadow-[0_8px_18px_rgba(0,70,109,0.07)]'
-                            : 'border-transparent bg-white hover:border-brand-border hover:bg-brand-bg'
+                            ? `
+                              border-brand-accent/35
+                              bg-brand-accent/10
+                              shadow-[0_8px_18px_rgba(0,70,109,0.07)]
+                            `
+                            : `
+                              border-transparent
+                              bg-white
+
+                              hover:border-brand-border
+                              hover:bg-brand-bg
+                            `
                         }
+
+                        focus-visible:outline-none
+                        focus-visible:ring-4
+                        focus-visible:ring-brand-accent/15
                       `}
                     >
-                      <div
-                        className="
-                          flex
-                          h-11
-                          w-11
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-[14px]
-                          bg-brand-primary
-                          text-sm
-                          font-bold
-                          text-white
-                          shadow-[0_7px_16px_rgba(0,70,109,0.13)]
-                        "
-                      >
-                        {
-                          conversation.name.charAt(
-                            0,
-                          )
+                      <CompanyAvatar
+                        name={
+                          conversation.name
                         }
-                      </div>
+                      />
 
                       <div className="min-w-0 flex-1">
                         <div
@@ -939,7 +935,7 @@ export default function Messages() {
                             <span
                               className="
                                 truncate
-                                text-xs
+                                text-[12px]
                                 font-bold
                                 text-brand-primary
                               "
@@ -955,7 +951,7 @@ export default function Messages() {
                                   h-3.5
                                   w-3.5
                                   shrink-0
-                                  text-[#167a50]
+                                  text-brand-emerald
                                 "
                               />
                             )}
@@ -965,7 +961,7 @@ export default function Messages() {
                             className="
                               shrink-0
                               text-[10px]
-                              font-medium
+                              font-normal
                               text-brand-textMuted
                             "
                           >
@@ -1004,10 +1000,17 @@ export default function Messages() {
                               gap-1
                               text-[10px]
                               font-bold
-                              text-[#167a50]
+                              text-brand-primary
                             "
                           >
-                            <CheckCircle2 className="h-3 w-3" />
+                            <CheckCircle2
+                              className="
+                                h-3
+                                w-3
+                                text-brand-emerald
+                              "
+                            />
+
                             Verified
                           </span>
 
@@ -1023,7 +1026,7 @@ export default function Messages() {
                                 rounded-full
                                 bg-brand-gold
                                 px-1
-                                text-[9px]
+                                text-[10px]
                                 font-bold
                                 text-brand-dark
                               "
@@ -1052,7 +1055,7 @@ export default function Messages() {
             min-w-0
             flex-1
             flex-col
-            bg-brand-bg
+            bg-brand-bg/90
 
             ${
               !showMobileList
@@ -1094,15 +1097,19 @@ export default function Messages() {
                 w-9
                 shrink-0
                 place-items-center
-                rounded-xl
+                rounded-[12px]
                 border
                 border-brand-border
                 bg-white
                 text-brand-textMuted
-                transition
+                transition-colors
 
                 hover:border-brand-primary
                 hover:text-brand-primary
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/20
 
                 md:hidden
               "
@@ -1110,27 +1117,11 @@ export default function Messages() {
               <ChevronLeft className="h-4 w-4" />
             </button>
 
-            <div
-              className="
-                flex
-                h-11
-                w-11
-                shrink-0
-                items-center
-                justify-center
-                rounded-[14px]
-                bg-brand-primary
-                text-sm
-                font-bold
-                text-white
-              "
-            >
-              {
-                activeConv.name.charAt(
-                  0,
-                )
+            <CompanyAvatar
+              name={
+                activeConv.name
               }
-            </div>
+            />
 
             <div className="min-w-0">
               <div
@@ -1144,7 +1135,7 @@ export default function Messages() {
                   className="
                     !m-0
                     truncate
-                    text-sm
+                    text-[18px]
                     font-bold
                     !text-brand-primary
                   "
@@ -1160,7 +1151,7 @@ export default function Messages() {
                       h-4
                       w-4
                       shrink-0
-                      text-[#167a50]
+                      text-brand-emerald
                     "
                   />
                 )}
@@ -1174,7 +1165,7 @@ export default function Messages() {
                   gap-1.5
                   text-[10px]
                   font-bold
-                  text-[#167a50]
+                  text-brand-primary
                 "
               >
                 <span
@@ -1186,7 +1177,7 @@ export default function Messages() {
                   "
                 />
 
-                Active & Verified Employer
+                Active &amp; Verified Employer
               </span>
             </div>
           </div>
@@ -1199,12 +1190,13 @@ export default function Messages() {
             <div
               className="
                 border-b
-                border-[#b9d9ea]
-                bg-[#eef8fd]
+                border-brand-accent/25
+                bg-brand-accent/10
                 px-5
                 py-3
-                text-xs
+                text-[12px]
                 font-semibold
+                leading-5
                 text-brand-primary
               "
             >
@@ -1221,7 +1213,7 @@ export default function Messages() {
             className="
               flex-1
               overflow-y-auto
-              bg-brand-bg
+              bg-transparent
               p-4
 
               sm:p-5
@@ -1247,7 +1239,7 @@ export default function Messages() {
                     w-14
                     place-items-center
                     rounded-[18px]
-                    bg-[#eef8fd]
+                    bg-brand-accent/10
                     text-brand-primary
                   "
                 >
@@ -1258,7 +1250,7 @@ export default function Messages() {
                   className="
                     !m-0
                     mt-4
-                    text-base
+                    text-[18px]
                     font-bold
                     !text-brand-primary
                   "
@@ -1270,7 +1262,7 @@ export default function Messages() {
                   className="
                     mt-2
                     max-w-[340px]
-                    text-xs
+                    text-[12px]
                     leading-5
                     text-brand-textMuted
                   "
@@ -1314,16 +1306,24 @@ export default function Messages() {
                             border
                             px-4
                             py-3
-                            text-xs
+                            text-[14px]
                             leading-6
                             shadow-sm
 
-                            sm:text-sm
-
                             ${
                               isMe
-                                ? 'rounded-br-[6px] border-brand-primary bg-brand-primary text-white'
-                                : 'rounded-bl-[6px] border-brand-border bg-white text-brand-text'
+                                ? `
+                                  rounded-br-[6px]
+                                  border-brand-primary
+                                  bg-brand-primary
+                                  text-white
+                                `
+                                : `
+                                  rounded-bl-[6px]
+                                  border-brand-border
+                                  bg-white
+                                  text-brand-text
+                                `
                             }
                           `}
                         >
@@ -1450,7 +1450,7 @@ export default function Messages() {
                       shrink-0
                       place-items-center
                       rounded-[11px]
-                      bg-[#eef8fd]
+                      bg-brand-accent/10
                       text-brand-primary
                     "
                   >
@@ -1461,7 +1461,7 @@ export default function Messages() {
                     <p
                       className="
                         truncate
-                        text-xs
+                        text-[12px]
                         font-bold
                         text-brand-primary
                       "
@@ -1500,10 +1500,14 @@ export default function Messages() {
                     place-items-center
                     rounded-[10px]
                     text-brand-textMuted
-                    transition
+                    transition-colors
 
                     hover:bg-white
                     hover:text-brand-crimson
+
+                    focus-visible:outline-none
+                    focus-visible:ring-4
+                    focus-visible:ring-brand-crimson/15
                   "
                 >
                   <Trash2 className="h-4 w-4" />
@@ -1515,7 +1519,7 @@ export default function Messages() {
               <p
                 className="
                   mb-3
-                  text-xs
+                  text-[12px]
                   font-semibold
                   text-brand-crimson
                 "
@@ -1554,13 +1558,30 @@ export default function Messages() {
                     place-items-center
                     rounded-[14px]
                     border
-                    transition
+                    transition-all
+                    duration-200
 
                     ${
                       attachedCv
-                        ? 'border-brand-accent bg-[#eef8fd] text-brand-primary'
-                        : 'border-brand-border bg-white text-brand-textMuted hover:border-brand-accent hover:bg-[#eef8fd] hover:text-brand-primary'
+                        ? `
+                          border-brand-accent
+                          bg-brand-accent/10
+                          text-brand-primary
+                        `
+                        : `
+                          border-brand-border
+                          bg-white
+                          text-brand-textMuted
+
+                          hover:border-brand-accent
+                          hover:bg-brand-accent/10
+                          hover:text-brand-primary
+                        `
                     }
+
+                    focus-visible:outline-none
+                    focus-visible:ring-4
+                    focus-visible:ring-brand-accent/20
                   `}
                 >
                   <Paperclip className="h-4 w-4" />
@@ -1593,20 +1614,21 @@ export default function Messages() {
                   border-brand-border
                   bg-brand-bg
                   px-4
-                  text-xs
-                  font-medium
+                  text-[14px]
+                  font-normal
                   text-brand-text
                   outline-none
-                  transition
+                  transition-all
+                  duration-200
 
-                  placeholder:text-brand-textMuted
+                  placeholder:text-brand-textMuted/70
+
+                  hover:border-brand-accent/60
 
                   focus:border-brand-accent
                   focus:bg-white
                   focus:ring-4
-                  focus:ring-[#1e92d2]/10
-
-                  sm:text-sm
+                  focus:ring-brand-accent/10
                 "
               />
 
@@ -1623,21 +1645,35 @@ export default function Messages() {
                   justify-center
                   gap-2
                   rounded-[14px]
-                  bg-brand-primary
                   px-4
-                  text-xs
+                  text-[12px]
                   font-bold
                   text-white
                   shadow-[0_8px_20px_rgba(0,70,109,0.16)]
-                  transition
+                  transition-all
+                  duration-200
 
-                  hover:bg-brand-dark
+                  hover:-translate-y-0.5
 
                   disabled:cursor-not-allowed
                   disabled:bg-brand-border
                   disabled:text-brand-textMuted
                   disabled:shadow-none
+                  disabled:hover:translate-y-0
+
+                  focus-visible:outline-none
+                  focus-visible:ring-4
+                  focus-visible:ring-brand-accent/25
                 "
+                style={
+                  !draft.trim() &&
+                  !attachedCv
+                    ? undefined
+                    : {
+                        background:
+                          'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+                      }
+                }
               >
                 <Send className="h-4 w-4" />
 
@@ -1662,6 +1698,44 @@ export default function Messages() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   COMPANY AVATAR
+========================================================= */
+
+interface CompanyAvatarProps {
+  name: string;
+}
+
+function CompanyAvatar({
+  name,
+}: CompanyAvatarProps) {
+  return (
+    <div
+      className="
+        flex
+        h-11
+        w-11
+        shrink-0
+        items-center
+        justify-center
+        rounded-[14px]
+        border
+        border-white/70
+        text-[14px]
+        font-bold
+        text-white
+        shadow-[0_7px_16px_rgba(0,70,109,0.13)]
+      "
+      style={{
+        background:
+          'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)',
+      }}
+    >
+      {name.charAt(0)}
     </div>
   );
 }
@@ -1695,8 +1769,14 @@ function SentAttachment({
 
         ${
           isMine
-            ? 'border-white/25 bg-white/10'
-            : 'border-brand-border bg-brand-bg'
+            ? `
+              border-white/25
+              bg-white/10
+            `
+            : `
+              border-brand-border
+              bg-brand-bg
+            `
         }
       `}
     >
@@ -1711,8 +1791,14 @@ function SentAttachment({
 
           ${
             isMine
-              ? 'bg-white/15 text-white'
-              : 'bg-[#eef8fd] text-brand-primary'
+              ? `
+                bg-white/15
+                text-white
+              `
+              : `
+                bg-brand-accent/10
+                text-brand-primary
+              `
           }
         `}
       >
@@ -1723,7 +1809,7 @@ function SentAttachment({
         <p
           className={`
             truncate
-            text-xs
+            text-[12px]
             font-bold
 
             ${
@@ -1751,6 +1837,7 @@ function SentAttachment({
           `}
         >
           CV •{' '}
+
           {formatFileSize(
             attachment.size,
           )}
@@ -1838,7 +1925,7 @@ function InterviewInvitationCard({
         className="
           border-b
           border-brand-border
-          bg-[#eef8fd]
+          bg-brand-accent/10
           p-4
         "
       >
@@ -1874,7 +1961,7 @@ function InterviewInvitationCard({
           className="
             !m-0
             mt-2
-            text-sm
+            text-[16px]
             font-bold
             !text-brand-primary
           "
@@ -1891,7 +1978,7 @@ function InterviewInvitationCard({
             flex
             items-start
             gap-2.5
-            text-xs
+            text-[12px]
             text-brand-textMuted
           "
         >
@@ -1930,7 +2017,7 @@ function InterviewInvitationCard({
             flex
             items-center
             gap-2.5
-            text-xs
+            text-[12px]
             text-brand-textMuted
           "
         >
@@ -1953,7 +2040,7 @@ function InterviewInvitationCard({
             flex
             items-center
             gap-2.5
-            text-xs
+            text-[12px]
             text-brand-textMuted
           "
         >
@@ -1980,7 +2067,7 @@ function InterviewInvitationCard({
               bg-brand-bg
               px-3
               py-2
-              text-xs
+              text-[12px]
               text-brand-textMuted
             "
           >
@@ -2015,13 +2102,18 @@ function InterviewInvitationCard({
                 border-brand-border
                 bg-white
                 px-3
-                text-xs
+                text-[12px]
                 font-bold
                 text-brand-textMuted
-                transition
+                transition-colors
 
                 hover:border-brand-crimson
+                hover:bg-brand-crimson/5
                 hover:text-brand-crimson
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-crimson/15
               "
             >
               <X className="h-3.5 w-3.5" />
@@ -2041,15 +2133,24 @@ function InterviewInvitationCard({
                 justify-center
                 gap-2
                 rounded-[11px]
-                bg-brand-primary
                 px-3
-                text-xs
+                text-[12px]
                 font-bold
                 text-white
-                transition
+                shadow-[0_7px_16px_rgba(0,70,109,0.14)]
+                transition-all
+                duration-200
 
-                hover:bg-brand-dark
+                hover:-translate-y-0.5
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/25
               "
+              style={{
+                background:
+                  'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+              }}
             >
               <Check className="h-3.5 w-3.5" />
 
@@ -2066,18 +2167,32 @@ function InterviewInvitationCard({
               border
               px-3
               py-2.5
-              text-xs
+              text-[12px]
               font-bold
 
               ${
                 isAccepted
-                  ? 'border-brand-emerald bg-[#effff7] text-[#167a50]'
-                  : 'border-brand-crimson bg-[#fff5f7] text-brand-crimson'
+                  ? `
+                    border-brand-emerald
+                    bg-brand-emerald/10
+                    text-brand-primary
+                  `
+                  : `
+                    border-brand-crimson
+                    bg-brand-crimson/10
+                    text-brand-crimson
+                  `
               }
             `}
           >
             {isAccepted ? (
-              <CheckCircle2 className="h-4 w-4" />
+              <CheckCircle2
+                className="
+                  h-4
+                  w-4
+                  text-brand-emerald
+                "
+              />
             ) : (
               <X className="h-4 w-4" />
             )}

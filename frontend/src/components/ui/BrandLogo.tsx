@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 
+import trucityLogo from '../../assets/trucity-logo.png';
+
 interface BrandLogoProps {
   compact?: boolean;
   to?: string;
@@ -36,7 +38,7 @@ export default function BrandLogo({
         `}
       >
         <img
-          src="/trucity-logo.png"
+          src={trucityLogo}
           alt="TruCity"
           draggable={false}
           className="

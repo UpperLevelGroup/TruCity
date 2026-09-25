@@ -3,7 +3,7 @@ import { Outlet } from "react-router-dom";
 import AdminSidebar from "../features/admin/components/AdminSidebar";
 import AdminTopbar from "../features/admin/components/AdminTopbar";
 
-import logo from "../assets/branding/trucity-logo.png";
+import logo from "../assets/trucity-logo.png";
 
 import "../styles/admin.css";
 

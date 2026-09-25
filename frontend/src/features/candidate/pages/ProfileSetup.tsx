@@ -6,6 +6,7 @@ import React, {
 
 import {
   Link,
+  NavLink,
   useNavigate,
 } from 'react-router-dom';
 
@@ -138,8 +139,7 @@ export default function ProfileSetup() {
      VALIDATION
   ========================================================= */
 
-  const isIdValid =
-    /^\d{13}$/.test(idNumber);
+  const isIdValid = /^\d{13}$/.test(idNumber);
 
   const handleIdNumberChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -147,10 +147,7 @@ export default function ProfileSetup() {
     const digitsOnly =
       event.target.value.replace(/\D/g, '');
 
-    const limitedValue =
-      digitsOnly.slice(0, 13);
-
-    setIdNumber(limitedValue);
+    setIdNumber(digitsOnly.slice(0, 13));
   };
 
   /* =========================================================
@@ -210,26 +207,18 @@ export default function ProfileSetup() {
     return () => {
       faceStreamRef.current
         ?.getTracks()
-        .forEach((track) =>
-          track.stop(),
-        );
+        .forEach((track) => track.stop());
 
       photoStreamRef.current
         ?.getTracks()
-        .forEach((track) =>
-          track.stop(),
-        );
+        .forEach((track) => track.stop());
 
       reelStreamRef.current
         ?.getTracks()
-        .forEach((track) =>
-          track.stop(),
-        );
+        .forEach((track) => track.stop());
 
-      if (timerRef.current) {
-        window.clearInterval(
-          timerRef.current,
-        );
+      if (timerRef.current !== null) {
+        window.clearInterval(timerRef.current);
       }
     };
   }, []);
@@ -246,7 +235,6 @@ export default function ProfileSetup() {
         });
 
       faceStreamRef.current = stream;
-
       setFaceMode('live');
     } catch {
       alert(
@@ -256,24 +244,17 @@ export default function ProfileSetup() {
   };
 
   const takeFacePhoto = () => {
-    const video =
-      faceVideoRef.current;
-
-    const canvas =
-      faceCanvasRef.current;
+    const video = faceVideoRef.current;
+    const canvas = faceCanvasRef.current;
 
     if (!video || !canvas) {
       return;
     }
 
-    canvas.width =
-      video.videoWidth;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-    canvas.height =
-      video.videoHeight;
-
-    const context =
-      canvas.getContext('2d');
+    const context = canvas.getContext('2d');
 
     context?.drawImage(
       video,
@@ -289,9 +270,7 @@ export default function ProfileSetup() {
 
     faceStreamRef.current
       ?.getTracks()
-      .forEach((track) =>
-        track.stop(),
-      );
+      .forEach((track) => track.stop());
 
     faceStreamRef.current = null;
 
@@ -301,9 +280,7 @@ export default function ProfileSetup() {
   const retakeFacePhoto = () => {
     faceStreamRef.current
       ?.getTracks()
-      .forEach((track) =>
-        track.stop(),
-      );
+      .forEach((track) => track.stop());
 
     faceStreamRef.current = null;
 
@@ -314,17 +291,13 @@ export default function ProfileSetup() {
   const handleFaceUpload = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    setFacePreview(
-      URL.createObjectURL(file),
-    );
-
+    setFacePreview(URL.createObjectURL(file));
     setFaceMode('done');
   };
 
@@ -339,9 +312,7 @@ export default function ProfileSetup() {
           video: true,
         });
 
-      photoStreamRef.current =
-        stream;
-
+      photoStreamRef.current = stream;
       setPhotoMode('live');
     } catch {
       alert(
@@ -351,24 +322,17 @@ export default function ProfileSetup() {
   };
 
   const takePhoto = () => {
-    const video =
-      photoVideoRef.current;
-
-    const canvas =
-      photoCanvasRef.current;
+    const video = photoVideoRef.current;
+    const canvas = photoCanvasRef.current;
 
     if (!video || !canvas) {
       return;
     }
 
-    canvas.width =
-      video.videoWidth;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-    canvas.height =
-      video.videoHeight;
-
-    const context =
-      canvas.getContext('2d');
+    const context = canvas.getContext('2d');
 
     context?.drawImage(
       video,
@@ -384,9 +348,7 @@ export default function ProfileSetup() {
 
     photoStreamRef.current
       ?.getTracks()
-      .forEach((track) =>
-        track.stop(),
-      );
+      .forEach((track) => track.stop());
 
     photoStreamRef.current = null;
 
@@ -396,9 +358,7 @@ export default function ProfileSetup() {
   const retakePhoto = () => {
     photoStreamRef.current
       ?.getTracks()
-      .forEach((track) =>
-        track.stop(),
-      );
+      .forEach((track) => track.stop());
 
     photoStreamRef.current = null;
 
@@ -409,17 +369,13 @@ export default function ProfileSetup() {
   const handlePhotoUpload = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    setPhotoPreview(
-      URL.createObjectURL(file),
-    );
-
+    setPhotoPreview(URL.createObjectURL(file));
     setPhotoMode('done');
   };
 
@@ -428,11 +384,8 @@ export default function ProfileSetup() {
   ========================================================= */
 
   const stopReelCapture = () => {
-    if (timerRef.current) {
-      window.clearInterval(
-        timerRef.current,
-      );
-
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
@@ -452,21 +405,15 @@ export default function ProfileSetup() {
           audio: true,
         });
 
-      reelStreamRef.current =
-        stream;
-
+      reelStreamRef.current = stream;
       chunksRef.current = [];
 
       const recorder =
         new MediaRecorder(stream);
 
-      recorder.ondataavailable = (
-        event,
-      ) => {
+      recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          chunksRef.current.push(
-            event.data,
-          );
+          chunksRef.current.push(event.data);
         }
       };
 
@@ -484,18 +431,13 @@ export default function ProfileSetup() {
 
         stream
           .getTracks()
-          .forEach((track) =>
-            track.stop(),
-          );
+          .forEach((track) => track.stop());
 
-        reelStreamRef.current =
-          null;
-
+        reelStreamRef.current = null;
         setReelMode('done');
       };
 
-      recorderRef.current =
-        recorder;
+      recorderRef.current = recorder;
 
       recorder.start();
 
@@ -504,17 +446,14 @@ export default function ProfileSetup() {
 
       timerRef.current =
         window.setInterval(() => {
-          setSecondsLeft(
-            (previous) => {
-              if (previous <= 1) {
-                stopReelCapture();
+          setSecondsLeft((previous) => {
+            if (previous <= 1) {
+              stopReelCapture();
+              return 0;
+            }
 
-                return 0;
-              }
-
-              return previous - 1;
-            },
-          );
+            return previous - 1;
+          });
         }, 1000);
     } catch {
       alert(
@@ -524,19 +463,14 @@ export default function ProfileSetup() {
   };
 
   const retakeReel = () => {
-    if (timerRef.current) {
-      window.clearInterval(
-        timerRef.current,
-      );
-
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
     reelStreamRef.current
       ?.getTracks()
-      .forEach((track) =>
-        track.stop(),
-      );
+      .forEach((track) => track.stop());
 
     reelStreamRef.current = null;
 
@@ -548,17 +482,13 @@ export default function ProfileSetup() {
   const handleReelUpload = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    setReelPreview(
-      URL.createObjectURL(file),
-    );
-
+    setReelPreview(URL.createObjectURL(file));
     setReelMode('done');
   };
 
@@ -573,18 +503,12 @@ export default function ProfileSetup() {
     Boolean(industry) &&
     Boolean(experience);
 
-  /* =========================================================
-     CONTINUE
-  ========================================================= */
-
   const handleContinue = () => {
     if (!isComplete) {
       return;
     }
 
-    navigate(
-      '/candidate/choose-plan',
-    );
+    navigate('/candidate/choose-plan');
   };
 
   return (
@@ -600,7 +524,7 @@ export default function ProfileSetup() {
       "
     >
       {/* =====================================================
-          FIXED TOP NAVBAR
+          ROLECHOICE NAVBAR
       ====================================================== */}
 
       <header
@@ -609,11 +533,11 @@ export default function ProfileSetup() {
           inset-x-0
           top-0
           z-50
+          overflow-visible
           border-b
           border-brand-border
-          bg-white/95
-          shadow-[0_4px_18px_rgba(0,70,109,0.05)]
-          backdrop-blur-xl
+          bg-brand-bg/95
+          backdrop-blur-md
         "
       >
         <div
@@ -625,102 +549,112 @@ export default function ProfileSetup() {
             max-w-[1480px]
             items-center
             justify-between
-            gap-5
+            gap-6
+            overflow-visible
             px-5
+
             sm:px-8
             lg:px-10
           "
         >
+          {/* LOGO */}
+
           <Link
             to="/"
             aria-label="TruCity home"
-            className="flex shrink-0 items-center"
+            className="
+              relative
+              flex
+              h-[88px]
+              w-[150px]
+              shrink-0
+              items-center
+              overflow-visible
+              no-underline
+
+              sm:w-[170px]
+              lg:w-[195px]
+            "
           >
             <img
-              src="/trucity-logo.png"
+              src="/trucity-nav-logo.png"
               alt="TruCity"
               draggable={false}
               className="
-                h-[64px]
-                w-[90px]
+                absolute
+                left-[-22px]
+                top-1/2
+                block
+                h-auto
+                w-[145px]
+                max-w-none
+                -translate-y-1/2
                 select-none
                 object-contain
-                sm:h-[70px]
-                sm:w-[100px]
+
+                sm:left-[-26px]
+                sm:w-[165px]
+
+                lg:left-[-30px]
+                lg:w-[190px]
               "
             />
           </Link>
 
-          <nav className="hidden items-center gap-8 lg:flex">
-            <Link
+          {/* DESKTOP NAV */}
+
+          <nav
+            aria-label="Public navigation"
+            className="
+              hidden
+              items-center
+              gap-9
+              lg:flex
+            "
+          >
+            <PublicNavLink
               to="/"
-              className="
-                text-sm
-                font-medium
-                text-brand-textMuted
-                transition
-                hover:text-brand-primary
-              "
-            >
-              HOME
-            </Link>
+              label="Home"
+              end
+            />
 
-            <Link
+            <PublicNavLink
               to="/guidance"
-              className="
-                text-sm
-                font-medium
-                text-brand-textMuted
-                transition
-                hover:text-brand-primary
-              "
-            >
-              Guidance Hub
-            </Link>
+              label="Guidance Hub"
+            />
 
-            <Link
+            <PublicNavLink
               to="/about"
-              className="
-                text-sm
-                font-medium
-                text-brand-textMuted
-                transition
-                hover:text-brand-primary
-              "
-            >
-              About
-            </Link>
+              label="About"
+            />
 
-            <Link
+            <PublicNavLink
               to="/contact"
-              className="
-                text-sm
-                font-medium
-                text-brand-textMuted
-                transition
-                hover:text-brand-primary
-              "
-            >
-              Contact
-            </Link>
+              label="Contact"
+            />
           </nav>
+
+          {/* SIGN IN */}
 
           <Link
             to="/login"
             className="
               inline-flex
-              min-h-[48px]
+              min-h-[46px]
+              shrink-0
               items-center
               justify-center
               rounded-[14px]
               border
               border-brand-primary
-              bg-white/95
-              px-6
-              text-sm
+              bg-brand-bg
+              px-5
+              text-[14px]
               font-bold
               text-brand-primary
+              no-underline
               transition-all
+              duration-200
 
               hover:bg-brand-primary
               hover:text-white
@@ -728,6 +662,8 @@ export default function ProfileSetup() {
               focus-visible:outline-none
               focus-visible:ring-4
               focus-visible:ring-brand-accent/25
+
+              sm:px-6
             "
           >
             Sign In
@@ -736,7 +672,7 @@ export default function ProfileSetup() {
       </header>
 
       {/* =====================================================
-          FIXED LEFT BACKGROUND
+          FIXED LEFT BRAND AREA
       ====================================================== */}
 
       <div
@@ -750,10 +686,11 @@ export default function ProfileSetup() {
           hidden
           w-[43%]
           overflow-hidden
+
           lg:block
         "
       >
-        {/* Main Gold Circle */}
+        {/* TWO-TONE GOLD CIRCLE */}
 
         <div
           className="
@@ -764,15 +701,18 @@ export default function ProfileSetup() {
             w-[720px]
             -translate-y-1/2
             rounded-full
-            bg-brand-gold
 
             xl:-left-[185px]
             xl:h-[760px]
             xl:w-[760px]
           "
+          style={{
+            background:
+              'linear-gradient(135deg, #FFAD01 0%, #FFD784 100%)',
+          }}
         />
 
-        {/* Gold Ring */}
+        {/* GOLD OUTLINE */}
 
         <div
           className="
@@ -788,7 +728,7 @@ export default function ProfileSetup() {
           "
         />
 
-        {/* Blue Decorative Oval */}
+        {/* TWO-TONE BLUE CIRCLE */}
 
         <div
           className="
@@ -796,17 +736,20 @@ export default function ProfileSetup() {
             right-[4%]
             top-[57%]
             h-[185px]
-            w-[140px]
+            w-[185px]
             -translate-y-1/2
-            rounded-[50%]
-            bg-brand-accent
+            rounded-full
             shadow-[0_20px_50px_rgba(0,70,109,0.18)]
           "
+          style={{
+            background:
+              'linear-gradient(145deg, #00466D 0%, #00466D 58%, #1E92D2 100%)',
+          }}
         />
       </div>
 
       {/* =====================================================
-          FIXED LEFT TEXT
+          LEFT TEXT
       ====================================================== */}
 
       <aside
@@ -818,6 +761,7 @@ export default function ProfileSetup() {
           z-20
           hidden
           w-[43%]
+
           lg:flex
           lg:items-center
         "
@@ -876,13 +820,12 @@ export default function ProfileSetup() {
             className="
               mt-6
               max-w-[275px]
-              text-[13px]
+              text-[14px]
               font-medium
               leading-[1.75]
               text-white/95
 
               xl:max-w-[300px]
-              xl:text-[14px]
             "
           >
             Build a profile employers can trust.
@@ -895,13 +838,12 @@ export default function ProfileSetup() {
             className="
               mt-7
               max-w-[275px]
-              text-[13px]
+              text-[14px]
               font-bold
               leading-6
               text-white
 
               xl:max-w-[300px]
-              xl:text-[14px]
             "
           >
             Where Truth and Authenticity meet.
@@ -910,7 +852,7 @@ export default function ProfileSetup() {
       </aside>
 
       {/* =====================================================
-          RIGHT SIDE DECORATIONS
+          RIGHT DECORATIVE SHAPES
       ====================================================== */}
 
       <div
@@ -921,9 +863,12 @@ export default function ProfileSetup() {
           z-[3]
           hidden
           overflow-hidden
+
           lg:block
         "
       >
+        {/* ORANGE RING */}
+
         <div
           className="
             absolute
@@ -932,10 +877,28 @@ export default function ProfileSetup() {
             h-[520px]
             w-[520px]
             rounded-full
-            border-[78px]
-            border-brand-gold/80
           "
-        />
+          style={{
+            background:
+              'linear-gradient(135deg, #FFAD01 0%, #FFD784 100%)',
+          }}
+        >
+          <div
+            className="
+              absolute
+              left-1/2
+              top-1/2
+              h-[70%]
+              w-[70%]
+              -translate-x-1/2
+              -translate-y-1/2
+              rounded-full
+              bg-brand-bg
+            "
+          />
+        </div>
+
+        {/* BLUE CIRCLE */}
 
         <div
           className="
@@ -945,9 +908,14 @@ export default function ProfileSetup() {
             h-[560px]
             w-[560px]
             rounded-full
-            bg-brand-primary
           "
+          style={{
+            background:
+              'linear-gradient(145deg, #00466D 0%, #00466D 58%, #1E92D2 100%)',
+          }}
         />
+
+        {/* GOLD OUTLINE */}
 
         <div
           className="
@@ -964,7 +932,7 @@ export default function ProfileSetup() {
       </div>
 
       {/* =====================================================
-          SCROLLING PROFILE AREA
+          PROFILE AREA
       ====================================================== */}
 
       <main
@@ -1005,47 +973,42 @@ export default function ProfileSetup() {
               w-full
               max-w-[650px]
               overflow-hidden
-              rounded-[32px]
+              rounded-[28px]
               border
               border-brand-border
               bg-white/95
               p-6
-              shadow-[0_28px_70px_rgba(0,70,109,0.14)]
+              shadow-[0_20px_55px_rgba(0,70,109,0.10)]
               backdrop-blur-xl
 
               sm:p-8
             "
           >
-            {/* =================================================
-                CARD HEADER
-            ================================================== */}
+            {/* CARD HEADER */}
 
             <div className="mb-7">
-              <div
+              <p
                 className="
-                  mb-4
-                  inline-flex
-                  rounded-full
-                  bg-brand-primary
-                  px-4
-                  py-2
-                  text-[10px]
+                  text-[12px]
                   font-bold
                   uppercase
-                  tracking-[0.18em]
-                  text-white
+                  tracking-[0.16em]
+                  text-brand-primary
                 "
               >
                 Profile Setup
-              </div>
+              </p>
 
               <h2
                 className="
                   !m-0
+                  mt-3
                   text-[30px]
                   font-bold
                   tracking-[-0.035em]
                   !text-brand-primary
+
+                  sm:text-[34px]
                 "
               >
                 Complete Your Profile
@@ -1054,7 +1017,7 @@ export default function ProfileSetup() {
               <p
                 className="
                   mt-2
-                  text-sm
+                  text-[14px]
                   leading-6
                   text-brand-textMuted
                 "
@@ -1080,9 +1043,7 @@ export default function ProfileSetup() {
                       inputMode="numeric"
                       maxLength={13}
                       value={idNumber}
-                      onChange={
-                        handleIdNumberChange
-                      }
+                      onChange={handleIdNumberChange}
                       placeholder="Enter 13-digit ID Number"
                       autoComplete="off"
                       aria-invalid={
@@ -1090,21 +1051,21 @@ export default function ProfileSetup() {
                         !isIdValid
                       }
                       className={`
+                        min-h-[50px]
                         w-full
                         rounded-[14px]
                         border
-                        bg-white/90
+                        bg-white
                         px-4
                         py-3
                         pr-[90px]
-                        text-sm
+                        text-[14px]
                         text-brand-dark
                         outline-none
                         transition
 
                         placeholder:text-brand-textMuted/60
 
-                        focus:bg-white
                         focus:ring-4
 
                         ${
@@ -1170,12 +1131,9 @@ export default function ProfileSetup() {
                     {idNumber.length > 0 &&
                       idNumber.length < 13 && (
                         <span className="text-brand-dark">
-                          {13 -
-                            idNumber.length}{' '}
+                          {13 - idNumber.length}{' '}
                           digit
-                          {13 -
-                            idNumber.length ===
-                          1
+                          {13 - idNumber.length === 1
                             ? ''
                             : 's'}{' '}
                           remaining
@@ -1209,9 +1167,7 @@ export default function ProfileSetup() {
               <ProfileSection
                 title="Face Picture"
                 required
-                icon={
-                  <User className="h-4 w-4" />
-                }
+                icon={<User className="h-4 w-4" />}
               >
                 {faceMode === 'live' && (
                   <div className="space-y-3">
@@ -1239,9 +1195,7 @@ export default function ProfileSetup() {
                     />
 
                     <PrimaryButton
-                      onClick={
-                        takeFacePhoto
-                      }
+                      onClick={takeFacePhoto}
                     >
                       Snap Face Photo
                     </PrimaryButton>
@@ -1268,9 +1222,7 @@ export default function ProfileSetup() {
 
                       <CompletedRow
                         text="Face picture ready"
-                        onRetake={
-                          retakeFacePhoto
-                        }
+                        onRetake={retakeFacePhoto}
                       />
                     </div>
                   )}
@@ -1279,9 +1231,7 @@ export default function ProfileSetup() {
                   <MediaChoice
                     cameraLabel="Use Camera"
                     uploadLabel="Upload Photo"
-                    onCamera={
-                      startFaceCapture
-                    }
+                    onCamera={startFaceCapture}
                     onUpload={() =>
                       faceInputRef.current?.click()
                     }
@@ -1292,9 +1242,7 @@ export default function ProfileSetup() {
                   ref={faceInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={
-                    handleFaceUpload
-                  }
+                  onChange={handleFaceUpload}
                   className="hidden"
                 />
               </ProfileSection>
@@ -1308,9 +1256,7 @@ export default function ProfileSetup() {
               <ProfileSection
                 title="360° Full-Body Photo"
                 required
-                icon={
-                  <Camera className="h-4 w-4" />
-                }
+                icon={<Camera className="h-4 w-4" />}
               >
                 {photoMode === 'live' && (
                   <div className="space-y-3">
@@ -1337,9 +1283,7 @@ export default function ProfileSetup() {
                       className="hidden"
                     />
 
-                    <PrimaryButton
-                      onClick={takePhoto}
-                    >
+                    <PrimaryButton onClick={takePhoto}>
                       Snap Photo
                     </PrimaryButton>
                   </div>
@@ -1365,9 +1309,7 @@ export default function ProfileSetup() {
 
                       <CompletedRow
                         text="Full-body photo ready"
-                        onRetake={
-                          retakePhoto
-                        }
+                        onRetake={retakePhoto}
                       />
                     </div>
                   )}
@@ -1376,9 +1318,7 @@ export default function ProfileSetup() {
                   <MediaChoice
                     cameraLabel="Use Camera"
                     uploadLabel="Upload Photo"
-                    onCamera={
-                      startPhotoCapture
-                    }
+                    onCamera={startPhotoCapture}
                     onUpload={() =>
                       photoInputRef.current?.click()
                     }
@@ -1389,9 +1329,7 @@ export default function ProfileSetup() {
                   ref={photoInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={
-                    handlePhotoUpload
-                  }
+                  onChange={handlePhotoUpload}
                   className="hidden"
                 />
               </ProfileSection>
@@ -1405,9 +1343,7 @@ export default function ProfileSetup() {
               <ProfileSection
                 title="Intro Reel"
                 subtitle="Maximum 30 seconds"
-                icon={
-                  <Video className="h-4 w-4" />
-                }
+                icon={<Video className="h-4 w-4" />}
               >
                 {reelMode === 'live' && (
                   <div className="space-y-3">
@@ -1431,7 +1367,7 @@ export default function ProfileSetup() {
                         items-center
                         justify-center
                         gap-2
-                        text-xs
+                        text-[12px]
                         font-bold
                         text-brand-crimson
                       "
@@ -1451,19 +1387,18 @@ export default function ProfileSetup() {
 
                     <button
                       type="button"
-                      onClick={
-                        stopReelCapture
-                      }
+                      onClick={stopReelCapture}
                       className="
                         w-full
                         rounded-[14px]
                         bg-brand-crimson
                         px-4
                         py-3
-                        text-sm
+                        text-[14px]
                         font-bold
                         text-white
                         transition
+
                         hover:opacity-90
                       "
                     >
@@ -1490,9 +1425,7 @@ export default function ProfileSetup() {
 
                       <CompletedRow
                         text="Intro reel added"
-                        onRetake={
-                          retakeReel
-                        }
+                        onRetake={retakeReel}
                       />
                     </div>
                   )}
@@ -1501,9 +1434,7 @@ export default function ProfileSetup() {
                   <MediaChoice
                     cameraLabel="Record Video"
                     uploadLabel="Upload Video"
-                    onCamera={
-                      startReelCapture
-                    }
+                    onCamera={startReelCapture}
                     onUpload={() =>
                       reelInputRef.current?.click()
                     }
@@ -1515,9 +1446,7 @@ export default function ProfileSetup() {
                   ref={reelInputRef}
                   type="file"
                   accept="video/*"
-                  onChange={
-                    handleReelUpload
-                  }
+                  onChange={handleReelUpload}
                   className="hidden"
                 />
               </ProfileSection>
@@ -1535,27 +1464,25 @@ export default function ProfileSetup() {
                 <select
                   value={industry}
                   onChange={(event) =>
-                    setIndustry(
-                      event.target.value,
-                    )
+                    setIndustry(event.target.value)
                   }
                   className="
+                    min-h-[50px]
                     w-full
                     cursor-pointer
                     appearance-none
                     rounded-[14px]
                     border
                     border-brand-border
-                    bg-white/90
+                    bg-white
                     px-4
                     py-3
-                    text-sm
+                    text-[14px]
                     text-brand-dark
                     outline-none
                     transition
 
                     focus:border-brand-accent
-                    focus:bg-white
                     focus:ring-4
                     focus:ring-brand-accent/15
                   "
@@ -1564,16 +1491,14 @@ export default function ProfileSetup() {
                     Choose your industry...
                   </option>
 
-                  {JOB_INDUSTRIES.map(
-                    (item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        {item}
-                      </option>
-                    ),
-                  )}
+                  {JOB_INDUSTRIES.map((item) => (
+                    <option
+                      key={item}
+                      value={item}
+                    >
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </ProfileSection>
 
@@ -1596,23 +1521,33 @@ export default function ProfileSetup() {
                           key={range}
                           type="button"
                           onClick={() =>
-                            setExperience(
-                              range,
-                            )
+                            setExperience(range)
                           }
                           className={`
                             rounded-[12px]
                             border
                             px-4
                             py-2.5
-                            text-xs
+                            text-[12px]
                             font-bold
                             transition-all
 
                             ${
                               selected
-                                ? 'border-brand-accent bg-brand-accent/10 text-brand-primary shadow-sm'
-                                : 'border-brand-border bg-white text-brand-textMuted hover:border-brand-accent hover:text-brand-primary'
+                                ? `
+                                  border-brand-accent
+                                  bg-brand-accent/10
+                                  text-brand-primary
+                                  shadow-sm
+                                `
+                                : `
+                                  border-brand-border
+                                  bg-white
+                                  text-brand-textMuted
+
+                                  hover:border-brand-accent
+                                  hover:text-brand-primary
+                                `
                             }
                           `}
                         >
@@ -1631,30 +1566,26 @@ export default function ProfileSetup() {
               <button
                 type="button"
                 disabled={!isComplete}
-                onClick={
-                  handleContinue
-                }
+                onClick={handleContinue}
                 className="
                   group
                   mt-3
                   flex
-                  min-h-[58px]
+                  min-h-[54px]
                   w-full
                   items-center
                   justify-center
                   gap-3
-                  rounded-[16px]
-                  bg-brand-primary
+                  rounded-[14px]
                   px-6
-                  text-sm
+                  text-[14px]
                   font-bold
                   text-white
-                  shadow-[0_12px_30px_rgba(0,70,109,0.20)]
+                  shadow-[0_12px_30px_rgba(0,70,109,0.18)]
                   transition-all
 
                   hover:-translate-y-0.5
-                  hover:bg-brand-dark
-                  hover:shadow-[0_16px_35px_rgba(0,70,109,0.26)]
+                  hover:opacity-95
 
                   focus-visible:outline-none
                   focus-visible:ring-4
@@ -1663,8 +1594,12 @@ export default function ProfileSetup() {
                   disabled:cursor-not-allowed
                   disabled:opacity-40
                   disabled:hover:translate-y-0
-                  disabled:hover:bg-brand-primary
                 "
+                style={{
+                  background: isComplete
+                    ? 'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)'
+                    : '#00466D',
+                }}
               >
                 Continue to Plan Selection
 
@@ -1683,7 +1618,7 @@ export default function ProfileSetup() {
       </main>
 
       {/* =====================================================
-          FIXED FOOTER
+          FOOTER
       ====================================================== */}
 
       <footer
@@ -1694,8 +1629,7 @@ export default function ProfileSetup() {
           z-50
           border-t
           border-brand-border/70
-          bg-white/80
-          shadow-[0_-4px_18px_rgba(0,70,109,0.04)]
+          bg-brand-bg/90
           backdrop-blur-md
         "
       >
@@ -1709,7 +1643,7 @@ export default function ProfileSetup() {
             justify-center
             px-6
             text-center
-            text-xs
+            text-[12px]
             text-brand-textMuted
           "
         >
@@ -1731,6 +1665,64 @@ export default function ProfileSetup() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/* =========================================================
+   PUBLIC NAV LINK — ROLECHOICE STYLE
+========================================================= */
+
+interface PublicNavLinkProps {
+  to: string;
+  label: string;
+  end?: boolean;
+}
+
+function PublicNavLink({
+  to,
+  label,
+  end = false,
+}: PublicNavLinkProps) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) => `
+        relative
+        text-[14px]
+        no-underline
+        transition-colors
+        duration-150
+
+        ${
+          isActive
+            ? `
+              font-bold
+              text-brand-primary
+
+              after:absolute
+              after:-bottom-2
+              after:left-0
+              after:h-[2px]
+              after:w-full
+              after:rounded-full
+              after:bg-brand-gold
+            `
+            : `
+              font-semibold
+              text-brand-textMuted
+              hover:text-brand-primary
+            `
+        }
+
+        focus-visible:rounded-md
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
+      `}
+    >
+      {label}
+    </NavLink>
   );
 }
 
@@ -1769,7 +1761,7 @@ function ProfileSection({
               flex
               items-center
               gap-2
-              text-sm
+              text-[14px]
               font-bold
               text-brand-primary
             "
@@ -1787,7 +1779,7 @@ function ProfileSection({
             <p
               className="
                 mt-1
-                text-xs
+                text-[12px]
                 text-brand-textMuted
               "
             >
@@ -1803,15 +1795,23 @@ function ProfileSection({
             border
             px-2.5
             py-1
-            text-[9px]
+            text-[10px]
             font-bold
             uppercase
-            tracking-[0.12em]
+            tracking-[0.1em]
 
             ${
               required
-                ? 'border-brand-accent/30 bg-brand-accent/10 text-brand-primary'
-                : 'border-brand-border bg-brand-surface text-brand-textMuted'
+                ? `
+                  border-brand-accent/30
+                  bg-brand-accent/10
+                  text-brand-primary
+                `
+                : `
+                  border-brand-border
+                  bg-brand-surface
+                  text-brand-textMuted
+                `
             }
           `}
         >
@@ -1861,8 +1861,7 @@ function MediaChoice({
   onUpload,
   video = false,
 }: MediaChoiceProps) {
-  const Icon =
-    video ? Video : Camera;
+  const Icon = video ? Video : Camera;
 
   return (
     <div
@@ -1870,6 +1869,7 @@ function MediaChoice({
         grid
         grid-cols-1
         gap-3
+
         sm:grid-cols-2
       "
     >
@@ -1887,13 +1887,17 @@ function MediaChoice({
           border-brand-accent/30
           bg-brand-accent/10
           px-4
-          text-xs
+          text-[12px]
           font-bold
           text-brand-primary
           transition
 
           hover:border-brand-accent
           hover:bg-brand-accent/15
+
+          focus-visible:outline-none
+          focus-visible:ring-4
+          focus-visible:ring-brand-accent/20
         "
       >
         <Icon className="h-4 w-4" />
@@ -1915,13 +1919,17 @@ function MediaChoice({
           border-brand-border
           bg-white
           px-4
-          text-xs
+          text-[12px]
           font-bold
           text-brand-textMuted
           transition
 
           hover:border-brand-primary
           hover:text-brand-primary
+
+          focus-visible:outline-none
+          focus-visible:ring-4
+          focus-visible:ring-brand-accent/20
         "
       >
         <Upload className="h-4 w-4" />
@@ -1951,6 +1959,7 @@ function CompletedRow({
         flex
         flex-col
         gap-2
+
         sm:flex-row
       "
     >
@@ -1967,12 +1976,18 @@ function CompletedRow({
           bg-brand-emerald/10
           px-4
           py-2.5
-          text-xs
+          text-[12px]
           font-bold
           text-brand-dark
         "
       >
-        <CheckCircle2 className="h-4 w-4" />
+        <CheckCircle2
+          className="
+            h-4
+            w-4
+            text-brand-emerald
+          "
+        />
 
         {text}
       </div>
@@ -1991,13 +2006,17 @@ function CompletedRow({
           bg-white
           px-4
           py-2.5
-          text-xs
+          text-[12px]
           font-bold
           text-brand-textMuted
           transition
 
           hover:border-brand-primary
           hover:text-brand-primary
+
+          focus-visible:outline-none
+          focus-visible:ring-4
+          focus-visible:ring-brand-accent/20
         "
       >
         <RotateCcw className="h-4 w-4" />
@@ -2034,21 +2053,24 @@ function PrimaryButton({
         items-center
         justify-center
         rounded-[14px]
-        bg-brand-primary
         px-5
-        text-xs
+        text-[12px]
         font-bold
         text-white
         shadow-[0_10px_25px_rgba(0,70,109,0.18)]
         transition
 
         hover:-translate-y-0.5
-        hover:bg-brand-dark
+        hover:opacity-95
 
         focus-visible:outline-none
         focus-visible:ring-4
         focus-visible:ring-brand-accent/25
       "
+      style={{
+        background:
+          'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+      }}
     >
       {children}
     </button>

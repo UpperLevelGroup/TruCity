@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 
-import { useForgotPassword } from "../useForgotPassword";
-import AuthShell from "../../../components/auth/AuthShell";
+import { useForgotPassword } from "../../useForgotPassword";
+import AuthShell from "../../../../components/auth/AuthShell";
 
 export default function ForgotPassword() {
   const {

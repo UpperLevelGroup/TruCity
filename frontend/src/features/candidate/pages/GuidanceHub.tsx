@@ -1,5 +1,6 @@
 import {
   useState,
+  type ReactNode,
 } from 'react';
 
 import {
@@ -9,6 +10,7 @@ import {
   Check,
   CheckCircle2,
   Clock3,
+  Copy,
   FileText,
   Headphones,
   Heart,
@@ -21,6 +23,10 @@ import {
   Sparkles,
   Video,
 } from 'lucide-react';
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type HubTab =
   | 'videos'
@@ -78,114 +84,84 @@ interface ShareItem {
 const GUIDES: GuideItem[] = [
   {
     id: 1,
-
     title:
       'Understanding Basic Employment Rights in South Africa',
-
     category:
       'Labour Rights',
-
     readingTime:
       '6 min read',
-
     description:
       'A practical overview of working hours, leave, salary deductions, notice periods and important workplace protections.',
-
     icon:
       'rights',
   },
 
   {
     id: 2,
-
     title:
       'How to Recognise Recruitment and Workplace Scams',
-
     category:
       'Safety',
-
     readingTime:
       '4 min read',
-
     description:
       'Learn how to identify suspicious job advertisements, payment requests, false recruiters and unsafe requests for personal information.',
-
     icon:
       'safety',
   },
 
   {
     id: 3,
-
     title:
       'Preparing for a Professional Interview',
-
     category:
       'Career Development',
-
     readingTime:
       '5 min read',
-
     description:
       'A practical checklist covering preparation, employer research, professional communication and answering common interview questions.',
-
     icon:
       'career',
   },
 
   {
     id: 4,
-
     title:
       'Building a Clear and Professional CV',
-
     category:
       'Career Development',
-
     readingTime:
       '5 min read',
-
     description:
       'Learn how to structure experience, skills and achievements so employers can understand your professional value quickly.',
-
     icon:
       'cv',
   },
 
   {
     id: 5,
-
     title:
       'Understanding Probation and Fixed-Term Contracts',
-
     category:
       'Employment Contracts',
-
     readingTime:
       '7 min read',
-
     description:
       'Understand what probation means, what should appear in a fixed-term agreement and what both employees and employers should consider.',
-
     icon:
       'rights',
   },
 
   {
     id: 6,
-
     title:
       'Creating a Respectful and Professional Workplace',
-
     category:
       'Workplace Guidance',
-
     readingTime:
       '5 min read',
-
     description:
       'Practical guidance for maintaining professional communication, setting expectations and managing workplace relationships.',
-
     icon:
       'career',
   },
@@ -198,76 +174,56 @@ const GUIDES: GuideItem[] = [
 const VIDEOS: VideoItem[] = [
   {
     id: 1,
-
     title:
       '3 things you should never do in an interview',
-
     category:
       'Interview Tips',
-
     duration:
       '0:45',
-
     likes:
       142,
-
     description:
       'Quick mistakes to avoid before, during and immediately after a professional interview.',
   },
 
   {
     id: 2,
-
     title:
       'How to resign professionally without burning bridges',
-
     category:
       'Workplace Guidance',
-
     duration:
       '1:15',
-
     likes:
       89,
-
     description:
       'A short guide to notice periods, professional communication and maintaining positive working relationships.',
   },
 
   {
     id: 3,
-
     title:
       'How to spot a fake job opportunity',
-
     category:
       'Safety',
-
     duration:
       '0:58',
-
     likes:
       210,
-
     description:
       'Common warning signs that a vacancy, recruiter or interview request may not be legitimate.',
   },
 
   {
     id: 4,
-
     title:
       'How to discuss salary expectations professionally',
-
     category:
       'Career Guidance',
-
     duration:
       '1:02',
-
     likes:
       176,
-
     description:
       'A practical approach to discussing compensation clearly and professionally.',
   },
@@ -280,57 +236,42 @@ const VIDEOS: VideoItem[] = [
 const AUDIO_ITEMS: AudioItem[] = [
   {
     id: 1,
-
     title:
       'South African Labour Law: The Basics Everyone Should Know',
-
     duration:
       '6 min',
-
     speaker:
       'TruCity Workplace Briefing',
-
     category:
       'Labour Rights',
-
     description:
       'A concise overview of contracts, working hours, deductions and important workplace protections.',
   },
 
   {
     id: 2,
-
     title:
       'Understanding Probation and Fixed-Term Contracts',
-
     duration:
       '5 min',
-
     speaker:
       'TruCity HR Insights',
-
     category:
       'Employment Contracts',
-
     description:
       'A practical explanation of probation periods, fixed-term agreements and professional expectations.',
   },
 
   {
     id: 3,
-
     title:
       'Professional Communication in the Workplace',
-
     duration:
       '5 min',
-
     speaker:
       'TruCity Workplace Series',
-
     category:
       'Professional Development',
-
     description:
       'Simple strategies for communicating clearly with colleagues, managers, employees and professional teams.',
   },
@@ -343,57 +284,44 @@ const AUDIO_ITEMS: AudioItem[] = [
 function GuideIcon({
   type,
 }: {
-  type:
-    GuideItem['icon'];
+  type: GuideItem['icon'];
 }) {
   const className =
     'h-5 w-5';
 
-  switch (
-    type
-  ) {
+  switch (type) {
     case 'rights':
       return (
         <Scale
-          className={
-            className
-          }
+          className={className}
         />
       );
 
     case 'safety':
       return (
         <ShieldCheck
-          className={
-            className
-          }
+          className={className}
         />
       );
 
     case 'career':
       return (
         <BriefcaseBusiness
-          className={
-            className
-          }
+          className={className}
         />
       );
 
     case 'cv':
       return (
         <FileText
-          className={
-            className
-          }
+          className={className}
         />
       );
 
     default:
       return (
         <BookOpen
-          className={
-            className
-          }
+          className={className}
         />
       );
   }
@@ -424,9 +352,7 @@ export default function GuidanceHub() {
     playingAudioId,
     setPlayingAudioId,
   ] =
-    useState<
-      number | null
-    >(
+    useState<number | null>(
       null,
     );
 
@@ -434,9 +360,7 @@ export default function GuidanceHub() {
     sharedItemKey,
     setSharedItemKey,
   ] =
-    useState<
-      string | null
-    >(
+    useState<string | null>(
       null,
     );
 
@@ -448,18 +372,11 @@ export default function GuidanceHub() {
     id: number,
   ) => {
     setLikedVideos(
-      (
-        current,
-      ) =>
-        current.includes(
-          id,
-        )
+      (current) =>
+        current.includes(id)
           ? current.filter(
-              (
-                videoId,
-              ) =>
-                videoId !==
-                id,
+              (videoId) =>
+                videoId !== id,
             )
           : [
               ...current,
@@ -487,6 +404,21 @@ export default function GuidanceHub() {
     const shareText =
       `${item.title}\n\n${item.description}\n\nShared from TruCity Guidance Hub`;
 
+    const markAsShared =
+      () => {
+        setSharedItemKey(
+          key,
+        );
+
+        window.setTimeout(
+          () =>
+            setSharedItemKey(
+              null,
+            ),
+          2200,
+        );
+      };
+
     try {
       if (
         typeof navigator !==
@@ -505,17 +437,7 @@ export default function GuidanceHub() {
             currentUrl,
         });
 
-        setSharedItemKey(
-          key,
-        );
-
-        window.setTimeout(
-          () =>
-            setSharedItemKey(
-              null,
-            ),
-          2200,
-        );
+        markAsShared();
 
         return;
       }
@@ -533,17 +455,7 @@ export default function GuidanceHub() {
           }`,
         );
 
-        setSharedItemKey(
-          key,
-        );
-
-        window.setTimeout(
-          () =>
-            setSharedItemKey(
-              null,
-            ),
-          2200,
-        );
+        markAsShared();
 
         return;
       }
@@ -551,9 +463,7 @@ export default function GuidanceHub() {
       throw new Error(
         'Sharing is not supported by this browser.',
       );
-    } catch (
-      error
-    ) {
+    } catch (error) {
       if (
         error instanceof DOMException &&
         error.name ===
@@ -573,55 +483,14 @@ export default function GuidanceHub() {
     <div
       className="
         relative
-        min-h-screen
-        overflow-hidden
-        bg-brand-bg
+        min-h-[100dvh]
+        overflow-x-hidden
+        bg-transparent
         pb-16
+        font-sans
         text-brand-text
       "
     >
-      {/* =====================================================
-          DECORATIVE BACKGROUND
-      ====================================================== */}
-
-      <div
-        className="
-          pointer-events-none
-          fixed
-          inset-0
-          overflow-hidden
-        "
-      >
-        <div
-          className="
-            absolute
-            -right-[190px]
-            -top-[130px]
-            hidden
-            h-[430px]
-            w-[430px]
-            rounded-full
-            border-[64px]
-            border-brand-gold/70
-            lg:block
-          "
-        />
-
-        <div
-          className="
-            absolute
-            -bottom-[260px]
-            -left-[220px]
-            hidden
-            h-[500px]
-            w-[500px]
-            rounded-full
-            bg-brand-orange/45
-            lg:block
-          "
-        />
-      </div>
-
       {/* =====================================================
           CONTENT
       ====================================================== */}
@@ -635,6 +504,7 @@ export default function GuidanceHub() {
           max-w-[1180px]
           px-4
           py-8
+
           sm:px-6
           lg:px-8
         "
@@ -652,6 +522,7 @@ export default function GuidanceHub() {
             border-brand-border
             bg-white/95
             shadow-[0_18px_50px_rgba(0,70,109,0.08)]
+            backdrop-blur-sm
           "
         >
           <div
@@ -659,7 +530,9 @@ export default function GuidanceHub() {
               grid
               gap-6
               p-6
+
               sm:p-8
+
               lg:grid-cols-[1fr_320px]
               lg:items-center
             "
@@ -673,14 +546,14 @@ export default function GuidanceHub() {
                   gap-2
                   rounded-full
                   border
-                  border-[#b9d9ea]
-                  bg-[#eef8fd]
+                  border-brand-accent/30
+                  bg-brand-accent/10
                   px-3
                   py-1.5
                   text-[10px]
                   font-bold
                   uppercase
-                  tracking-[0.18em]
+                  tracking-[0.16em]
                   text-brand-primary
                 "
               >
@@ -693,11 +566,14 @@ export default function GuidanceHub() {
                 className="
                   !m-0
                   max-w-[720px]
-                  text-[30px]
+                  text-[32px]
                   font-bold
+                  leading-[1.1]
                   tracking-[-0.035em]
                   !text-brand-primary
-                  sm:text-[38px]
+
+                  sm:text-[40px]
+                  lg:text-[44px]
                 "
               >
                 Practical guidance for the world of{' '}
@@ -709,10 +585,11 @@ export default function GuidanceHub() {
 
               <p
                 className="
-                  mt-3
+                  mt-4
                   max-w-[700px]
-                  text-sm
-                  leading-6
+                  text-[16px]
+                  font-normal
+                  leading-7
                   text-brand-textMuted
                 "
               >
@@ -735,16 +612,22 @@ export default function GuidanceHub() {
             >
               <div
                 className="
-                  mb-3
+                  mb-4
                   flex
                   items-center
                   gap-2
-                  text-sm
+                  text-[14px]
                   font-bold
                   text-brand-primary
                 "
               >
-                <Info className="h-4 w-4 text-brand-accent" />
+                <Info
+                  className="
+                    h-4
+                    w-4
+                    text-brand-accent
+                  "
+                />
 
                 Stay informed
               </div>
@@ -752,55 +635,25 @@ export default function GuidanceHub() {
               <ul
                 className="
                   space-y-3
-                  text-xs
+                  text-[12px]
                   leading-5
                   text-brand-textMuted
                 "
               >
-                <li className="flex gap-2">
-                  <CheckCircle2
-                    className="
-                      mt-0.5
-                      h-4
-                      w-4
-                      shrink-0
-                      text-brand-accent
-                    "
-                  />
-
+                <InfoPoint>
                   Understand important workplace rights and
                   responsibilities.
-                </li>
+                </InfoPoint>
 
-                <li className="flex gap-2">
-                  <CheckCircle2
-                    className="
-                      mt-0.5
-                      h-4
-                      w-4
-                      shrink-0
-                      text-brand-accent
-                    "
-                  />
-
+                <InfoPoint>
                   Recognise potentially unsafe or fraudulent
                   recruitment practices.
-                </li>
+                </InfoPoint>
 
-                <li className="flex gap-2">
-                  <CheckCircle2
-                    className="
-                      mt-0.5
-                      h-4
-                      w-4
-                      shrink-0
-                      text-brand-accent
-                    "
-                  />
-
+                <InfoPoint>
                   Build stronger professional communication,
                   career and workplace skills.
-                </li>
+                </InfoPoint>
               </ul>
             </div>
           </div>
@@ -808,8 +661,6 @@ export default function GuidanceHub() {
 
         {/* =================================================
             NAVIGATION
-
-            QUICK VIDEOS NOW COMES BEFORE GUIDES.
         ================================================== */}
 
         <div
@@ -833,6 +684,8 @@ export default function GuidanceHub() {
               gap-2
               overflow-x-auto
             "
+            role="tablist"
+            aria-label="Guidance Hub sections"
           >
             <HubTabButton
               active={
@@ -908,9 +761,7 @@ export default function GuidanceHub() {
               "
             >
               {VIDEOS.map(
-                (
-                  video,
-                ) => {
+                (video) => {
                   const isLiked =
                     likedVideos.includes(
                       video.id,
@@ -948,6 +799,7 @@ export default function GuidanceHub() {
                         "
                       >
                         <div
+                          aria-hidden="true"
                           className="
                             absolute
                             -right-10
@@ -956,7 +808,7 @@ export default function GuidanceHub() {
                             w-36
                             rounded-full
                             border-[24px]
-                            border-white/10
+                            border-brand-accent/30
                           "
                         />
 
@@ -972,12 +824,19 @@ export default function GuidanceHub() {
                             place-items-center
                             rounded-full
                             border
-                            border-white/40
-                            bg-white/95
+                            border-white/50
+                            bg-white
                             text-brand-primary
-                            shadow-xl
-                            transition
+                            shadow-[0_10px_24px_rgba(0,39,61,0.18)]
+                            transition-all
+                            duration-200
+
                             hover:scale-105
+                            hover:text-brand-accent
+
+                            focus-visible:outline-none
+                            focus-visible:ring-4
+                            focus-visible:ring-brand-accent/30
                           "
                         >
                           <Play
@@ -996,7 +855,7 @@ export default function GuidanceHub() {
                             bottom-4
                             right-4
                             rounded-full
-                            bg-black/35
+                            bg-brand-dark/80
                             px-2.5
                             py-1
                             text-[10px]
@@ -1032,7 +891,7 @@ export default function GuidanceHub() {
                         <h3
                           className="
                             !m-0
-                            text-base
+                            text-[18px]
                             font-bold
                             leading-6
                             !text-brand-primary
@@ -1046,7 +905,8 @@ export default function GuidanceHub() {
                         <p
                           className="
                             mt-2
-                            text-sm
+                            text-[14px]
+                            font-normal
                             leading-6
                             text-brand-textMuted
                           "
@@ -1070,6 +930,9 @@ export default function GuidanceHub() {
                         >
                           <button
                             type="button"
+                            aria-pressed={
+                              isLiked
+                            }
                             onClick={() =>
                               toggleVideoLike(
                                 video.id,
@@ -1077,17 +940,24 @@ export default function GuidanceHub() {
                             }
                             className={`
                               inline-flex
+                              min-h-[36px]
                               items-center
                               gap-2
-                              text-xs
+                              rounded-[10px]
+                              px-2
+                              text-[12px]
                               font-bold
-                              transition
+                              transition-colors
 
                               ${
                                 isLiked
                                   ? 'text-brand-crimson'
                                   : 'text-brand-textMuted hover:text-brand-primary'
                               }
+
+                              focus-visible:outline-none
+                              focus-visible:ring-4
+                              focus-visible:ring-brand-accent/15
                             `}
                           >
                             <Heart
@@ -1178,9 +1048,7 @@ export default function GuidanceHub() {
               "
             >
               {GUIDES.map(
-                (
-                  guide,
-                ) => {
+                (guide) => {
                   const isShared =
                     sharedItemKey ===
                     `guide-${guide.id}`;
@@ -1198,9 +1066,11 @@ export default function GuidanceHub() {
                         bg-white/95
                         p-5
                         shadow-[0_12px_32px_rgba(0,70,109,0.06)]
-                        transition
+                        transition-all
+                        duration-200
+
                         hover:-translate-y-0.5
-                        hover:border-[#b9d9ea]
+                        hover:border-brand-accent/40
                         hover:shadow-[0_18px_42px_rgba(0,70,109,0.10)]
                       "
                     >
@@ -1220,7 +1090,7 @@ export default function GuidanceHub() {
                             w-12
                             place-items-center
                             rounded-[15px]
-                            bg-[#eef8fd]
+                            bg-brand-accent/10
                             text-brand-primary
                           "
                         >
@@ -1268,7 +1138,7 @@ export default function GuidanceHub() {
                       <h3
                         className="
                           !m-0
-                          text-base
+                          text-[18px]
                           font-bold
                           leading-6
                           !text-brand-primary
@@ -1282,7 +1152,8 @@ export default function GuidanceHub() {
                       <p
                         className="
                           mt-2
-                          text-sm
+                          text-[14px]
+                          font-normal
                           leading-6
                           text-brand-textMuted
                         "
@@ -1305,13 +1176,21 @@ export default function GuidanceHub() {
                           type="button"
                           className="
                             inline-flex
+                            min-h-[36px]
                             items-center
                             gap-2
-                            text-xs
+                            rounded-[10px]
+                            px-1
+                            text-[12px]
                             font-bold
                             text-brand-primary
-                            transition
-                            group-hover:text-brand-accent
+                            transition-colors
+
+                            hover:text-brand-accent
+
+                            focus-visible:outline-none
+                            focus-visible:ring-4
+                            focus-visible:ring-brand-accent/15
                           "
                         >
                           Read guide
@@ -1321,6 +1200,8 @@ export default function GuidanceHub() {
                               h-4
                               w-4
                               transition-transform
+                              duration-200
+
                               group-hover:translate-x-0.5
                             "
                           />
@@ -1370,9 +1251,7 @@ export default function GuidanceHub() {
 
             <div className="space-y-4">
               {AUDIO_ITEMS.map(
-                (
-                  audio,
-                ) => {
+                (audio) => {
                   const isPlaying =
                     playingAudioId ===
                     audio.id;
@@ -1393,6 +1272,7 @@ export default function GuidanceHub() {
                         bg-white/95
                         p-5
                         shadow-[0_12px_32px_rgba(0,70,109,0.06)]
+
                         sm:p-6
                       "
                     >
@@ -1401,6 +1281,7 @@ export default function GuidanceHub() {
                           flex
                           flex-col
                           gap-5
+
                           sm:flex-row
                           sm:items-center
                           sm:justify-between
@@ -1422,9 +1303,9 @@ export default function GuidanceHub() {
                               place-items-center
                               rounded-[15px]
                               border
-                              border-brand-orange
-                              bg-[#fff8e8]
-                              text-[#8a5d00]
+                              border-brand-gold/40
+                              bg-brand-orange/25
+                              text-brand-primary
                             "
                           >
                             <Headphones className="h-5 w-5" />
@@ -1446,7 +1327,7 @@ export default function GuidanceHub() {
                                   font-bold
                                   uppercase
                                   tracking-[0.14em]
-                                  text-[#8a5d00]
+                                  text-brand-primary
                                 "
                               >
                                 {
@@ -1475,8 +1356,9 @@ export default function GuidanceHub() {
                             <h3
                               className="
                                 !m-0
-                                text-base
+                                text-[18px]
                                 font-bold
+                                leading-6
                                 !text-brand-primary
                               "
                             >
@@ -1488,7 +1370,7 @@ export default function GuidanceHub() {
                             <p
                               className="
                                 mt-1
-                                text-xs
+                                text-[12px]
                                 font-semibold
                                 text-brand-accent
                               "
@@ -1502,7 +1384,8 @@ export default function GuidanceHub() {
                               className="
                                 mt-2
                                 max-w-[700px]
-                                text-sm
+                                text-[14px]
+                                font-normal
                                 leading-6
                                 text-brand-textMuted
                               "
@@ -1546,6 +1429,9 @@ export default function GuidanceHub() {
 
                           <button
                             type="button"
+                            aria-pressed={
+                              isPlaying
+                            }
                             onClick={() =>
                               setPlayingAudioId(
                                 isPlaying
@@ -1563,16 +1449,39 @@ export default function GuidanceHub() {
                               rounded-[13px]
                               border
                               px-4
-                              text-xs
+                              text-[12px]
                               font-bold
-                              transition
+                              transition-all
+                              duration-200
 
                               ${
                                 isPlaying
-                                  ? 'border-brand-gold bg-[#fff8e8] text-[#8a5d00]'
-                                  : 'border-brand-primary bg-brand-primary text-white hover:bg-brand-dark'
+                                  ? `
+                                    border-brand-gold
+                                    bg-brand-orange/25
+                                    text-brand-primary
+                                  `
+                                  : `
+                                    border-brand-primary
+                                    text-white
+                                    shadow-[0_8px_18px_rgba(0,70,109,0.14)]
+
+                                    hover:-translate-y-0.5
+                                  `
                               }
+
+                              focus-visible:outline-none
+                              focus-visible:ring-4
+                              focus-visible:ring-brand-accent/20
                             `}
+                            style={
+                              isPlaying
+                                ? undefined
+                                : {
+                                    background:
+                                      'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+                                  }
+                            }
                           >
                             {isPlaying ? (
                               <Pause className="h-4 w-4 fill-current" />
@@ -1669,11 +1578,12 @@ export default function GuidanceHub() {
             rounded-[18px]
             border
             border-brand-border
-            bg-white/80
+            bg-white/90
             p-4
-            text-xs
+            text-[12px]
             leading-5
             text-brand-textMuted
+            shadow-[0_8px_24px_rgba(0,70,109,0.04)]
           "
         >
           <ShieldCheck
@@ -1697,6 +1607,39 @@ export default function GuidanceHub() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* =========================================================
+   INFO POINT
+========================================================= */
+
+function InfoPoint({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <li
+      className="
+        flex
+        gap-2
+      "
+    >
+      <CheckCircle2
+        className="
+          mt-0.5
+          h-4
+          w-4
+          shrink-0
+          text-brand-accent
+        "
+      />
+
+      <span>
+        {children}
+      </span>
+    </li>
   );
 }
 
@@ -1728,20 +1671,42 @@ function ShareButton({
         rounded-[10px]
         border
         px-3
-        text-xs
+        text-[12px]
         font-bold
-        transition
+        transition-all
+        duration-200
 
         ${
           shared
-            ? 'border-brand-emerald bg-[#effff7] text-[#167a50]'
-            : 'border-brand-border bg-white text-brand-textMuted hover:border-brand-accent hover:text-brand-primary'
+            ? `
+              border-brand-emerald
+              bg-brand-emerald/10
+              text-brand-primary
+            `
+            : `
+              border-brand-border
+              bg-white
+              text-brand-textMuted
+
+              hover:border-brand-accent
+              hover:text-brand-primary
+            `
         }
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/15
       `}
     >
       {shared ? (
         <>
-          <Check className="h-3.5 w-3.5" />
+          <Check
+            className="
+              h-3.5
+              w-3.5
+              text-brand-emerald
+            "
+          />
 
           Shared
         </>
@@ -1763,8 +1728,8 @@ function ShareButton({
 interface HubTabButtonProps {
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
+  icon: ReactNode;
+  children: ReactNode;
 }
 
 function HubTabButton({
@@ -1776,11 +1741,16 @@ function HubTabButton({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={
+        active
+      }
       onClick={
         onClick
       }
       className={`
         inline-flex
+        min-h-[42px]
         shrink-0
         items-center
         justify-center
@@ -1788,16 +1758,37 @@ function HubTabButton({
         rounded-[13px]
         px-4
         py-2.5
-        text-xs
+        text-[12px]
         font-bold
-        transition
+        transition-all
+        duration-200
 
         ${
           active
-            ? 'bg-brand-primary text-white shadow-sm'
-            : 'text-brand-textMuted hover:bg-brand-bg hover:text-brand-primary'
+            ? `
+              text-white
+              shadow-[0_7px_18px_rgba(0,70,109,0.15)]
+            `
+            : `
+              text-brand-textMuted
+
+              hover:bg-brand-bg
+              hover:text-brand-primary
+            `
         }
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
       `}
+      style={
+        active
+          ? {
+              background:
+                'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+            }
+          : undefined
+      }
     >
       {icon}
 
@@ -1828,7 +1819,7 @@ function SectionHeading({
           text-[10px]
           font-bold
           uppercase
-          tracking-[0.18em]
+          tracking-[0.16em]
           text-brand-accent
         "
       >
@@ -1839,10 +1830,12 @@ function SectionHeading({
         className="
           !m-0
           mt-1
-          text-xl
+          text-[24px]
           font-bold
           tracking-[-0.025em]
           !text-brand-primary
+
+          sm:text-[28px]
         "
       >
         {title}
@@ -1852,7 +1845,8 @@ function SectionHeading({
         className="
           mt-2
           max-w-[680px]
-          text-sm
+          text-[14px]
+          font-normal
           leading-6
           text-brand-textMuted
         "

@@ -1,4 +1,4 @@
-import trucityLogo from "../../../assets/branding/trucity-logo.png";
+import trucityLogo from "../../../assets/trucity-logo.png";
 
 interface TruCityLogoProps {
   width?: number;

@@ -1,294 +1,294 @@
-import React, {
+import {
   useEffect,
-  useMemo,
   useState,
-} from "react";
+} from 'react';
+
+import type {
+  ChangeEvent,
+  ReactNode,
+} from 'react';
 
 import {
   Bookmark,
-  BookmarkCheck,
   Briefcase,
   Building2,
-  CalendarDays,
   CheckCircle2,
   ChevronRight,
-  Clock3,
+  Clock,
   Flag,
-  Layers3,
+  Layers,
   MapPin,
+  MessageSquare,
   Search,
   Send,
-  Users,
   X,
-} from "lucide-react";
+} from 'lucide-react';
 
+import {
+  useNavigate,
+} from 'react-router-dom';
 
+import {
+  useNotifications,
+} from '../../../context/NotificationsContext';
 
-import { useNotifications } from "../../../context/NotificationsContext";
-import { companyService } from "../../company/company.service";
+/* =========================================================
+   INDUSTRY STYLES
+========================================================= */
 
-import type {
-  CompanyJob,
-  EmploymentType,
-  WorkplaceType,
-} from "../../company/company.types";
+const INDUSTRY_COLORS = {
+  'FinTech & Banking': {
+    avatar:
+      'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)',
 
-import logo from "../../../assets/branding/trucity-logo.png";
+    badge:
+      'border-brand-accent/25 bg-brand-accent/10 text-brand-primary',
+  },
+
+  'Supply Chain & IoT': {
+    avatar:
+      'linear-gradient(135deg, #FFAD01 0%, #FFD784 100%)',
+
+    badge:
+      'border-brand-gold/35 bg-brand-gold/10 text-brand-primary',
+  },
+
+  AdTech: {
+    avatar:
+      'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)',
+
+    badge:
+      'border-brand-border bg-brand-surface text-brand-primary',
+  },
+} as const;
+
+type Industry =
+  keyof typeof INDUSTRY_COLORS;
+
+type ActiveTab =
+  | 'companies'
+  | 'jobs'
+  | 'saved';
 
 /* =========================================================
    TYPES
 ========================================================= */
 
-type ActiveTab =
-  | "companies"
-  | "jobs"
-  | "saved";
+interface Company {
+  name: string;
+  industry: Industry;
+  location: string;
+  roles: readonly string[];
+  bio: string;
+  about: string;
+  requirements: readonly string[];
+}
+
+interface Job {
+  id: number;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  posted: string;
+  department: string;
+}
 
 interface CompanyFeedProps {
-  onReport?: (company: string) => void;
+  onChat?: (
+    company: string,
+  ) => void;
+
+  onReport?: (
+    company: string,
+  ) => void;
 }
 
-interface CompanySummary {
+interface CompanyAvatarProps {
   name: string;
-  jobs: CompanyJob[];
+  industry?: Industry;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-interface JobDetailSectionProps {
+interface ItemDetails {
   title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
+  subtitle: string;
+  description: string;
+  metaList: readonly string[];
+
+  type:
+    | 'company'
+    | 'job';
+
+  companyName?: string;
+  jobId?: number;
 }
 
 /* =========================================================
-   BRAND
+   DATA
 ========================================================= */
 
-const COLORS = {
-  white: "#FFFFFF",
-  page: "#F8FCFF",
-  teal: "#00466D",
-  darkBlue: "#00273D",
-  blue: "#1E92D2",
-  gold: "#FFAD01",
-  orange: "#FFD784",
-  border: "#D4E2EA",
-  text: "#334155",
-  muted: "#64748B",
-  soft: "#94A3B8",
-  green: "#16804A",
-  greenBg: "#E9FFF4",
-  red: "#A61B3C",
-  redBg: "#FFF1F4",
-};
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function safeText(
-  value?: string | null,
-  fallback = "Not provided"
-): string {
-  if (!value || !value.trim()) {
-    return fallback;
-  }
-
-  return value.trim();
-}
-
-function formatDate(
-  value?: string | null
-): string {
-  if (!value) {
-    return "Not provided";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString(
-    "en-ZA",
+const COMPANIES:
+  readonly Company[] = [
     {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }
-  );
-}
+      name:
+        'Apex Tech Solutions',
 
-function formatRelativeDate(
-  value?: string | null
-): string {
-  if (!value) {
-    return "Recently posted";
-  }
+      industry:
+        'FinTech & Banking',
 
-  const date = new Date(value);
+      location:
+        'Sandton, GP',
 
-  if (Number.isNaN(date.getTime())) {
-    return "Recently posted";
-  }
+      roles: [
+        'Senior Java Engineer',
+        'React Native Dev',
+        'DevOps Lead',
+      ],
 
-  const diff =
-    Date.now() - date.getTime();
+      bio:
+        'Leading digital payments provider expanding software engineering teams across Gauteng.',
 
-  const days = Math.floor(
-    diff / (1000 * 60 * 60 * 24)
-  );
+      about:
+        'Apex Tech Solutions is a premier financial technology institution driving innovation in digital banking infrastructure across South Africa. We cultivate a collaborative, high-performance engineering culture focusing on scalable, secure microservices and modern mobile experiences.',
 
-  if (days <= 0) {
-    return "Posted today";
-  }
+      requirements: [
+        'Minimum 3+ years of professional software development experience.',
+        'Strong proficiency in modern object-oriented programming or reactive frameworks.',
+        "Bachelor's degree in Computer Science, Information Technology, or equivalent practical experience.",
+        'Demonstrated track record of delivering production-ready features in agile environments.',
+      ],
+    },
 
-  if (days === 1) {
-    return "Posted yesterday";
-  }
+    {
+      name:
+        'Vanguard Logistics Hub',
 
-  if (days < 7) {
-    return `Posted ${days} days ago`;
-  }
+      industry:
+        'Supply Chain & IoT',
 
-  if (days < 30) {
-    return `Posted ${Math.floor(days / 7)} week${
-      Math.floor(days / 7) === 1
-        ? ""
-        : "s"
-    } ago`;
-  }
+      location:
+        'Midrand, GP',
 
-  return `Posted ${Math.floor(days / 30)} month${
-    Math.floor(days / 30) === 1
-      ? ""
-      : "s"
-  } ago`;
-}
+      roles: [
+        'QA Automation Lead',
+        'C# Backend Dev',
+      ],
 
-function formatSalary(
-  job: CompanyJob
-): string {
-  const currency =
-    job.salaryCurrency || "ZAR";
+      bio:
+        'National enterprise modernising warehousing and automated delivery networks.',
 
-  const symbol =
-    currency === "ZAR"
-      ? "R"
-      : currency;
+      about:
+        'Vanguard Logistics Hub operates at the intersection of supply chain automation and IoT technology. We build robust backend systems and real-time tracking engines that power automated distribution networks nationwide.',
 
-  const min = job.salaryMin;
-  const max = job.salaryMax;
+      requirements: [
+        'Proven background in backend system architecture or quality engineering frameworks.',
+        'Familiarity with cloud platforms and containerised microservices.',
+        'Strong analytical problem-solving skills and attention to system performance optimisation.',
+      ],
+    },
 
-  if (
-    min == null &&
-    max == null
-  ) {
-    return job.salaryNegotiable
-      ? "Salary negotiable"
-      : "Salary not provided";
-  }
+    {
+      name:
+        'Innovate Digital Corp',
 
-  const formatNumber = (
-    value: number
-  ) =>
-    new Intl.NumberFormat(
-      "en-ZA",
-      {
-        maximumFractionDigits: 0,
-      }
-    ).format(value);
+      industry:
+        'AdTech',
 
-  if (
-    min != null &&
-    max != null
-  ) {
-    return `${symbol}${formatNumber(
-      min
-    )} – ${symbol}${formatNumber(max)}`;
-  }
+      location:
+        'Cape Town, WC',
 
-  if (min != null) {
-    return `From ${symbol}${formatNumber(
-      min
-    )}`;
-  }
+      roles: [
+        'Frontend Engineer',
+        'Data Analyst',
+      ],
 
-  return `Up to ${symbol}${formatNumber(
-    max as number
-  )}`;
-}
+      bio:
+        "Building performance marketing infrastructure for Africa's fastest-growing brands.",
 
-function formatEmploymentType(
-  value?: EmploymentType | string | null
-): string {
-  return safeText(
-    value,
-    "Employment type not provided"
-  );
-}
+      about:
+        'Innovate Digital Corp specialises in high-throughput advertising technology and data analytics pipelines. Our engineering teams build responsive user interfaces and robust data pipelines that process millions of daily user interactions.',
 
-function formatWorkplaceType(
-  value?: WorkplaceType | string | null
-): string {
-  return safeText(
-    value,
-    "Workplace type not provided"
-  );
-}
+      requirements: [
+        'Solid expertise in modern JavaScript/TypeScript frameworks and state management.',
+        'Experience working with data visualisation tools, RESTful APIs, or GraphQL endpoints.',
+        'Passion for clean code, responsive design principles, and rigorous code reviews.',
+      ],
+    },
+  ];
 
-function normaliseList(
-  value?: string[] | null
-): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
+const JOBS:
+  readonly Job[] = [
+    {
+      id: 1,
+      title: 'Senior Java Engineer',
+      company: 'Apex Tech Solutions',
+      location: 'Sandton, GP',
+      salary: 'R85,000 - R110,000 / pm',
+      posted: '2d ago',
+      department: 'Engineering',
+    },
 
-  return value
-    .map((item) =>
-      typeof item === "string"
-        ? item.trim()
-        : ""
-    )
-    .filter(Boolean);
-}
+    {
+      id: 2,
+      title: 'React Native Dev',
+      company: 'Apex Tech Solutions',
+      location: 'Sandton, GP',
+      salary: 'R60,000 - R80,000 / pm',
+      posted: '1d ago',
+      department: 'Mobile Engineering',
+    },
 
-function splitTextList(
-  value?: string | null
-): string[] {
-  if (!value?.trim()) {
-    return [];
-  }
+    {
+      id: 3,
+      title: 'DevOps Lead',
+      company: 'Apex Tech Solutions',
+      location: 'Sandton, GP',
+      salary: 'R90,000 - R120,000 / pm',
+      posted: '3d ago',
+      department: 'Infrastructure',
+    },
 
-  return value
-    .split(/\r?\n|•|;/)
-    .map((item) =>
-      item
-        .replace(/^[-*]\s*/, "")
-        .trim()
-    )
-    .filter(Boolean);
-}
+    {
+      id: 4,
+      title: 'QA Automation Lead',
+      company: 'Vanguard Logistics Hub',
+      location: 'Midrand, GP',
+      salary: 'R65,000 - R85,000 / pm',
+      posted: '5h ago',
+      department: 'Quality Assurance',
+    },
 
-function getCompanyInitial(
-  name: string
-): string {
-  return (
-    name
-      .trim()
-      .charAt(0)
-      .toUpperCase() || "C"
-  );
-}
+    {
+      id: 5,
+      title: 'C# Backend Dev',
+      company: 'Vanguard Logistics Hub',
+      location: 'Midrand, GP',
+      salary: 'R70,000 - R90,000 / pm',
+      posted: '4d ago',
+      department: 'Backend Engineering',
+    },
 
-function isActiveJob(
-  job: CompanyJob
-): boolean {
-  return (
-    String(job.status).toLowerCase() ===
-    "active"
-  );
-}
+    {
+      id: 6,
+      title: 'Frontend Engineer',
+      company: 'Innovate Digital Corp',
+      location: 'Cape Town, WC',
+      salary: 'R55,000 - R75,000 / pm',
+      posted: 'Just now',
+      department: 'Frontend Engineering',
+    },
+
+    {
+      id: 7,
+      title: 'Data Analyst',
+      company: 'Innovate Digital Corp',
+      location: 'Cape Town, WC',
+      salary: 'R45,000 - R65,000 / pm',
+      posted: '1w ago',
+      department: 'Data Intelligence',
+    },
+  ];
 
 /* =========================================================
    COMPANY AVATAR
@@ -296,64 +296,48 @@ function isActiveJob(
 
 function CompanyAvatar({
   name,
-  size = "md",
-}: {
-  name: string;
-  size?: "sm" | "md" | "lg";
-}) {
-  const sizes = {
-    sm: "h-10 w-10 rounded-xl text-sm",
-    md: "h-14 w-14 rounded-2xl text-lg",
-    lg: "h-20 w-20 rounded-[22px] text-2xl",
+  industry,
+  size = 'md',
+}: CompanyAvatarProps) {
+  const background =
+    industry
+      ? INDUSTRY_COLORS[
+          industry
+        ].avatar
+      : 'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)';
+
+  const sizeClasses = {
+    sm:
+      'h-9 w-9 text-[12px] rounded-xl',
+
+    md:
+      'h-12 w-12 text-[16px] rounded-2xl',
+
+    lg:
+      'h-16 w-16 text-[20px] rounded-[20px]',
   };
 
   return (
     <div
       className={`
-        ${sizes[size]}
         flex
         shrink-0
         items-center
         justify-center
         border
-        border-white
+        border-white/80
         font-bold
+        tracking-tight
         text-white
-        shadow-[0_8px_24px_rgba(0,70,109,0.16)]
+        shadow-[0_8px_20px_rgba(0,70,109,0.14)]
+        ${sizeClasses[size]}
       `}
       style={{
-        background:
-          "linear-gradient(135deg,#00466D 0%,#1E92D2 100%)",
+        background,
       }}
     >
-      {getCompanyInitial(name)}
+      {name.charAt(0)}
     </div>
-  );
-}
-
-/* =========================================================
-   DETAIL SECTION
-========================================================= */
-
-function JobDetailSection({
-  title,
-  icon,
-  children,
-}: JobDetailSectionProps) {
-  return (
-    <section className="rounded-2xl border border-[#D4E2EA] bg-white p-5">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="text-[#00466D]">
-          {icon}
-        </span>
-
-        <h3 className="text-base font-bold text-[#00273D]">
-          {title}
-        </h3>
-      </div>
-
-      {children}
-    </section>
   );
 }
 
@@ -362,370 +346,499 @@ function JobDetailSection({
 ========================================================= */
 
 export default function CompanyFeed({
+  onChat = () => {},
   onReport = () => {},
 }: CompanyFeedProps) {
+  const navigate =
+    useNavigate();
 
-  const { addNotification } =
-    useNotifications();
+  const {
+    addNotification,
+  } = useNotifications();
 
-  /*
-   * IMPORTANT:
-   *
-   * Open Roles is intentionally the default tab.
-   */
-  const [activeTab, setActiveTab] =
-    useState<ActiveTab>("jobs");
+  const [
+    activeTab,
+    setActiveTab,
+  ] =
+    useState<ActiveTab>(
+      'companies',
+    );
 
-  const [jobs, setJobs] =
-    useState<CompanyJob[]>([]);
+  const [
+    appliedJobs,
+    setAppliedJobs,
+  ] =
+    useState<number[]>(
+      () => {
+        try {
+          const stored =
+            localStorage.getItem(
+              'trucity-candidate-applied-jobs',
+            );
 
-  const [loadingJobs, setLoadingJobs] =
-    useState(true);
+          if (!stored) {
+            return [];
+          }
 
-  const [jobError, setJobError] =
-    useState<string | null>(null);
+          const parsed:
+            unknown =
+            JSON.parse(
+              stored,
+            );
 
-  const [jobSearchQuery, setJobSearchQuery] =
-    useState("");
-
-  const [jobFilter, setJobFilter] =
-    useState("All");
-
-  const [selectedJob, setSelectedJob] =
-    useState<CompanyJob | null>(null);
-
-  const [selectedCompany, setSelectedCompany] =
-    useState<CompanySummary | null>(null);
-
-  const [dismissedCompanies, setDismissedCompanies] =
-    useState<string[]>([]);
-
-  /*
-   * Saved jobs are local to the candidate browser.
-   * The actual job information still comes from PostgreSQL.
-   */
-  const [savedJobs, setSavedJobs] =
-    useState<string[]>(() => {
-      try {
-        const stored =
-          localStorage.getItem(
-            "trucity-saved-jobs"
-          );
-
-        if (!stored) {
-          return [];
-        }
-
-        const parsed: unknown =
-          JSON.parse(stored);
-
-        if (!Array.isArray(parsed)) {
-          return [];
-        }
-
-        return parsed.filter(
-          (value): value is string =>
-            typeof value === "string"
-        );
-      } catch {
-        return [];
-      }
-    });
-
-  /*
-   * Applied jobs are also retained locally so the
-   * candidate can immediately see which jobs they
-   * already expressed interest in.
-   */
-  const [appliedJobs, setAppliedJobs] =
-    useState<string[]>(() => {
-      try {
-        const stored =
-          localStorage.getItem(
-            "trucity-candidate-applied-jobs"
-          );
-
-        if (!stored) {
-          return [];
-        }
-
-        const parsed: unknown =
-          JSON.parse(stored);
-
-        if (!Array.isArray(parsed)) {
-          return [];
-        }
-
-        return parsed.filter(
-          (value): value is string =>
-            typeof value === "string"
-        );
-      } catch {
-        return [];
-      }
-    });
-
-  /* =========================================================
-     LOAD OPEN ROLES IMMEDIATELY
-  ========================================================= */
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadOpenJobs = async () => {
-      try {
-        setLoadingJobs(true);
-        setJobError(null);
-
-        /*
-         * getOpenJobs() is the candidate-safe service
-         * method for /api/jobs/open.
-         *
-         * This is deliberately NOT getJobs(), because
-         * getJobs() is the employer's own-job endpoint.
-         */
-        const service =
-          companyService as typeof companyService & {
-            getOpenJobs?: () => Promise<CompanyJob[]>;
-          };
-
-        let result: CompanyJob[] = [];
-
-        if (
-          typeof service.getOpenJobs ===
-          "function"
-        ) {
-          result =
-            await service.getOpenJobs();
-        } else {
-          /*
-           * Compatibility fallback in case the currently
-           * installed service has not yet exposed getOpenJobs.
-           *
-           * The active filtering still prevents closed jobs
-           * from appearing in the candidate feed.
-           */
-          result =
-            await service.getJobs();
-        }
-
-        if (!mounted) {
-          return;
-        }
-
-        setJobs(
-          Array.isArray(result)
-            ? result.filter(isActiveJob)
-            : []
-        );
-      } catch (error) {
-        console.error(
-          "Failed to load open roles:",
-          error
-        );
-
-        if (!mounted) {
-          return;
-        }
-
-        setJobs([]);
-
-        setJobError(
-          "We could not load open roles right now. Please try again."
-        );
-      } finally {
-        if (mounted) {
-          setLoadingJobs(false);
-        }
-      }
-    };
-
-    void loadOpenJobs();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  /* =========================================================
-     SAVE STATE
-  ========================================================= */
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "trucity-saved-jobs",
-        JSON.stringify(savedJobs)
-      );
-    } catch {
-      // Ignore localStorage failures.
-    }
-  }, [savedJobs]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "trucity-candidate-applied-jobs",
-        JSON.stringify(appliedJobs)
-      );
-    } catch {
-      // Ignore localStorage failures.
-    }
-  }, [appliedJobs]);
-
-  /* =========================================================
-     COMPANY GROUPING
-  ========================================================= */
-
-  const companies = useMemo<CompanySummary[]>(
-    () => {
-      const map =
-        new Map<string, CompanyJob[]>();
-
-      jobs.forEach((job) => {
-        const companyName =
-          safeText(
-            job.companyName,
-            "Company"
-          );
-
-        const existing =
-          map.get(companyName) ?? [];
-
-        existing.push(job);
-
-        map.set(
-          companyName,
-          existing
-        );
-      });
-
-      return Array.from(map.entries())
-        .map(
-          ([name, companyJobs]) => ({
-            name,
-            jobs: companyJobs,
-          })
-        )
-        .filter(
-          (company) =>
-            !dismissedCompanies.includes(
-              company.name
+          if (
+            !Array.isArray(
+              parsed,
             )
+          ) {
+            return [];
+          }
+
+          return parsed.filter(
+            (
+              value,
+            ): value is number =>
+              typeof value ===
+                'number' &&
+              JOBS.some(
+                (
+                  job,
+                ) =>
+                  job.id ===
+                  value,
+              ),
+          );
+        } catch {
+          return [];
+        }
+      },
+    );
+
+  const [
+    dismissed,
+    setDismissed,
+  ] =
+    useState<string[]>(
+      [],
+    );
+
+  const [
+    companyFilter,
+    setCompanyFilter,
+  ] =
+    useState(
+      'All',
+    );
+
+  const [
+    jobFilter,
+    setJobFilter,
+  ] =
+    useState(
+      'All',
+    );
+
+  const [
+    jobSearchQuery,
+    setJobSearchQuery,
+  ] =
+    useState(
+      '',
+    );
+
+  const [
+    selectedItemDetails,
+    setSelectedItemDetails,
+  ] =
+    useState<ItemDetails | null>(
+      null,
+    );
+
+  const [
+    savedJobs,
+    setSavedJobs,
+  ] =
+    useState<number[]>(
+      () => {
+        try {
+          const stored =
+            localStorage.getItem(
+              'trucity-saved-jobs',
+            );
+
+          if (!stored) {
+            return [];
+          }
+
+          const parsed:
+            unknown =
+            JSON.parse(
+              stored,
+            );
+
+          if (
+            !Array.isArray(
+              parsed,
+            )
+          ) {
+            return [];
+          }
+
+          return parsed.filter(
+            (
+              value,
+            ): value is number =>
+              typeof value ===
+                'number' &&
+              JOBS.some(
+                (
+                  job,
+                ) =>
+                  job.id ===
+                  value,
+              ),
+          );
+        } catch {
+          return [];
+        }
+      },
+    );
+
+  const [
+    savedCompanies,
+    setSavedCompanies,
+  ] =
+    useState<string[]>(
+      () => {
+        try {
+          const stored =
+            localStorage.getItem(
+              'trucity-saved-companies',
+            );
+
+          if (!stored) {
+            return [];
+          }
+
+          const parsed:
+            unknown =
+            JSON.parse(
+              stored,
+            );
+
+          if (
+            !Array.isArray(
+              parsed,
+            )
+          ) {
+            return [];
+          }
+
+          return parsed.filter(
+            (
+              value,
+            ): value is string =>
+              typeof value ===
+                'string' &&
+              COMPANIES.some(
+                (
+                  company,
+                ) =>
+                  company.name ===
+                  value,
+              ),
+          );
+        } catch {
+          return [];
+        }
+      },
+    );
+
+  /* =========================================================
+     PERSISTENCE
+  ========================================================= */
+
+  useEffect(
+    () => {
+      try {
+        localStorage.setItem(
+          'trucity-candidate-applied-jobs',
+          JSON.stringify(
+            appliedJobs,
+          ),
         );
+      } catch (
+        error
+      ) {
+        console.error(
+          'Unable to persist applied jobs:',
+          error,
+        );
+      }
     },
     [
-      jobs,
-      dismissedCompanies,
-    ]
+      appliedJobs,
+    ],
   );
 
-  /* =========================================================
-     FILTER OPTIONS
-  ========================================================= */
-
-  const departments = useMemo(() => {
-    const values =
-      jobs
-        .map((job) =>
-          job.department?.trim()
-        )
-        .filter(
-          (value): value is string =>
-            Boolean(value)
+  useEffect(
+    () => {
+      try {
+        localStorage.setItem(
+          'trucity-saved-jobs',
+          JSON.stringify(
+            savedJobs,
+          ),
         );
-
-    return [
-      "All",
-      ...Array.from(
-        new Set(values)
-      ).sort(),
-    ];
-  }, [jobs]);
-
-  /* =========================================================
-     FILTERED JOBS
-  ========================================================= */
-
-  const filteredJobs = useMemo(() => {
-    const query =
-      jobSearchQuery
-        .trim()
-        .toLowerCase();
-
-    return jobs.filter((job) => {
-      if (
-        jobFilter !== "All" &&
-        job.department !== jobFilter
+      } catch (
+        error
       ) {
-        return false;
+        console.error(
+          'Unable to persist saved jobs:',
+          error,
+        );
       }
+    },
+    [
+      savedJobs,
+    ],
+  );
 
-      if (!query) {
-        return true;
+  useEffect(
+    () => {
+      try {
+        localStorage.setItem(
+          'trucity-saved-companies',
+          JSON.stringify(
+            savedCompanies,
+          ),
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          'Unable to persist saved companies:',
+          error,
+        );
       }
-
-      const searchableText = [
-        job.title,
-        job.companyName,
-        job.department,
-        job.location,
-        job.workplaceType,
-        job.type,
-        job.description,
-        job.qualifications,
-        job.experienceRequired,
-        job.responsibilities,
-        job.benefits,
-        ...(job.skills ?? []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return searchableText.includes(
-        query
-      );
-    });
-  }, [
-    jobs,
-    jobFilter,
-    jobSearchQuery,
-  ]);
-
-  /* =========================================================
-     SAVED JOBS VIEW
-  ========================================================= */
-
-  const savedJobList = useMemo(
-    () =>
-      jobs.filter((job) =>
-        savedJobs.includes(
-          job.id
-        )
-      ),
-    [jobs, savedJobs]
+    },
+    [
+      savedCompanies,
+    ],
   );
 
   /* =========================================================
-     TOGGLE SAVE
+     MODAL SCROLL LOCK
+  ========================================================= */
+
+  useEffect(
+    () => {
+      if (
+        !selectedItemDetails
+      ) {
+        return;
+      }
+
+      const previous =
+        document.body
+          .style
+          .overflow;
+
+      document.body
+        .style
+        .overflow =
+        'hidden';
+
+      return () => {
+        document.body
+          .style
+          .overflow =
+          previous;
+      };
+    },
+    [
+      selectedItemDetails,
+    ],
+  );
+
+  /* =========================================================
+     FILTERS
+  ========================================================= */
+
+  const companyFilters = [
+    'All',
+    'FinTech',
+    'Supply Chain',
+    'AdTech',
+  ];
+
+  const jobFilters = [
+    'All',
+    'Engineer',
+    'Dev',
+    'DevOps',
+    'QA Automation',
+    'Data Analyst',
+  ];
+
+  const shownCompanies =
+    COMPANIES
+      .filter(
+        (
+          company,
+        ) =>
+          companyFilter ===
+            'All' ||
+          company.industry.includes(
+            companyFilter,
+          ),
+      )
+      .filter(
+        (
+          company,
+        ) =>
+          !dismissed.includes(
+            company.name,
+          ),
+      );
+
+  const shownJobs =
+    JOBS
+      .filter(
+        (
+          job,
+        ) =>
+          !dismissed.includes(
+            job.company,
+          ),
+      )
+      .filter(
+        (
+          job,
+        ) =>
+          jobFilter ===
+            'All' ||
+          job.title
+            .toLowerCase()
+            .includes(
+              jobFilter.toLowerCase(),
+            ),
+      )
+      .filter(
+        (
+          job,
+        ) => {
+          const query =
+            jobSearchQuery
+              .trim()
+              .toLowerCase();
+
+          if (!query) {
+            return true;
+          }
+
+          return (
+            job.title
+              .toLowerCase()
+              .includes(
+                query,
+              ) ||
+            job.location
+              .toLowerCase()
+              .includes(
+                query,
+              ) ||
+            job.department
+              .toLowerCase()
+              .includes(
+                query,
+              )
+          );
+        },
+      );
+
+  const savedJobItems =
+    JOBS.filter(
+      (
+        job,
+      ) =>
+        savedJobs.includes(
+          job.id,
+        ),
+    );
+
+  const savedCompanyItems =
+    COMPANIES.filter(
+      (
+        company,
+      ) =>
+        savedCompanies.includes(
+          company.name,
+        ),
+    );
+
+  const hasSavedItems =
+    savedJobs.length > 0 ||
+    savedCompanies.length > 0;
+
+  /* =========================================================
+     SAVE ACTIONS
   ========================================================= */
 
   const toggleSaveJob = (
-    jobId: string
+    jobId: number,
   ) => {
-    setSavedJobs((current) => {
-      if (current.includes(jobId)) {
-        return current.filter(
-          (id) => id !== jobId
-        );
-      }
+    setSavedJobs(
+      (
+        current,
+      ) => {
+        const alreadySaved =
+          current.includes(
+            jobId,
+          );
 
-      return [
-        ...current,
-        jobId,
-      ];
-    });
+        return alreadySaved
+          ? current.filter(
+              (
+                id,
+              ) =>
+                id !==
+                jobId,
+            )
+          : [
+              ...current,
+              jobId,
+            ];
+      },
+    );
+  };
+
+  const toggleSaveCompany = (
+    companyName: string,
+  ) => {
+    setSavedCompanies(
+      (
+        current,
+      ) => {
+        const alreadySaved =
+          current.includes(
+            companyName,
+          );
+
+        return alreadySaved
+          ? current.filter(
+              (
+                name,
+              ) =>
+                name !==
+                companyName,
+            )
+          : [
+              ...current,
+              companyName,
+            ];
+      },
+    );
   };
 
   /* =========================================================
@@ -733,1987 +846,2234 @@ export default function CompanyFeed({
   ========================================================= */
 
   const handleExpressInterest = (
-    job: CompanyJob
+    job: Job,
   ) => {
-    if (appliedJobs.includes(job.id)) {
+    if (
+      appliedJobs.includes(
+        job.id,
+      )
+    ) {
       return;
     }
 
-    const companyName =
-      safeText(
-        job.companyName,
-        "the company"
-      );
-
-    setAppliedJobs((current) => [
-      ...current,
-      job.id,
-    ]);
-
-    try {
-      addNotification({
-        id: crypto.randomUUID(),
-        type: "application",
-        title: "Interest submitted",
-        message: `Your interest in ${job.title} at ${companyName} has been recorded.`,
-        time: new Date().toLocaleTimeString(
-          [],
-          {
-            hour: "2-digit",
-            minute: "2-digit",
-          }
-        ),
-        read: false,
-        destination: "/candidate",
-      });
-    } catch (error) {
-      console.error(
-        "Unable to create notification:",
-        error
-      );
-    }
-  };
-
-  /* =========================================================
-     COMPANY ACTIONS
-  ========================================================= */
-
-  const handleReportCompany = (
-    companyName: string
-  ) => {
-    onReport(companyName);
-  };
-
-  const dismissCompany = (
-    companyName: string
-  ) => {
-    setDismissedCompanies(
-      (current) =>
-        current.includes(companyName)
-          ? current
-          : [
-              ...current,
-              companyName,
-            ]
+    setAppliedJobs(
+      (
+        current,
+      ) => [
+        ...current,
+        job.id,
+      ],
     );
 
-    setSelectedCompany(null);
+    addNotification({
+      type:
+        'application',
+
+      title:
+        'Application submitted',
+
+      message:
+        `Your TruCity profile was submitted to ${job.company} for the ${job.title} position.`,
+
+      time:
+        'Just now',
+
+      read:
+        false,
+
+      destination:
+        '/candidate/feed',
+    });
   };
 
   /* =========================================================
-     JOB CARD
+     CONTACT COMPANY
   ========================================================= */
 
-  const renderJobCard = (
-    job: CompanyJob
+  const handleContactCompany = (
+    companyName: string,
   ) => {
-    const saved =
-      savedJobs.includes(job.id);
+    onChat(
+      companyName,
+    );
 
-    const applied =
-      appliedJobs.includes(job.id);
+    navigate(
+      '/candidate/messages',
+      {
+        state: {
+          source:
+            'company-contact',
 
-    const companyName =
-      safeText(
-        job.companyName,
-        "Company"
-      );
+          company:
+            companyName,
 
-    const skills =
-      normaliseList(
-        job.skills
-      );
-
-    return (
-      <article
-        key={job.id}
-        className="
-          group
-          rounded-[24px]
-          border
-          border-[#D4E2EA]
-          bg-white
-          p-5
-          shadow-[0_12px_35px_rgba(0,70,109,0.07)]
-          transition
-          duration-200
-          hover:-translate-y-0.5
-          hover:shadow-[0_18px_42px_rgba(0,70,109,0.12)]
-        "
-      >
-        <div className="flex flex-col gap-5">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-4">
-              <CompanyAvatar
-                name={companyName}
-                size="md"
-              />
-
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-bold tracking-tight text-[#00273D]">
-                    {safeText(
-                      job.title,
-                      "Untitled position"
-                    )}
-                  </h2>
-
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#E9FFF4] px-2.5 py-1 text-[11px] font-bold text-[#16804A]">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Open
-                  </span>
-                </div>
-
-                <p className="mt-1 text-sm font-semibold text-[#00466D]">
-                  {companyName}
-                </p>
-
-                <p className="mt-1 text-xs text-[#64748B]">
-                  {formatRelativeDate(
-                    job.postedDate
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                toggleSaveJob(job.id)
-              }
-              className="
-                flex
-                h-10
-                w-10
-                shrink-0
-                items-center
-                justify-center
-                rounded-xl
-                border
-                border-[#D4E2EA]
-                bg-white
-                text-[#00466D]
-                transition
-                hover:border-[#FFAD01]
-                hover:bg-[#FFF8E8]
-              "
-              aria-label={
-                saved
-                  ? "Remove saved job"
-                  : "Save job"
-              }
-              title={
-                saved
-                  ? "Remove from saved jobs"
-                  : "Save job"
-              }
-            >
-              {saved ? (
-                <BookmarkCheck className="h-5 w-5 text-[#FFAD01]" />
-              ) : (
-                <Bookmark className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-
-          {/* Quick information */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl bg-[#F8FCFF] p-3">
-              <div className="mb-1 flex items-center gap-2 text-[#64748B]">
-                <MapPin className="h-4 w-4" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide">
-                  Location
-                </span>
-              </div>
-
-              <p className="text-sm font-semibold text-[#334155]">
-                {safeText(
-                  job.location
-                )}
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-[#F8FCFF] p-3">
-              <div className="mb-1 flex items-center gap-2 text-[#64748B]">
-                <Briefcase className="h-4 w-4" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide">
-                  Employment
-                </span>
-              </div>
-
-              <p className="text-sm font-semibold text-[#334155]">
-                {formatEmploymentType(
-                  job.type
-                )}
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-[#F8FCFF] p-3">
-              <div className="mb-1 flex items-center gap-2 text-[#64748B]">
-                <Building2 className="h-4 w-4" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide">
-                  Workplace
-                </span>
-              </div>
-
-              <p className="text-sm font-semibold text-[#334155]">
-                {formatWorkplaceType(
-                  job.workplaceType
-                )}
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-[#FFF8E8] p-3">
-              <div className="mb-1 flex items-center gap-2 text-[#8A6500]">
-                <span className="text-sm font-bold">
-                  R
-                </span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">
-                  Salary
-                </span>
-              </div>
-
-              <p className="text-sm font-bold text-[#334155]">
-                {formatSalary(job)}
-              </p>
-            </div>
-          </div>
-
-          {/* Description */}
-          {job.description && (
-            <p className="line-clamp-3 text-sm leading-6 text-[#64748B]">
-              {job.description}
-            </p>
-          )}
-
-          {/* Skills */}
-          {skills.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {skills
-                .slice(0, 5)
-                .map((skill) => (
-                  <span
-                    key={skill}
-                    className="
-                      rounded-full
-                      border
-                      border-[#D4E2EA]
-                      bg-[#F8FCFF]
-                      px-3
-                      py-1.5
-                      text-xs
-                      font-medium
-                      text-[#334155]
-                    "
-                  >
-                    {skill}
-                  </span>
-                ))}
-
-              {skills.length > 5 && (
-                <span className="rounded-full bg-[#EEF8FD] px-3 py-1.5 text-xs font-semibold text-[#00466D]">
-                  +{skills.length - 5} more
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="flex flex-col gap-3 border-t border-[#E7EEF2] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 text-xs text-[#64748B]">
-              <Clock3 className="h-4 w-4" />
-
-              <span>
-                {job.applicationDeadline
-                  ? `Apply by ${formatDate(
-                      job.applicationDeadline
-                    )}`
-                  : "No closing date provided"}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedJob(job)
-                }
-                className="
-                  inline-flex
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-xl
-                  border
-                  border-[#D4E2EA]
-                  bg-white
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-bold
-                  text-[#00466D]
-                  transition
-                  hover:border-[#00466D]
-                  hover:bg-[#F8FCFF]
-                "
-              >
-                More Info
-                <ChevronRight className="h-4 w-4" />
-              </button>
-
-              <button
-                type="button"
-                disabled={applied}
-                onClick={() =>
-                  handleExpressInterest(
-                    job
-                  )
-                }
-                className={`
-                  inline-flex
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-xl
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-bold
-                  transition
-                  ${
-                    applied
-                      ? "cursor-default bg-[#E9FFF4] text-[#16804A]"
-                      : "bg-[#FFAD01] text-[#00273D] hover:bg-[#FFD784]"
-                  }
-                `}
-              >
-                {applied ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    Interest Submitted
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    Express Interest
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </article>
+          allowCvAttachment:
+            true,
+        },
+      },
     );
   };
 
   /* =========================================================
-     COMPANY CARD
+     DETAILS
   ========================================================= */
 
-  const renderCompanyCard = (
-    company: CompanySummary
+  const openJobDetails = (
+    job: Job,
   ) => {
-    const companyJobs =
-      company.jobs;
+    setSelectedItemDetails(
+      {
+        title:
+          job.title,
 
-    const locations =
-      Array.from(
-        new Set(
-          companyJobs
-            .map((job) =>
-              job.location?.trim()
-            )
-            .filter(Boolean)
-        )
-      );
+        subtitle:
+          `${job.company} · ${job.location}`,
 
-    const departments =
-      Array.from(
-        new Set(
-          companyJobs
-            .map((job) =>
-              job.department?.trim()
-            )
-            .filter(Boolean)
-        )
-      );
+        description:
+          `We are looking for a dedicated ${job.title} to join our high-performing team in ${job.department}. You will play a key role in building high-impact systems, collaborating cross-functionally, and driving professional standards.`,
 
-    return (
-      <article
-        key={company.name}
-        className="
-          rounded-[24px]
-          border
-          border-[#D4E2EA]
-          bg-white
-          p-5
-          shadow-[0_12px_35px_rgba(0,70,109,0.07)]
-        "
-      >
-        <div className="flex items-start gap-4">
-          <CompanyAvatar
-            name={company.name}
-            size="lg"
-          />
+        metaList: [
+          'Professional experience matching the core role requirements.',
+          'Strong understanding of modern systems, integrations and professional workflows.',
+          'Strong communication skills and a collaborative team mindset.',
+          `Competitive compensation package: ${job.salary}.`,
+        ],
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-bold tracking-tight text-[#00273D]">
-                  {company.name}
-                </h2>
+        type:
+          'job',
 
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E9FFF4] px-3 py-1 text-xs font-bold text-[#16804A]">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Open roles available
-                  </span>
+        companyName:
+          job.company,
 
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EEF8FD] px-3 py-1 text-xs font-semibold text-[#00466D]">
-                    <Briefcase className="h-3.5 w-3.5" />
-                    {companyJobs.length} open role
-                    {companyJobs.length ===
-                    1
-                      ? ""
-                      : "s"}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedCompany(
-                    company
-                  )
-                }
-                className="
-                  inline-flex
-                  items-center
-                  gap-2
-                  rounded-xl
-                  border
-                  border-[#D4E2EA]
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-bold
-                  text-[#00466D]
-                  transition
-                  hover:border-[#00466D]
-                  hover:bg-[#F8FCFF]
-                "
-              >
-                More Info
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-[#F8FCFF] p-4">
-                <div className="mb-2 flex items-center gap-2 text-[#64748B]">
-                  <MapPin className="h-4 w-4" />
-                  <span className="text-xs font-semibold">
-                    Locations
-                  </span>
-                </div>
-
-                <p className="text-sm font-semibold text-[#334155]">
-                  {locations.length > 0
-                    ? locations.join(
-                        " • "
-                      )
-                    : "Not provided"}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-[#F8FCFF] p-4">
-                <div className="mb-2 flex items-center gap-2 text-[#64748B]">
-                  <Layers3 className="h-4 w-4" />
-                  <span className="text-xs font-semibold">
-                    Areas hiring
-                  </span>
-                </div>
-
-                <p className="text-sm font-semibold text-[#334155]">
-                  {departments.length > 0
-                    ? departments.join(
-                        " • "
-                      )
-                    : "Various roles"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#94A3B8]">
-                Current open roles
-              </p>
-
-              <div className="space-y-2">
-                {companyJobs
-                  .slice(0, 3)
-                  .map((job) => (
-                    <button
-                      key={job.id}
-                      type="button"
-                      onClick={() =>
-                        setSelectedJob(
-                          job
-                        )
-                      }
-                      className="
-                        flex
-                        w-full
-                        items-center
-                        justify-between
-                        gap-3
-                        rounded-xl
-                        border
-                        border-[#E7EEF2]
-                        bg-white
-                        px-3
-                        py-3
-                        text-left
-                        transition
-                        hover:border-[#FFAD01]
-                        hover:bg-[#FFFDF7]
-                      "
-                    >
-                      <span className="text-sm font-semibold text-[#334155]">
-                        {safeText(
-                          job.title,
-                          "Open position"
-                        )}
-                      </span>
-
-                      <ChevronRight className="h-4 w-4 shrink-0 text-[#94A3B8]" />
-                    </button>
-                  ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
+        jobId:
+          job.id,
+      },
     );
   };
 
-  /* =========================================================
-     BACKGROUND
-  ========================================================= */
+  const openCompanyDetails = (
+    company: Company,
+  ) => {
+    setSelectedItemDetails(
+      {
+        title:
+          company.name,
+
+        subtitle:
+          `${company.industry} · ${company.location}`,
+
+        description:
+          company.about,
+
+        metaList:
+          company.requirements,
+
+        type:
+          'company',
+
+        companyName:
+          company.name,
+      },
+    );
+  };
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden"
-      style={{
-        backgroundColor:
-          COLORS.page,
-      }}
+      className="
+        relative
+        min-h-[100dvh]
+        overflow-x-hidden
+        bg-transparent
+        font-sans
+        text-brand-text
+      "
     >
-      {/* Background watermark */}
-      <div
+      <main
         className="
-          pointer-events-none
-          fixed
-          inset-0
-          z-0
-          bg-center
-          bg-no-repeat
-          opacity-[0.035]
+          relative
+          z-10
+          mx-auto
+          w-full
+          max-w-[1480px]
+          px-4
+          py-8
+
+          sm:px-8
+          lg:px-10
+          lg:py-10
         "
-        style={{
-          backgroundImage: `url(${logo})`,
-          backgroundSize: "620px",
-        }}
-      />
-
-      {/* Decorative circles */}
-      <div className="pointer-events-none absolute -right-24 top-20 h-64 w-64 rounded-full bg-[#1E92D2]/[0.05]" />
-      <div className="pointer-events-none absolute -left-28 top-[42%] h-72 w-72 rounded-full bg-[#FFAD01]/[0.06]" />
-      <div className="pointer-events-none absolute right-[8%] bottom-20 h-48 w-48 rounded-full bg-[#1E92D2]/[0.04]" />
-
-      <main className="relative z-10 mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* =====================================================
+      >
+        {/* =================================================
             PAGE HEADER
-        ===================================================== */}
+        ================================================== */}
 
-        <section className="mb-7">
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[#FFAD01]">
+        <section className="mb-8">
+          <p
+            className="
+              mb-2
+              text-[12px]
+              font-bold
+              uppercase
+              tracking-[0.16em]
+              text-brand-accent
+            "
+          >
             Discover Opportunities
           </p>
 
-          <h1 className="text-[32px] font-bold tracking-[-0.035em] text-[#00466D] sm:text-[40px]">
-            Find your next{" "}
-            <span className="text-[#FFAD01]">
+          <h1
+            className="
+              !m-0
+              text-[32px]
+              font-bold
+              leading-[1.08]
+              tracking-[-0.035em]
+              !text-brand-primary
+
+              sm:text-[40px]
+              lg:text-[48px]
+            "
+          >
+            Find your next{' '}
+
+            <span className="text-brand-gold">
               opportunity.
             </span>
           </h1>
 
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">
-            Browse open roles from employers
-            on TruCity and explore the
-            opportunities that match your
-            professional profile.
+          <p
+            className="
+              mt-3
+              max-w-[680px]
+              text-[15px]
+              font-normal
+              leading-7
+              text-brand-textMuted
+
+              sm:text-[16px]
+            "
+          >
+            Browse verified employers and apply to open roles
+            using your TruCity professional profile.
           </p>
         </section>
 
-        {/* =====================================================
-            TABS
-        ===================================================== */}
+        {/* =================================================
+            CONTROLS
+        ================================================== */}
 
         <div
           className="
             sticky
-            top-4
+            top-[104px]
             z-30
             mb-7
+            space-y-3
             rounded-[24px]
             border
-            border-[#D4E2EA]
+            border-brand-border
             bg-white/95
             p-4
             shadow-[0_16px_40px_rgba(0,70,109,0.10)]
             backdrop-blur-xl
           "
         >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex overflow-x-auto rounded-[14px] border border-[#D4E2EA] bg-[#F8FCFF] p-1">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTab("companies")
+          <div
+            className="
+              flex
+              flex-col
+              gap-3
+
+              lg:flex-row
+              lg:items-center
+            "
+          >
+            <div
+              className="
+                flex
+                overflow-x-auto
+                rounded-[14px]
+                border
+                border-brand-border
+                bg-brand-bg
+                p-1
+              "
+            >
+              <TabButton
+                active={
+                  activeTab ===
+                  'companies'
                 }
-                className={`
-                  inline-flex
-                  shrink-0
-                  items-center
-                  gap-2
-                  rounded-xl
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-bold
-                  transition
-                  ${
-                    activeTab ===
-                    "companies"
-                      ? "bg-[#00466D] text-white shadow-sm"
-                      : "text-[#64748B] hover:text-[#00466D]"
-                  }
-                `}
+                onClick={() =>
+                  setActiveTab(
+                    'companies',
+                  )
+                }
+                icon={
+                  <Building2 className="h-4 w-4" />
+                }
               >
-                <Building2 className="h-4 w-4" />
                 Companies
-              </button>
+              </TabButton>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTab("jobs")
+              <TabButton
+                active={
+                  activeTab ===
+                  'jobs'
                 }
-                className={`
-                  inline-flex
-                  shrink-0
-                  items-center
-                  gap-2
-                  rounded-xl
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-bold
-                  transition
-                  ${
-                    activeTab === "jobs"
-                      ? "bg-[#00466D] text-white shadow-sm"
-                      : "text-[#64748B] hover:text-[#00466D]"
-                  }
-                `}
+                onClick={() =>
+                  setActiveTab(
+                    'jobs',
+                  )
+                }
+                icon={
+                  <Briefcase className="h-4 w-4" />
+                }
               >
-                <Briefcase className="h-4 w-4" />
-                Open Roles ({jobs.length})
-              </button>
+                Open Roles
+              </TabButton>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTab("saved")
+              <TabButton
+                active={
+                  activeTab ===
+                  'saved'
                 }
-                className={`
-                  inline-flex
-                  shrink-0
-                  items-center
-                  gap-2
-                  rounded-xl
-                  px-4
-                  py-2.5
-                  text-sm
-                  font-bold
-                  transition
-                  ${
-                    activeTab === "saved"
-                      ? "bg-[#00466D] text-white shadow-sm"
-                      : "text-[#64748B] hover:text-[#00466D]"
-                  }
-                `}
+                onClick={() =>
+                  setActiveTab(
+                    'saved',
+                  )
+                }
+                icon={
+                  <Bookmark className="h-4 w-4" />
+                }
               >
-                <Bookmark className="h-4 w-4" />
-                Saved ({savedJobList.length})
-              </button>
+                Saved
+              </TabButton>
             </div>
 
-            {/* Search */}
-            {activeTab === "jobs" && (
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <div className="relative min-w-0 sm:w-72">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+            {activeTab ===
+              'jobs' && (
+              <JobSearch
+                value={
+                  jobSearchQuery
+                }
+                onChange={
+                  setJobSearchQuery
+                }
+              />
+            )}
 
-                  <input
-                    value={
-                      jobSearchQuery
+            {activeTab ===
+              'companies' && (
+              <div
+                className="
+                  flex
+                  min-h-[46px]
+                  flex-1
+                  items-center
+                  rounded-[14px]
+                  border
+                  border-brand-border
+                  bg-brand-bg
+                  px-4
+                  text-[12px]
+                  font-semibold
+                  text-brand-textMuted
+                "
+              >
+                Browse verified companies currently hiring on TruCity.
+              </div>
+            )}
+
+            {activeTab ===
+              'saved' && (
+              <div
+                className="
+                  flex
+                  min-h-[46px]
+                  flex-1
+                  items-center
+                  rounded-[14px]
+                  border
+                  border-brand-gold/35
+                  bg-brand-gold/10
+                  px-4
+                  text-[12px]
+                  font-semibold
+                  text-brand-primary
+                "
+              >
+                <Bookmark
+                  className="
+                    mr-2
+                    h-4
+                    w-4
+                    fill-brand-gold
+                    text-brand-gold
+                  "
+                />
+
+                Your bookmarked companies and jobs are stored here.
+              </div>
+            )}
+          </div>
+
+          {activeTab ===
+            'companies' && (
+            <FilterRow
+              filters={
+                companyFilters
+              }
+              selected={
+                companyFilter
+              }
+              onSelect={
+                setCompanyFilter
+              }
+            />
+          )}
+
+          {activeTab ===
+            'jobs' && (
+            <FilterRow
+              filters={
+                jobFilters
+              }
+              selected={
+                jobFilter
+              }
+              onSelect={
+                setJobFilter
+              }
+            />
+          )}
+        </div>
+
+        {/* =================================================
+            COMPANIES
+        ================================================== */}
+
+        {activeTab ===
+          'companies' && (
+          <div className="space-y-4">
+            {shownCompanies.length ===
+            0 ? (
+              <EmptyState
+                icon="company"
+                title="No companies available"
+                text="There are no companies in this category right now."
+              />
+            ) : (
+              shownCompanies.map(
+                (
+                  company,
+                ) => (
+                  <CompanyCard
+                    key={
+                      company.name
                     }
-                    onChange={(event) =>
-                      setJobSearchQuery(
-                        event.target.value
+                    company={
+                      company
+                    }
+                    isSaved={savedCompanies.includes(
+                      company.name,
+                    )}
+                    onMessage={() =>
+                      handleContactCompany(
+                        company.name,
                       )
                     }
-                    placeholder="Search jobs, skills or companies..."
+                    onToggleSave={() =>
+                      toggleSaveCompany(
+                        company.name,
+                      )
+                    }
+                    onOpenInfo={() =>
+                      openCompanyDetails(
+                        company,
+                      )
+                    }
+                    onReport={() =>
+                      onReport(
+                        company.name,
+                      )
+                    }
+                    onDismiss={() =>
+                      setDismissed(
+                        (
+                          current,
+                        ) =>
+                          current.includes(
+                            company.name,
+                          )
+                            ? current
+                            : [
+                                ...current,
+                                company.name,
+                              ],
+                      )
+                    }
+                  />
+                ),
+              )
+            )}
+          </div>
+        )}
+
+        {/* =================================================
+            JOBS
+        ================================================== */}
+
+        {activeTab ===
+          'jobs' && (
+          <div className="space-y-3">
+            {shownJobs.length ===
+            0 ? (
+              <EmptyState
+                icon="job"
+                title="No matching jobs"
+                text="No active roles match your search or current filters."
+              />
+            ) : (
+              shownJobs.map(
+                (
+                  job,
+                ) => {
+                  const company =
+                    COMPANIES.find(
+                      (
+                        item,
+                      ) =>
+                        item.name ===
+                        job.company,
+                    );
+
+                  return (
+                    <JobCard
+                      key={
+                        job.id
+                      }
+                      job={
+                        job
+                      }
+                      company={
+                        company
+                      }
+                      isSaved={savedJobs.includes(
+                        job.id,
+                      )}
+                      hasApplied={appliedJobs.includes(
+                        job.id,
+                      )}
+                      onToggleSave={() =>
+                        toggleSaveJob(
+                          job.id,
+                        )
+                      }
+                      onOpenInfo={() =>
+                        openJobDetails(
+                          job,
+                        )
+                      }
+                      onExpressInterest={() =>
+                        handleExpressInterest(
+                          job,
+                        )
+                      }
+                    />
+                  );
+                },
+              )
+            )}
+          </div>
+        )}
+
+        {/* =================================================
+            SAVED
+        ================================================== */}
+
+        {activeTab ===
+          'saved' && (
+          <div className="space-y-6">
+            <div
+              className="
+                rounded-[24px]
+                border
+                border-brand-border
+                bg-white/95
+                p-5
+                shadow-[0_14px_34px_rgba(0,70,109,0.06)]
+              "
+            >
+              <div
+                className="
+                  flex
+                  items-center
+                  gap-3
+                "
+              >
+                <div
+                  className="
+                    grid
+                    h-11
+                    w-11
+                    place-items-center
+                    rounded-[14px]
+                    border
+                    border-brand-gold/35
+                    bg-brand-gold/10
+                  "
+                >
+                  <Bookmark
                     className="
-                      h-11
-                      w-full
-                      rounded-xl
-                      border
-                      border-[#D4E2EA]
-                      bg-white
-                      pl-10
-                      pr-4
-                      text-sm
-                      text-[#334155]
-                      outline-none
-                      transition
-                      placeholder:text-[#94A3B8]
-                      focus:border-[#1E92D2]
-                      focus:ring-2
-                      focus:ring-[#1E92D2]/10
+                      h-5
+                      w-5
+                      fill-brand-gold
+                      text-brand-gold
                     "
                   />
                 </div>
 
-                <select
-                  value={jobFilter}
-                  onChange={(event) =>
-                    setJobFilter(
-                      event.target.value
-                    )
-                  }
-                  className="
-                    h-11
-                    rounded-xl
-                    border
-                    border-[#D4E2EA]
-                    bg-white
-                    px-3
-                    text-sm
-                    font-medium
-                    text-[#334155]
-                    outline-none
-                    focus:border-[#1E92D2]
-                  "
-                >
-                  {departments.map(
-                    (department) => (
-                      <option
-                        key={department}
-                        value={department}
-                      >
-                        {department ===
-                        "All"
-                          ? "All departments"
-                          : department}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* =====================================================
-            COMPANIES
-        ===================================================== */}
-
-        {activeTab === "companies" && (
-          <section>
-            {loadingJobs ? (
-              <LoadingState text="Loading companies..." />
-            ) : companies.length ===
-              0 ? (
-              <EmptyState
-                icon={
-                  <Building2 className="h-8 w-8" />
-                }
-                title="No companies available"
-                message="There are currently no employers with open roles to display."
-              />
-            ) : (
-              <div className="grid gap-5 lg:grid-cols-2">
-                {companies.map(
-                  renderCompanyCard
-                )}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* =====================================================
-            OPEN ROLES
-        ===================================================== */}
-
-        {activeTab === "jobs" && (
-          <section>
-            {loadingJobs ? (
-              <LoadingState text="Loading open roles..." />
-            ) : jobError ? (
-              <EmptyState
-                icon={
-                  <Briefcase className="h-8 w-8" />
-                }
-                title="Open roles could not be loaded"
-                message={jobError}
-                action={
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.location.reload()
-                    }
-                    className="rounded-xl bg-[#00466D] px-4 py-2.5 text-sm font-bold text-white"
-                  >
-                    Try Again
-                  </button>
-                }
-              />
-            ) : filteredJobs.length ===
-              0 ? (
-              <EmptyState
-                icon={
-                  <Search className="h-8 w-8" />
-                }
-                title={
-                  jobs.length === 0
-                    ? "No open roles available"
-                    : "No matching roles"
-                }
-                message={
-                  jobs.length === 0
-                    ? "There are currently no active job opportunities."
-                    : "Try changing your search or department filter."
-                }
-                action={
-                  jobs.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setJobSearchQuery(
-                          ""
-                        );
-                        setJobFilter(
-                          "All"
-                        );
-                      }}
-                      className="rounded-xl bg-[#00466D] px-4 py-2.5 text-sm font-bold text-white"
-                    >
-                      Clear Filters
-                    </button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-[#00273D]">
-                      Open Roles
-                    </h2>
-
-                    <p className="mt-1 text-sm text-[#64748B]">
-                      {filteredJobs.length} role
-                      {filteredJobs.length ===
-                      1
-                        ? ""
-                        : "s"}{" "}
-                      available
-                    </p>
-                  </div>
-                </div>
-
-                {filteredJobs.map(
-                  renderJobCard
-                )}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* =====================================================
-            SAVED JOBS
-        ===================================================== */}
-
-        {activeTab === "saved" && (
-          <section>
-            {savedJobList.length ===
-            0 ? (
-              <EmptyState
-                icon={
-                  <Bookmark className="h-8 w-8" />
-                }
-                title="No saved jobs yet"
-                message="Save roles you're interested in and they'll appear here."
-                action={
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveTab("jobs")
-                    }
-                    className="rounded-xl bg-[#00466D] px-4 py-2.5 text-sm font-bold text-white"
-                  >
-                    Browse Open Roles
-                  </button>
-                }
-              />
-            ) : (
-              <div className="space-y-5">
                 <div>
-                  <h2 className="text-lg font-bold text-[#00273D]">
-                    Saved Roles
+                  <h2
+                    className="
+                      !m-0
+                      text-[20px]
+                      font-bold
+                      !text-brand-primary
+                    "
+                  >
+                    Saved
                   </h2>
 
-                  <p className="mt-1 text-sm text-[#64748B]">
-                    Jobs you've saved for later.
+                  <p
+                    className="
+                      mt-1
+                      text-[12px]
+                      text-brand-textMuted
+                    "
+                  >
+                    Companies and roles you bookmarked for later.
                   </p>
                 </div>
-
-                {savedJobList.map(
-                  renderJobCard
-                )}
               </div>
+            </div>
+
+            {!hasSavedItems ? (
+              <SavedEmptyState
+                onBrowse={() =>
+                  setActiveTab(
+                    'companies',
+                  )
+                }
+              />
+            ) : (
+              <>
+                {savedCompanyItems.length >
+                  0 && (
+                  <section className="space-y-4">
+                    <SavedSectionHeading
+                      icon={
+                        <Building2 className="h-4 w-4" />
+                      }
+                      title="Saved Companies"
+                    />
+
+                    {savedCompanyItems.map(
+                      (
+                        company,
+                      ) => (
+                        <CompanyCard
+                          key={
+                            company.name
+                          }
+                          company={
+                            company
+                          }
+                          isSaved
+                          onMessage={() =>
+                            handleContactCompany(
+                              company.name,
+                            )
+                          }
+                          onToggleSave={() =>
+                            toggleSaveCompany(
+                              company.name,
+                            )
+                          }
+                          onOpenInfo={() =>
+                            openCompanyDetails(
+                              company,
+                            )
+                          }
+                          onReport={() =>
+                            onReport(
+                              company.name,
+                            )
+                          }
+                          onDismiss={() =>
+                            setDismissed(
+                              (
+                                current,
+                              ) =>
+                                current.includes(
+                                  company.name,
+                                )
+                                  ? current
+                                  : [
+                                      ...current,
+                                      company.name,
+                                    ],
+                            )
+                          }
+                        />
+                      ),
+                    )}
+                  </section>
+                )}
+
+                {savedJobItems.length >
+                  0 && (
+                  <section className="space-y-3">
+                    <SavedSectionHeading
+                      icon={
+                        <Briefcase className="h-4 w-4" />
+                      }
+                      title="Saved Jobs"
+                    />
+
+                    {savedJobItems.map(
+                      (
+                        job,
+                      ) => {
+                        const company =
+                          COMPANIES.find(
+                            (
+                              item,
+                            ) =>
+                              item.name ===
+                              job.company,
+                          );
+
+                        return (
+                          <JobCard
+                            key={
+                              job.id
+                            }
+                            job={
+                              job
+                            }
+                            company={
+                              company
+                            }
+                            isSaved
+                            hasApplied={appliedJobs.includes(
+                              job.id,
+                            )}
+                            onToggleSave={() =>
+                              toggleSaveJob(
+                                job.id,
+                              )
+                            }
+                            onOpenInfo={() =>
+                              openJobDetails(
+                                job,
+                              )
+                            }
+                            onExpressInterest={() =>
+                              handleExpressInterest(
+                                job,
+                              )
+                            }
+                          />
+                        );
+                      },
+                    )}
+                  </section>
+                )}
+              </>
             )}
-          </section>
+          </div>
         )}
       </main>
 
-      {/* =======================================================
-          JOB MORE INFO MODAL
-      ======================================================= */}
+      {/* =====================================================
+          DETAILS MODAL
+      ====================================================== */}
 
-      {selectedJob && (
-        <div
-          className="
-            fixed
-            left-0
-            right-0
-            bottom-0
-            top-[88px]
-            z-[100]
-            flex
-            items-center
-            justify-center
-            bg-[#00273D]/50
-            p-3
-            sm:p-4
-            backdrop-blur-sm
-          "
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setSelectedJob(null);
-            }
+      {selectedItemDetails && (
+        <DetailModal
+          details={
+            selectedItemDetails
+          }
+          isApplied={
+            selectedItemDetails.type ===
+              'job' &&
+            selectedItemDetails.jobId !==
+              undefined
+              ? appliedJobs.includes(
+                  selectedItemDetails.jobId,
+                )
+              : false
+          }
+          onClose={() =>
+            setSelectedItemDetails(
+              null,
+            )
+          }
+          onContact={(
+            companyName,
+          ) => {
+            setSelectedItemDetails(
+              null,
+            );
+
+            handleContactCompany(
+              companyName,
+            );
           }}
-        >
-          <div
-            className="
-              flex
-              h-[calc(100dvh-88px)]
-              max-h-[calc(100dvh-88px)]
-              w-full
-              max-w-4xl
-              flex-col
-              overflow-hidden
-              rounded-[28px]
-              bg-[#F8FCFF]
-              shadow-[0_30px_90px_rgba(0,39,61,0.30)]
-            "
-          >
-            {/* Modal header */}
-            <div className="relative shrink-0 border-b border-[#D4E2EA] bg-white px-5 py-5 sm:px-7">
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedJob(null)
-                }
-                className="
-                  absolute
-                  right-4
-                  top-4
-                  flex
-                  h-10
-                  w-10
-                  items-center
-                  justify-center
-                  rounded-xl
-                  border
-                  border-[#D4E2EA]
-                  bg-white
-                  text-[#64748B]
-                  transition
-                  hover:border-[#00466D]
-                  hover:text-[#00466D]
-                "
-                aria-label="Close job details"
-              >
-                <X className="h-5 w-5" />
-              </button>
+          onExpressInterest={(
+            jobId,
+          ) => {
+            const job =
+              JOBS.find(
+                (
+                  item,
+                ) =>
+                  item.id ===
+                  jobId,
+              );
 
-              <div className="flex items-start gap-4 pr-12">
-                <CompanyAvatar
-                  name={safeText(
-                    selectedJob.companyName,
-                    "Company"
-                  )}
-                  size="lg"
-                />
-
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[#E9FFF4] px-3 py-1 text-xs font-bold text-[#16804A]">
-                      Open Position
-                    </span>
-
-                    {selectedJob.applicationDeadline && (
-                      <span className="rounded-full bg-[#EEF8FD] px-3 py-1 text-xs font-semibold text-[#00466D]">
-                        Apply by{" "}
-                        {formatDate(
-                          selectedJob.applicationDeadline
-                        )}
-                      </span>
-                    )}
-                  </div>
-
-                  <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#00273D] sm:text-3xl">
-                    {safeText(
-                      selectedJob.title,
-                      "Untitled position"
-                    )}
-                  </h2>
-
-                  <p className="mt-1 text-base font-semibold text-[#00466D]">
-                    {safeText(
-                      selectedJob.companyName,
-                      "Company"
-                    )}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-[#64748B]">
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4" />
-                      {safeText(
-                        selectedJob.location
-                      )}
-                    </span>
-
-                    <span className="inline-flex items-center gap-1.5">
-                      <Briefcase className="h-4 w-4" />
-                      {formatEmploymentType(
-                        selectedJob.type
-                      )}
-                    </span>
-
-                    <span className="inline-flex items-center gap-1.5">
-                      <Building2 className="h-4 w-4" />
-                      {formatWorkplaceType(
-                        selectedJob.workplaceType
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal body */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-7">
-              <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
-                <div className="space-y-5">
-                  {/* About this role */}
-                  <JobDetailSection
-                    title="About this role"
-                    icon={
-                      <Briefcase className="h-5 w-5" />
-                    }
-                  >
-                    <p className="whitespace-pre-line text-sm leading-7 text-[#475569]">
-                      {safeText(
-                        selectedJob.description,
-                        "The employer has not provided a detailed description for this role yet."
-                      )}
-                    </p>
-                  </JobDetailSection>
-
-                  {/* Responsibilities */}
-                  <JobDetailSection
-                    title="What you'll do"
-                    icon={
-                      <CheckCircle2 className="h-5 w-5" />
-                    }
-                  >
-                    {(() => {
-                      const items =
-                        splitTextList(
-                          selectedJob.responsibilities
-                        );
-
-                      if (
-                        items.length ===
-                        0
-                      ) {
-                        return (
-                          <p className="text-sm leading-6 text-[#64748B]">
-                            Responsibilities have
-                            not been provided for
-                            this position.
-                          </p>
-                        );
-                      }
-
-                      return (
-                        <ul className="space-y-3">
-                          {items.map(
-                            (
-                              item,
-                              index
-                            ) => (
-                              <li
-                                key={`${item}-${index}`}
-                                className="flex gap-3 text-sm leading-6 text-[#475569]"
-                              >
-                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#FFAD01]" />
-                                <span>
-                                  {item}
-                                </span>
-                              </li>
-                            )
-                          )}
-                        </ul>
-                      );
-                    })()}
-                  </JobDetailSection>
-
-                  {/* Requirements */}
-                  <JobDetailSection
-                    title="What we're looking for"
-                    icon={
-                      <Users className="h-5 w-5" />
-                    }
-                  >
-                    <div className="space-y-5">
-                      <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#94A3B8]">
-                          Experience
-                        </p>
-
-                        <p className="whitespace-pre-line text-sm leading-6 text-[#475569]">
-                          {safeText(
-                            selectedJob.experienceRequired,
-                            "Experience requirements have not been provided."
-                          )}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#94A3B8]">
-                          Qualifications
-                        </p>
-
-                        <p className="whitespace-pre-line text-sm leading-6 text-[#475569]">
-                          {safeText(
-                            selectedJob.qualifications,
-                            "Qualification requirements have not been provided."
-                          )}
-                        </p>
-                      </div>
-
-                      {normaliseList(
-                        selectedJob.skills
-                      ).length >
-                        0 && (
-                        <div>
-                          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#94A3B8]">
-                            Skills
-                          </p>
-
-                          <div className="flex flex-wrap gap-2">
-                            {normaliseList(
-                              selectedJob.skills
-                            ).map(
-                              (skill) => (
-                                <span
-                                  key={
-                                    skill
-                                  }
-                                  className="rounded-full border border-[#D4E2EA] bg-[#F8FCFF] px-3 py-1.5 text-xs font-semibold text-[#334155]"
-                                >
-                                  {skill}
-                                </span>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </JobDetailSection>
-
-                  {/* Benefits */}
-                  <JobDetailSection
-                    title="What you get"
-                    icon={
-                      <CheckCircle2 className="h-5 w-5" />
-                    }
-                  >
-                    {(() => {
-                      const items =
-                        splitTextList(
-                          selectedJob.benefits
-                        );
-
-                      if (
-                        items.length ===
-                        0
-                      ) {
-                        return (
-                          <p className="text-sm leading-6 text-[#64748B]">
-                            Benefits have not
-                            been provided for
-                            this position.
-                          </p>
-                        );
-                      }
-
-                      return (
-                        <ul className="space-y-3">
-                          {items.map(
-                            (
-                              item,
-                              index
-                            ) => (
-                              <li
-                                key={`${item}-${index}`}
-                                className="flex gap-3 text-sm leading-6 text-[#475569]"
-                              >
-                                <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#16804A]" />
-                                <span>
-                                  {item}
-                                </span>
-                              </li>
-                            )
-                          )}
-                        </ul>
-                      );
-                    })()}
-                  </JobDetailSection>
-                </div>
-
-                {/* Right information column */}
-                <aside className="space-y-4">
-                  <div className="rounded-2xl border border-[#D4E2EA] bg-white p-5">
-                    <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-[#94A3B8]">
-                      Job information
-                    </h3>
-
-                    <div className="space-y-4">
-                      <InfoRow
-                        icon={
-                          <span className="font-bold text-sm">
-                            R
-                          </span>
-                        }
-                        label="Salary"
-                        value={formatSalary(
-                          selectedJob
-                        )}
-                      />
-
-                      <InfoRow
-                        icon={
-                          <MapPin className="h-4 w-4" />
-                        }
-                        label="Location"
-                        value={safeText(
-                          selectedJob.location
-                        )}
-                      />
-
-                      <InfoRow
-                        icon={
-                          <Building2 className="h-4 w-4" />
-                        }
-                        label="Workplace"
-                        value={formatWorkplaceType(
-                          selectedJob.workplaceType
-                        )}
-                      />
-
-                      <InfoRow
-                        icon={
-                          <Briefcase className="h-4 w-4" />
-                        }
-                        label="Employment"
-                        value={formatEmploymentType(
-                          selectedJob.type
-                        )}
-                      />
-
-                      <InfoRow
-                        icon={
-                          <Layers3 className="h-4 w-4" />
-                        }
-                        label="Department"
-                        value={safeText(
-                          selectedJob.department,
-                          "Not specified"
-                        )}
-                      />
-
-                      <InfoRow
-                        icon={
-                          <Users className="h-4 w-4" />
-                        }
-                        label="Openings"
-                        value={
-                          selectedJob.openings !=
-                          null
-                            ? String(
-                                selectedJob.openings
-                              )
-                            : "Not specified"
-                        }
-                      />
-
-                      <InfoRow
-                        icon={
-                          <CalendarDays className="h-4 w-4" />
-                        }
-                        label="Posted"
-                        value={formatDate(
-                          selectedJob.postedDate
-                        )}
-                      />
-
-                      <InfoRow
-                        icon={
-                          <Clock3 className="h-4 w-4" />
-                        }
-                        label="Deadline"
-                        value={
-                          selectedJob.applicationDeadline
-                            ? formatDate(
-                                selectedJob.applicationDeadline
-                              )
-                            : "Not specified"
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  {/* Company */}
-                  <div className="rounded-2xl border border-[#D4E2EA] bg-white p-5">
-                    <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-[#94A3B8]">
-                      Company
-                    </h3>
-
-                    <div className="flex items-center gap-3">
-                      <CompanyAvatar
-                        name={safeText(
-                          selectedJob.companyName,
-                          "Company"
-                        )}
-                        size="sm"
-                      />
-
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-[#00273D]">
-                          {safeText(
-                            selectedJob.companyName,
-                            "Company"
-                          )}
-                        </p>
-
-                        <p className="mt-1 text-xs text-[#64748B]">
-                          {safeText(
-                            selectedJob.location
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const companyName =
-                          safeText(
-                            selectedJob.companyName,
-                            "Company"
-                          );
-
-                        const companyJobs =
-                          jobs.filter(
-                            (job) =>
-                              safeText(
-                                job.companyName,
-                                "Company"
-                              ) ===
-                              companyName
-                          );
-
-                        setSelectedJob(
-                          null
-                        );
-
-                        setSelectedCompany({
-                          name: companyName,
-                          jobs: companyJobs,
-                        });
-                      }}
-                      className="
-                        mt-4
-                        flex
-                        w-full
-                        items-center
-                        justify-center
-                        gap-2
-                        rounded-xl
-                        border
-                        border-[#D4E2EA]
-                        px-4
-                        py-2.5
-                        text-sm
-                        font-bold
-                        text-[#00466D]
-                        transition
-                        hover:border-[#00466D]
-                        hover:bg-[#F8FCFF]
-                      "
-                    >
-                      View Company
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </aside>
-              </div>
-            </div>
-
-            {/* Modal footer */}
-            <div className="shrink-0 border-t border-[#D4E2EA] bg-white px-5 py-4 sm:px-7">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  onClick={() =>
-                    toggleSaveJob(
-                      selectedJob.id
-                    )
-                  }
-                  className="
-                    inline-flex
-                    items-center
-                    justify-center
-                    gap-2
-                    rounded-xl
-                    border
-                    border-[#D4E2EA]
-                    px-4
-                    py-3
-                    text-sm
-                    font-bold
-                    text-[#00466D]
-                  "
-                >
-                  {savedJobs.includes(
-                    selectedJob.id
-                  ) ? (
-                    <>
-                      <BookmarkCheck className="h-4 w-4 text-[#FFAD01]" />
-                      Saved
-                    </>
-                  ) : (
-                    <>
-                      <Bookmark className="h-4 w-4" />
-                      Save Job
-                    </>
-                  )}
-                </button>
-
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    disabled={appliedJobs.includes(
-                      selectedJob.id
-                    )}
-                    onClick={() =>
-                      handleExpressInterest(
-                        selectedJob
-                      )
-                    }
-                    className={`
-                      inline-flex
-                      items-center
-                      justify-center
-                      gap-2
-                      rounded-xl
-                      px-5
-                      py-3
-                      text-sm
-                      font-bold
-                      ${
-                        appliedJobs.includes(
-                          selectedJob.id
-                        )
-                          ? "bg-[#E9FFF4] text-[#16804A]"
-                          : "bg-[#FFAD01] text-[#00273D] hover:bg-[#FFD784]"
-                      }
-                    `}
-                  >
-                    {appliedJobs.includes(
-                      selectedJob.id
-                    ) ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4" />
-                        Interest Submitted
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        Express Interest
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =======================================================
-          COMPANY MORE INFO MODAL
-      ======================================================= */}
-
-      {selectedCompany && (
-        <div
-          className="
-            fixed
-            left-0
-            right-0
-            bottom-0
-            top-[88px]
-            z-[100]
-            flex
-            items-center
-            justify-center
-            bg-[#00273D]/50
-            p-3
-            sm:p-4
-            backdrop-blur-sm
-          "
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              setSelectedCompany(null);
+            if (!job) {
+              return;
             }
+
+            handleExpressInterest(
+              job,
+            );
           }}
-        >
-          <div
-            className="
-              flex
-              h-[calc(100dvh-88px)]
-              max-h-[calc(100dvh-88px)]
-              w-full
-              max-w-3xl
-              flex-col
-              overflow-hidden
-              rounded-[28px]
-              bg-[#F8FCFF]
-              shadow-[0_30px_90px_rgba(0,39,61,0.30)]
-            "
-          >
-            {/* Header */}
-            <div className="shrink-0 border-b border-[#D4E2EA] bg-white px-5 py-5 sm:px-7">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <CompanyAvatar
-                    name={
-                      selectedCompany.name
-                    }
-                    size="lg"
-                  />
-
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#FFAD01]">
-                      Employer
-                    </p>
-
-                    <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#00273D]">
-                      {selectedCompany.name}
-                    </h2>
-
-                    <p className="mt-1 text-sm text-[#64748B]">
-                      {selectedCompany.jobs.length}{" "}
-                      open role
-                      {selectedCompany.jobs.length ===
-                      1
-                        ? ""
-                        : "s"}{" "}
-                      currently available
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedCompany(
-                      null
-                    )
-                  }
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#D4E2EA] text-[#64748B] hover:text-[#00466D]"
-                  aria-label="Close company details"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-7">
-              <div className="space-y-5">
-                <section className="rounded-2xl border border-[#D4E2EA] bg-white p-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-[#00466D]" />
-
-                    <h3 className="text-base font-bold text-[#00273D]">
-                      About this company
-                    </h3>
-                  </div>
-
-                  <p className="text-sm leading-7 text-[#475569]">
-                    {selectedCompany.name} is
-                    currently advertising{" "}
-                    {
-                      selectedCompany.jobs
-                        .length
-                    }{" "}
-                    open position
-                    {selectedCompany.jobs
-                      .length === 1
-                      ? ""
-                      : "s"}{" "}
-                    on TruCity.
-                  </p>
-
-                  <p className="mt-3 text-sm leading-7 text-[#64748B]">
-                    The company information shown
-                    here is based on the employer and
-                    role information currently available
-                    through TruCity. We do not display
-                    information that has not been supplied
-                    by the employer.
-                  </p>
-                </section>
-
-                <section className="rounded-2xl border border-[#D4E2EA] bg-white p-5">
-                  <h3 className="mb-4 text-base font-bold text-[#00273D]">
-                    Current opportunities
-                  </h3>
-
-                  <div className="space-y-3">
-                    {selectedCompany.jobs.map(
-                      (job) => (
-                        <button
-                          key={job.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCompany(
-                              null
-                            );
-                            setSelectedJob(
-                              job
-                            );
-                          }}
-                          className="
-                            flex
-                            w-full
-                            items-center
-                            justify-between
-                            gap-4
-                            rounded-2xl
-                            border
-                            border-[#E7EEF2]
-                            bg-[#F8FCFF]
-                            p-4
-                            text-left
-                            transition
-                            hover:border-[#FFAD01]
-                            hover:bg-[#FFFDF7]
-                          "
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-[#00273D]">
-                              {safeText(
-                                job.title,
-                                "Open position"
-                              )}
-                            </p>
-
-                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#64748B]">
-                              <span className="inline-flex items-center gap-1">
-                                <MapPin className="h-3.5 w-3.5" />
-                                {safeText(
-                                  job.location
-                                )}
-                              </span>
-
-                              <span className="inline-flex items-center gap-1">
-                                <Briefcase className="h-3.5 w-3.5" />
-                                {formatEmploymentType(
-                                  job.type
-                                )}
-                              </span>
-                            </div>
-                          </div>
-
-                          <ChevronRight className="h-5 w-5 shrink-0 text-[#94A3B8]" />
-                        </button>
-                      )
-                    )}
-                  </div>
-                </section>
-
-                <section className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-[#D4E2EA] bg-white p-5">
-                    <div className="mb-3 flex items-center gap-2 text-[#00466D]">
-                      <MapPin className="h-5 w-5" />
-
-                      <h3 className="text-sm font-bold">
-                        Locations
-                      </h3>
-                    </div>
-
-                    <div className="space-y-2">
-                      {Array.from(
-                        new Set(
-                          selectedCompany.jobs
-                            .map(
-                              (job) =>
-                                job.location?.trim()
-                            )
-                            .filter(Boolean)
-                        )
-                      ).map(
-                        (location) => (
-                          <p
-                            key={
-                              location
-                            }
-                            className="text-sm text-[#475569]"
-                          >
-                            {location}
-                          </p>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-[#D4E2EA] bg-white p-5">
-                    <div className="mb-3 flex items-center gap-2 text-[#00466D]">
-                      <Layers3 className="h-5 w-5" />
-
-                      <h3 className="text-sm font-bold">
-                        Areas of work
-                      </h3>
-                    </div>
-
-                    <div className="space-y-2">
-                      {Array.from(
-                        new Set(
-                          selectedCompany.jobs
-                            .map(
-                              (job) =>
-                                job.department?.trim()
-                            )
-                            .filter(Boolean)
-                        )
-                      ).map(
-                        (department) => (
-                          <p
-                            key={
-                              department
-                            }
-                            className="text-sm text-[#475569]"
-                          >
-                            {department}
-                          </p>
-                        )
-                      )}
-
-                      {selectedCompany.jobs.every(
-                        (job) =>
-                          !job.department?.trim()
-                      ) && (
-                        <p className="text-sm text-[#64748B]">
-                          Department information
-                          has not been provided.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-[#D4E2EA] bg-[#EEF8FD] p-5">
-                  <div className="flex gap-3">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#16804A]" />
-
-                    <div>
-                      <h3 className="text-sm font-bold text-[#00273D]">
-                        Information available on
-                        TruCity
-                      </h3>
-
-                      <p className="mt-1 text-sm leading-6 text-[#475569]">
-                        Job information is provided by
-                        the employer and displayed from
-                        the current TruCity listing.
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="shrink-0 border-t border-[#D4E2EA] bg-white px-5 py-4 sm:px-7">
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() =>
-                    dismissCompany(
-                      selectedCompany.name
-                    )
-                  }
-                  className="
-                    inline-flex
-                    items-center
-                    justify-center
-                    gap-2
-                    rounded-xl
-                    border
-                    border-[#D4E2EA]
-                    px-4
-                    py-3
-                    text-sm
-                    font-bold
-                    text-[#64748B]
-                    hover:border-[#FF4672]
-                    hover:text-[#A61B3C]
-                  "
-                >
-                  <Flag className="h-4 w-4" />
-                  Hide Company
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleReportCompany(
-                      selectedCompany.name
-                    )
-                  }
-                  className="
-                    inline-flex
-                    items-center
-                    justify-center
-                    gap-2
-                    rounded-xl
-                    border
-                    border-[#D4E2EA]
-                    px-4
-                    py-3
-                    text-sm
-                    font-bold
-                    text-[#A61B3C]
-                    hover:bg-[#FFF1F4]
-                  "
-                >
-                  <Flag className="h-4 w-4" />
-                  Report
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        />
       )}
     </div>
   );
 }
 
 /* =========================================================
-   INFO ROW
+   TAB BUTTON
 ========================================================= */
 
-function InfoRow({
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  children: ReactNode;
+}
+
+function TabButton({
+  active,
+  onClick,
   icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
+  children,
+}: TabButtonProps) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F8FCFF] text-[#00466D]">
+    <button
+      type="button"
+      onClick={
+        onClick
+      }
+      className={`
+        flex
+        shrink-0
+        items-center
+        justify-center
+        gap-2
+        rounded-[10px]
+        px-4
+        py-2.5
+        text-[12px]
+        font-bold
+        transition-all
+        duration-200
+
+        ${
+          active
+            ? `
+              bg-brand-primary
+              text-white
+              shadow-sm
+            `
+            : `
+              text-brand-textMuted
+              hover:bg-white
+              hover:text-brand-primary
+            `
+        }
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
+      `}
+    >
+      {icon}
+
+      {children}
+    </button>
+  );
+}
+
+/* =========================================================
+   FILTER ROW
+========================================================= */
+
+interface FilterRowProps {
+  filters: string[];
+  selected: string;
+
+  onSelect: (
+    value: string,
+  ) => void;
+}
+
+function FilterRow({
+  filters,
+  selected,
+  onSelect,
+}: FilterRowProps) {
+  return (
+    <div
+      className="
+        flex
+        gap-2
+        overflow-x-auto
+        pb-1
+      "
+    >
+      {filters.map(
+        (
+          item,
+        ) => {
+          const active =
+            selected ===
+            item;
+
+          return (
+            <button
+              key={
+                item
+              }
+              type="button"
+              onClick={() =>
+                onSelect(
+                  item,
+                )
+              }
+              className={`
+                shrink-0
+                rounded-full
+                border
+                px-3.5
+                py-1.5
+                text-[12px]
+                font-bold
+                transition-colors
+                duration-200
+
+                ${
+                  active
+                    ? `
+                      border-brand-accent
+                      bg-brand-accent/10
+                      text-brand-primary
+                    `
+                    : `
+                      border-brand-border
+                      bg-white
+                      text-brand-textMuted
+
+                      hover:border-brand-accent
+                      hover:text-brand-primary
+                    `
+                }
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/20
+              `}
+            >
+              {item}
+            </button>
+          );
+        },
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   JOB SEARCH
+========================================================= */
+
+interface JobSearchProps {
+  value: string;
+
+  onChange: (
+    value: string,
+  ) => void;
+}
+
+function JobSearch({
+  value,
+  onChange,
+}: JobSearchProps) {
+  return (
+    <div
+      className="
+        relative
+        flex
+        min-w-[220px]
+        flex-1
+        items-center
+      "
+    >
+      <Search
+        className="
+          pointer-events-none
+          absolute
+          left-4
+          h-4
+          w-4
+          text-brand-textMuted
+        "
+      />
+
+      <input
+        type="text"
+        value={
+          value
+        }
+        onChange={(
+          event:
+            ChangeEvent<HTMLInputElement>,
+        ) =>
+          onChange(
+            event.target.value,
+          )
+        }
+        placeholder="Search roles, locations or departments..."
+        className="
+          min-h-[46px]
+          w-full
+          rounded-[14px]
+          border
+          border-brand-border
+          bg-white
+          py-3
+          pl-11
+          pr-10
+          text-[14px]
+          font-normal
+          text-brand-text
+          outline-none
+          transition-all
+          duration-200
+          placeholder:text-brand-textMuted/70
+
+          hover:border-brand-accent/60
+
+          focus:border-brand-accent
+          focus:ring-4
+          focus:ring-brand-accent/10
+        "
+      />
+
+      {value && (
+        <button
+          type="button"
+          onClick={() =>
+            onChange(
+              '',
+            )
+          }
+          aria-label="Clear job search"
+          className="
+            absolute
+            right-3
+            rounded-lg
+            p-1
+            text-brand-textMuted
+            transition-colors
+
+            hover:bg-brand-bg
+            hover:text-brand-primary
+
+            focus-visible:outline-none
+            focus-visible:ring-4
+            focus-visible:ring-brand-accent/20
+          "
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   BOOKMARK BUTTON
+========================================================= */
+
+interface BookmarkButtonProps {
+  saved: boolean;
+  onClick: () => void;
+  savedLabel: string;
+  unsavedLabel: string;
+}
+
+function BookmarkButton({
+  saved,
+  onClick,
+  savedLabel,
+  unsavedLabel,
+}: BookmarkButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={(
+        event,
+      ) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        onClick();
+      }}
+      title={
+        saved
+          ? 'Remove bookmark'
+          : 'Save'
+      }
+      aria-label={
+        saved
+          ? savedLabel
+          : unsavedLabel
+      }
+      className={`
+        grid
+        h-10
+        w-10
+        shrink-0
+        place-items-center
+        rounded-[13px]
+        border
+        transition-all
+        duration-200
+
+        ${
+          saved
+            ? `
+              border-brand-gold
+              bg-brand-gold/10
+              text-brand-primary
+              shadow-[0_6px_16px_rgba(255,173,1,0.12)]
+            `
+            : `
+              border-brand-border
+              bg-white
+              text-brand-textMuted
+
+              hover:border-brand-gold
+              hover:bg-brand-gold/10
+              hover:text-brand-primary
+            `
+        }
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/20
+      `}
+    >
+      <Bookmark
+        className={`
+          h-4
+          w-4
+
+          ${
+            saved
+              ? 'fill-brand-gold text-brand-gold'
+              : ''
+          }
+        `}
+      />
+    </button>
+  );
+}
+
+/* =========================================================
+   COMPANY CARD
+========================================================= */
+
+interface CompanyCardProps {
+  company: Company;
+  isSaved: boolean;
+  onMessage: () => void;
+  onToggleSave: () => void;
+  onOpenInfo: () => void;
+  onReport: () => void;
+  onDismiss: () => void;
+}
+
+function CompanyCard({
+  company,
+  isSaved,
+  onMessage,
+  onToggleSave,
+  onOpenInfo,
+  onReport,
+  onDismiss,
+}: CompanyCardProps) {
+  const industryStyle =
+    INDUSTRY_COLORS[
+      company.industry
+    ];
+
+  return (
+    <article
+      className="
+        w-full
+        overflow-hidden
+        rounded-[24px]
+        border
+        border-brand-border
+        bg-white/95
+        shadow-[0_16px_40px_rgba(0,70,109,0.08)]
+        transition-all
+        duration-200
+
+        hover:-translate-y-0.5
+        hover:border-brand-accent/40
+        hover:shadow-[0_22px_50px_rgba(0,70,109,0.12)]
+      "
+    >
+      <div
+        className="
+          flex
+          items-start
+          gap-4
+          p-5
+
+          sm:p-6
+        "
+      >
+        <CompanyAvatar
+          name={
+            company.name
+          }
+          industry={
+            company.industry
+          }
+        />
+
+        <div
+          className="
+            min-w-0
+            flex-1
+          "
+        >
+          <div
+            className="
+              flex
+              items-start
+              justify-between
+              gap-3
+            "
+          >
+            <div className="min-w-0">
+              <h2
+                className="
+                  !m-0
+                  text-[18px]
+                  font-bold
+                  tracking-[-0.02em]
+                  !text-brand-primary
+
+                  sm:text-[20px]
+                "
+              >
+                {company.name}
+              </h2>
+
+              <div
+                className="
+                  mt-2
+                  flex
+                  flex-wrap
+                  items-center
+                  gap-2
+                  text-[12px]
+                  text-brand-textMuted
+                "
+              >
+                <span
+                  className={`
+                    rounded-full
+                    border
+                    px-2.5
+                    py-1
+                    font-bold
+                    ${industryStyle.badge}
+                  `}
+                >
+                  {company.industry}
+                </span>
+
+                <span
+                  className="
+                    flex
+                    items-center
+                    gap-1
+                  "
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+
+                  {company.location}
+                </span>
+              </div>
+            </div>
+
+            <BookmarkButton
+              saved={
+                isSaved
+              }
+              onClick={
+                onToggleSave
+              }
+              savedLabel={`Remove ${company.name} from saved`}
+              unsavedLabel={`Save ${company.name}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="
+          space-y-5
+          px-5
+          pb-6
+
+          sm:px-6
+        "
+      >
+        <p
+          className="
+            max-w-[900px]
+            text-[14px]
+            leading-6
+            text-brand-textMuted
+          "
+        >
+          {company.bio}
+        </p>
+
+        <div
+          className="
+            rounded-[18px]
+            border
+            border-brand-border
+            bg-brand-bg
+            p-4
+          "
+        >
+          <div
+            className="
+              mb-3
+              flex
+              items-center
+              gap-2
+              text-[10px]
+              font-bold
+              uppercase
+              tracking-[0.16em]
+              text-brand-primary
+            "
+          >
+            <Layers className="h-3.5 w-3.5 text-brand-accent" />
+
+            Open Roles
+          </div>
+
+          <div
+            className="
+              flex
+              flex-wrap
+              gap-2
+            "
+          >
+            {company.roles.map(
+              (
+                role,
+              ) => (
+                <span
+                  key={
+                    role
+                  }
+                  className="
+                    rounded-[10px]
+                    border
+                    border-brand-border
+                    bg-white
+                    px-3
+                    py-1.5
+                    text-[12px]
+                    font-bold
+                    text-brand-textMuted
+                  "
+                >
+                  {role}
+                </span>
+              ),
+            )}
+          </div>
+        </div>
+
+        <div
+          className="
+            flex
+            flex-wrap
+            items-center
+            gap-2
+            border-t
+            border-brand-border
+            pt-4
+          "
+        >
+          <PrimaryActionButton
+            onClick={
+              onMessage
+            }
+            icon={
+              <MessageSquare className="h-4 w-4" />
+            }
+          >
+            Message Company
+          </PrimaryActionButton>
+
+          <button
+            type="button"
+            onClick={
+              onOpenInfo
+            }
+            className="
+              flex
+              min-h-[42px]
+              items-center
+              gap-1.5
+              rounded-[13px]
+              border
+              border-brand-border
+              bg-white
+              px-4
+              text-[12px]
+              font-bold
+              text-brand-textMuted
+              transition-colors
+
+              hover:border-brand-primary
+              hover:text-brand-primary
+
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-brand-accent/20
+            "
+          >
+            More Info
+
+            <ChevronRight className="h-4 w-4" />
+          </button>
+
+          <div
+            className="
+              ml-auto
+              flex
+              items-center
+              gap-1
+            "
+          >
+            <button
+              type="button"
+              onClick={
+                onReport
+              }
+              title="Report company"
+              aria-label={`Report ${company.name}`}
+              className="
+                grid
+                h-10
+                w-10
+                place-items-center
+                rounded-[12px]
+                text-brand-textMuted
+                transition-colors
+
+                hover:bg-brand-crimson/10
+                hover:text-brand-crimson
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-crimson/15
+              "
+            >
+              <Flag className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={
+                onDismiss
+              }
+              title="Dismiss company"
+              aria-label={`Dismiss ${company.name}`}
+              className="
+                grid
+                h-10
+                w-10
+                place-items-center
+                rounded-[12px]
+                text-brand-textMuted
+                transition-colors
+
+                hover:bg-brand-bg
+                hover:text-brand-primary
+
+                focus-visible:outline-none
+                focus-visible:ring-4
+                focus-visible:ring-brand-accent/20
+              "
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/* =========================================================
+   JOB CARD
+========================================================= */
+
+interface JobCardProps {
+  job: Job;
+  company?: Company;
+  isSaved: boolean;
+  hasApplied: boolean;
+  onToggleSave: () => void;
+  onOpenInfo: () => void;
+  onExpressInterest: () => void;
+}
+
+function JobCard({
+  job,
+  company,
+  isSaved,
+  hasApplied,
+  onToggleSave,
+  onOpenInfo,
+  onExpressInterest,
+}: JobCardProps) {
+  return (
+    <article
+      className="
+        flex
+        w-full
+        flex-col
+        justify-between
+        gap-4
+        rounded-[22px]
+        border
+        border-brand-border
+        bg-white/95
+        p-5
+        shadow-[0_14px_36px_rgba(0,70,109,0.07)]
+        transition-all
+        duration-200
+
+        hover:-translate-y-0.5
+        hover:border-brand-accent/40
+        hover:shadow-[0_20px_45px_rgba(0,70,109,0.11)]
+
+        sm:flex-row
+        sm:items-center
+      "
+    >
+      <div
+        className="
+          flex
+          items-start
+          gap-4
+        "
+      >
+        <CompanyAvatar
+          name={
+            job.company
+          }
+          industry={
+            company?.industry
+          }
+        />
+
+        <div className="space-y-1.5">
+          <h3
+            className="
+              !m-0
+              text-[16px]
+              font-bold
+              tracking-[-0.015em]
+              !text-brand-primary
+
+              sm:text-[18px]
+            "
+          >
+            {job.title}
+          </h3>
+
+          <div
+            className="
+              flex
+              flex-wrap
+              items-center
+              gap-2
+              text-[12px]
+              text-brand-textMuted
+            "
+          >
+            <span
+              className="
+                font-bold
+                text-brand-text
+              "
+            >
+              {job.company}
+            </span>
+
+            <span>•</span>
+
+            <span
+              className="
+                flex
+                items-center
+                gap-1
+              "
+            >
+              <MapPin className="h-3.5 w-3.5" />
+
+              {job.location}
+            </span>
+
+            <span>•</span>
+
+            <span
+              className="
+                flex
+                items-center
+                gap-1
+              "
+            >
+              <Clock className="h-3.5 w-3.5" />
+
+              {job.posted}
+            </span>
+          </div>
+
+          <span
+            className="
+              inline-flex
+              rounded-full
+              border
+              border-brand-border
+              bg-brand-surface
+              px-3
+              py-1
+              text-[11px]
+              font-bold
+              text-brand-primary
+            "
+          >
+            {job.salary}
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="
+          flex
+          flex-wrap
+          items-center
+          gap-2
+          self-end
+
+          sm:self-auto
+        "
+      >
+        <button
+          type="button"
+          onClick={
+            onOpenInfo
+          }
+          className="
+            min-h-[40px]
+            rounded-[12px]
+            border
+            border-brand-border
+            bg-white
+            px-3.5
+            text-[12px]
+            font-bold
+            text-brand-textMuted
+            transition-colors
+
+            hover:border-brand-primary
+            hover:text-brand-primary
+
+            focus-visible:outline-none
+            focus-visible:ring-4
+            focus-visible:ring-brand-accent/20
+          "
+        >
+          More Info
+        </button>
+
+        <BookmarkButton
+          saved={
+            isSaved
+          }
+          onClick={
+            onToggleSave
+          }
+          savedLabel={`Remove ${job.title} from saved`}
+          unsavedLabel={`Save ${job.title}`}
+        />
+
+        <button
+          type="button"
+          onClick={
+            onExpressInterest
+          }
+          disabled={
+            hasApplied
+          }
+          className={`
+            flex
+            min-h-[40px]
+            items-center
+            gap-2
+            rounded-[12px]
+            px-4
+            text-[12px]
+            font-bold
+            transition-all
+            duration-200
+
+            ${
+              hasApplied
+                ? `
+                  cursor-default
+                  border
+                  border-brand-emerald
+                  bg-brand-emerald/10
+                  text-brand-primary
+                `
+                : `
+                  text-white
+                  shadow-[0_8px_20px_rgba(0,70,109,0.16)]
+
+                  hover:-translate-y-0.5
+                `
+            }
+
+            focus-visible:outline-none
+            focus-visible:ring-4
+            focus-visible:ring-brand-accent/20
+          `}
+          style={
+            hasApplied
+              ? undefined
+              : {
+                  background:
+                    'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+                }
+          }
+        >
+          {hasApplied ? (
+            <>
+              <CheckCircle2
+                className="
+                  h-3.5
+                  w-3.5
+                  text-brand-emerald
+                "
+              />
+
+              Applied
+            </>
+          ) : (
+            <>
+              <Send className="h-3.5 w-3.5" />
+
+              Express Interest
+            </>
+          )}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/* =========================================================
+   PRIMARY ACTION
+========================================================= */
+
+interface PrimaryActionButtonProps {
+  onClick: () => void;
+  icon?: ReactNode;
+  children: ReactNode;
+}
+
+function PrimaryActionButton({
+  onClick,
+  icon,
+  children,
+}: PrimaryActionButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={
+        onClick
+      }
+      className="
+        flex
+        min-h-[42px]
+        items-center
+        justify-center
+        gap-2
+        rounded-[13px]
+        px-4
+        text-[12px]
+        font-bold
+        text-white
+        shadow-[0_8px_20px_rgba(0,70,109,0.16)]
+        transition-all
+        duration-200
+
+        hover:-translate-y-0.5
+
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-brand-accent/25
+      "
+      style={{
+        background:
+          'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+      }}
+    >
+      {icon}
+
+      {children}
+    </button>
+  );
+}
+
+/* =========================================================
+   SAVED SECTION HEADING
+========================================================= */
+
+interface SavedSectionHeadingProps {
+  icon: ReactNode;
+  title: string;
+}
+
+function SavedSectionHeading({
+  icon,
+  title,
+}: SavedSectionHeadingProps) {
+  return (
+    <div
+      className="
+        flex
+        items-center
+        gap-2
+      "
+    >
+      <div
+        className="
+          grid
+          h-9
+          w-9
+          place-items-center
+          rounded-[12px]
+          bg-brand-accent/10
+          text-brand-primary
+        "
+      >
         {icon}
       </div>
 
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
-          {label}
-        </p>
-
-        <p className="mt-0.5 break-words text-sm font-semibold text-[#334155]">
-          {value}
-        </p>
-      </div>
+      <h3
+        className="
+          !m-0
+          text-[18px]
+          font-bold
+          !text-brand-primary
+        "
+      >
+        {title}
+      </h3>
     </div>
   );
 }
 
 /* =========================================================
-   LOADING
+   DETAILS MODAL
 ========================================================= */
 
-function LoadingState({
-  text,
-}: {
-  text: string;
-}) {
-  return (
-    <div className="rounded-[24px] border border-[#D4E2EA] bg-white p-10 text-center shadow-[0_12px_35px_rgba(0,70,109,0.06)]">
-      <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#D4E2EA] border-t-[#00466D]" />
+interface DetailModalProps {
+  details: ItemDetails;
+  isApplied: boolean;
+  onClose: () => void;
 
-      <p className="text-sm font-semibold text-[#64748B]">
-        {text}
-      </p>
+  onContact: (
+    company: string,
+  ) => void;
+
+  onExpressInterest: (
+    jobId: number,
+  ) => void;
+}
+
+function DetailModal({
+  details,
+  isApplied,
+  onClose,
+  onContact,
+  onExpressInterest,
+}: DetailModalProps) {
+  return (
+    <div
+      className="
+        fixed
+        inset-0
+        z-[100]
+        flex
+        items-center
+        justify-center
+        bg-brand-dark/35
+        p-4
+        backdrop-blur-md
+      "
+    >
+      <div
+        className="
+          flex
+          w-full
+          max-w-lg
+          flex-col
+          overflow-hidden
+          rounded-[28px]
+          border
+          border-brand-border
+          bg-white
+          shadow-[0_35px_100px_rgba(0,70,109,0.24)]
+        "
+      >
+        <div
+          className="
+            flex
+            items-start
+            justify-between
+            gap-4
+            border-b
+            border-brand-border
+            bg-brand-bg
+            p-5
+
+            sm:p-6
+          "
+        >
+          <div>
+            <h3
+              className="
+                !m-0
+                text-[22px]
+                font-bold
+                tracking-[-0.025em]
+                !text-brand-primary
+              "
+            >
+              {details.title}
+            </h3>
+
+            <p
+              className="
+                mt-1
+                text-[12px]
+                font-bold
+                text-brand-accent
+              "
+            >
+              {details.subtitle}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={
+              onClose
+            }
+            aria-label="Close details"
+            className="
+              grid
+              h-9
+              w-9
+              place-items-center
+              rounded-[12px]
+              border
+              border-brand-border
+              bg-white
+              text-brand-textMuted
+              transition-colors
+
+              hover:border-brand-primary
+              hover:text-brand-primary
+
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-brand-accent/20
+            "
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div
+          className="
+            max-h-[60vh]
+            space-y-6
+            overflow-y-auto
+            p-5
+
+            sm:p-6
+          "
+        >
+          <div>
+            <h4
+              className="
+                mb-2
+                text-[10px]
+                font-bold
+                uppercase
+                tracking-[0.17em]
+                text-brand-primary
+              "
+            >
+              Overview
+            </h4>
+
+            <p
+              className="
+                text-[14px]
+                leading-6
+                text-brand-textMuted
+              "
+            >
+              {details.description}
+            </p>
+          </div>
+
+          <div>
+            <h4
+              className="
+                mb-3
+                text-[10px]
+                font-bold
+                uppercase
+                tracking-[0.17em]
+                text-brand-primary
+              "
+            >
+              Key Requirements
+            </h4>
+
+            <ul className="space-y-3">
+              {details.metaList.map(
+                (
+                  requirement,
+                  index,
+                ) => (
+                  <li
+                    key={`${requirement}-${index}`}
+                    className="
+                      flex
+                      items-start
+                      gap-2.5
+                      text-[14px]
+                      leading-6
+                      text-brand-textMuted
+                    "
+                  >
+                    <CheckCircle2
+                      className="
+                        mt-1
+                        h-4
+                        w-4
+                        shrink-0
+                        text-brand-accent
+                      "
+                    />
+
+                    <span>
+                      {requirement}
+                    </span>
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+        </div>
+
+        <div
+          className="
+            flex
+            flex-wrap
+            items-center
+            gap-3
+            border-t
+            border-brand-border
+            bg-brand-bg
+            p-4
+          "
+        >
+          {details.type ===
+            'job' &&
+            details.jobId !==
+              undefined && (
+              <button
+                type="button"
+                onClick={() =>
+                  onExpressInterest(
+                    details.jobId!,
+                  )
+                }
+                disabled={
+                  isApplied
+                }
+                className={`
+                  flex
+                  min-h-[42px]
+                  items-center
+                  gap-2
+                  rounded-[12px]
+                  px-4
+                  text-[12px]
+                  font-bold
+                  transition-all
+                  duration-200
+
+                  ${
+                    isApplied
+                      ? `
+                        cursor-default
+                        border
+                        border-brand-emerald
+                        bg-brand-emerald/10
+                        text-brand-primary
+                      `
+                      : `
+                        text-white
+                        hover:-translate-y-0.5
+                      `
+                  }
+
+                  focus-visible:outline-none
+                  focus-visible:ring-4
+                  focus-visible:ring-brand-accent/20
+                `}
+                style={
+                  isApplied
+                    ? undefined
+                    : {
+                        background:
+                          'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+                      }
+                }
+              >
+                {isApplied ? (
+                  <>
+                    <CheckCircle2
+                      className="
+                        h-3.5
+                        w-3.5
+                        text-brand-emerald
+                      "
+                    />
+
+                    Applied
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+
+                    Express Interest
+                  </>
+                )}
+              </button>
+            )}
+
+          {details.type ===
+            'company' &&
+            details.companyName && (
+              <PrimaryActionButton
+                onClick={() =>
+                  onContact(
+                    details.companyName!,
+                  )
+                }
+                icon={
+                  <MessageSquare className="h-3.5 w-3.5" />
+                }
+              >
+                Message Company
+              </PrimaryActionButton>
+            )}
+
+          <button
+            type="button"
+            onClick={
+              onClose
+            }
+            className="
+              ml-auto
+              min-h-[42px]
+              rounded-[12px]
+              border
+              border-brand-border
+              bg-white
+              px-4
+              text-[12px]
+              font-bold
+              text-brand-textMuted
+              transition-colors
+
+              hover:border-brand-primary
+              hover:text-brand-primary
+
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-brand-accent/20
+            "
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2722,36 +3082,190 @@ function LoadingState({
    EMPTY STATE
 ========================================================= */
 
+interface EmptyStateProps {
+  icon:
+    | 'company'
+    | 'job';
+
+  title: string;
+  text: string;
+}
+
 function EmptyState({
   icon,
   title,
-  message,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  message: string;
-  action?: React.ReactNode;
-}) {
+  text,
+}: EmptyStateProps) {
   return (
-    <div className="rounded-[24px] border border-[#D4E2EA] bg-white p-10 text-center shadow-[0_12px_35px_rgba(0,70,109,0.06)]">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EEF8FD] text-[#00466D]">
-        {icon}
+    <div
+      className="
+        flex
+        w-full
+        flex-col
+        items-center
+        justify-center
+        rounded-[24px]
+        border
+        border-brand-border
+        bg-white/95
+        p-12
+        text-center
+        shadow-[0_14px_34px_rgba(0,70,109,0.06)]
+      "
+    >
+      <div
+        className="
+          mb-4
+          grid
+          h-14
+          w-14
+          place-items-center
+          rounded-[18px]
+          bg-brand-accent/10
+          text-brand-primary
+        "
+      >
+        {icon ===
+        'company' ? (
+          <Building2 className="h-7 w-7" />
+        ) : (
+          <Briefcase className="h-7 w-7" />
+        )}
       </div>
 
-      <h2 className="mt-5 text-lg font-bold text-[#00273D]">
+      <h3
+        className="
+          !m-0
+          text-[18px]
+          font-bold
+          !text-brand-primary
+        "
+      >
         {title}
-      </h2>
+      </h3>
 
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#64748B]">
-        {message}
+      <p
+        className="
+          mt-2
+          max-w-[420px]
+          text-[14px]
+          leading-6
+          text-brand-textMuted
+        "
+      >
+        {text}
+      </p>
+    </div>
+  );
+}
+
+/* =========================================================
+   SAVED EMPTY STATE
+========================================================= */
+
+interface SavedEmptyStateProps {
+  onBrowse: () => void;
+}
+
+function SavedEmptyState({
+  onBrowse,
+}: SavedEmptyStateProps) {
+  return (
+    <div
+      className="
+        flex
+        w-full
+        flex-col
+        items-center
+        justify-center
+        rounded-[28px]
+        border
+        border-brand-border
+        bg-white/95
+        px-6
+        py-16
+        text-center
+        shadow-[0_16px_40px_rgba(0,70,109,0.07)]
+      "
+    >
+      <div
+        className="
+          grid
+          h-16
+          w-16
+          place-items-center
+          rounded-[20px]
+          border
+          border-brand-gold/35
+          bg-brand-gold/10
+          text-brand-gold
+        "
+      >
+        <Bookmark className="h-7 w-7" />
+      </div>
+
+      <h3
+        className="
+          !m-0
+          mt-5
+          text-[22px]
+          font-bold
+          tracking-[-0.025em]
+          !text-brand-primary
+        "
+      >
+        Nothing saved yet
+      </h3>
+
+      <p
+        className="
+          mt-2
+          max-w-[460px]
+          text-[14px]
+          leading-6
+          text-brand-textMuted
+        "
+      >
+        Bookmark a company or an open role and it will appear
+        here so you can return to it later.
       </p>
 
-      {action && (
-        <div className="mt-5">
-          {action}
-        </div>
-      )}
+      <button
+        type="button"
+        onClick={
+          onBrowse
+        }
+        className="
+          mt-6
+          inline-flex
+          min-h-[46px]
+          items-center
+          justify-center
+          gap-2
+          rounded-[14px]
+          px-5
+          text-[14px]
+          font-bold
+          text-white
+          shadow-[0_10px_25px_rgba(0,70,109,0.16)]
+          transition-all
+          duration-200
+
+          hover:-translate-y-0.5
+
+          focus-visible:outline-none
+          focus-visible:ring-4
+          focus-visible:ring-brand-accent/25
+        "
+        style={{
+          background:
+            'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
+        }}
+      >
+        <Building2 className="h-4 w-4" />
+
+        Browse Opportunities
+      </button>
     </div>
   );
 }

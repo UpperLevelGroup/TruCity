@@ -15,7 +15,7 @@ import type {
   CompanyActivity,
 } from "../company.types";
 
-import logo from "../../../assets/branding/trucity-logo.png";
+import logo from "../../../assets/trucity-logo.png";
 
 interface GuideItem {
   id: string;

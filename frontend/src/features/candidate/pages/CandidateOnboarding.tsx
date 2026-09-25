@@ -70,7 +70,7 @@ const onboardingSteps: OnboardingStep[] = [
     accent: 'blue',
     points: [
       'Apply directly from an opportunity',
-      'Continue employer conversations in Messages',
+      'Continue employer conversations in M1essages',
       'Keep application communication in one place',
     ],
   },

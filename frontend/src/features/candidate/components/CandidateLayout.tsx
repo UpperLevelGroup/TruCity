@@ -1,101 +1,84 @@
-import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useState } from "react";
+import {
+  Outlet,
+} from 'react-router-dom';
 
-import { CandidateNavBar } from "./CandidateNavBar";
-import CandidateOnboarding from "../pages/CandidateOnboarding";
-import { NotificationsProvider } from "../../../context/NotificationsContext";
+import { useState } from 'react';
 
-type CandidatePlan = "free" | "general" | "skilled";
+import { CandidateNavBar } from './CandidateNavBar';
+import CandidateOnboarding from '../pages/CandidateOnboarding';
+
+import {
+  NotificationsProvider,
+} from '../../../context/NotificationsContext';
 
 const ONBOARDING_STORAGE_KEY =
-  "trucity-candidate-onboarding-complete";
+  'trucity-candidate-onboarding-complete';
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
 
 const fullAccessTabs = [
   {
-    to: "/candidate",
-    label: "Home",
-    icon: "home",
+    to: '/candidate/feed',
+    label: 'Home',
+    icon: 'home',
   },
   {
-    to: "/candidate/messages",
-    label: "Messages",
-    icon: "messages",
+    to: '/candidate/messages',
+    label: 'Messages',
+    icon: 'messages',
   },
   {
-    to: "/candidate/hub",
-    label: "Guidance Hub",
-    icon: "hub",
+    to: '/candidate/hub',
+    label: 'Guidance Hub',
+    icon: 'hub',
   },
   {
-    to: "/candidate/cv",
-    label: "CV",
-    icon: "cv",
+    to: '/candidate/cv',
+    label: 'CV',
+    icon: 'cv',
   },
   {
-    to: "/candidate/profile",
-    label: "Profile",
-    icon: "profile",
-  },
-];
-
-const freePlanTabs = [
-  {
-    to: "/candidate",
-    label: "Home",
-    icon: "home",
-  },
-  {
-    to: "/candidate/profile",
-    label: "Profile",
-    icon: "profile",
+    to: '/candidate/profile',
+    label: 'Profile',
+    icon: 'profile',
   },
 ];
 
 export default function CandidateLayout() {
-  const location = useLocation();
+  /* =========================================================
+     FIRST-TIME ONBOARDING STATE
+  ========================================================= */
 
-  const candidatePlan =
-    sessionStorage.getItem("candidatePlan") as CandidatePlan | null;
-
-  const [showOnboarding, setShowOnboarding] = useState(() => {
+  const [
+    showOnboarding,
+    setShowOnboarding,
+  ] = useState(() => {
     return (
-      localStorage.getItem(ONBOARDING_STORAGE_KEY) !== "true"
+      localStorage.getItem(
+        ONBOARDING_STORAGE_KEY,
+      ) !== 'true'
     );
   });
 
-  const isFreePlan =
-    candidatePlan === "free";
+  /* =========================================================
+     ONBOARDING COMPLETE
+  ========================================================= */
 
-  const isFreePlanAllowedRoute =
-    location.pathname === "/candidate" ||
-    location.pathname === "/candidate/profile" ||
-    location.pathname === "/candidate/notifications";
+  const handleOnboardingComplete =
+    () => {
+      localStorage.setItem(
+        ONBOARDING_STORAGE_KEY,
+        'true',
+      );
 
-  if (
-    isFreePlan &&
-    !isFreePlanAllowedRoute
-  ) {
-    return (
-      <Navigate
-        to="/candidate"
-        replace
-      />
-    );
-  }
+      setShowOnboarding(false);
+    };
 
-  const tabs =
-    isFreePlan
-      ? freePlanTabs
-      : fullAccessTabs;
-
-  const handleOnboardingComplete = () => {
-    localStorage.setItem(
-      ONBOARDING_STORAGE_KEY,
-      "true"
-    );
-
-    setShowOnboarding(false);
-  };
+  /* =========================================================
+     LAYOUT
+  ========================================================= */
 
   return (
     <NotificationsProvider>
@@ -109,21 +92,20 @@ export default function CandidateLayout() {
           antialiased
         "
       >
-        <CandidateNavBar tabs={tabs} />
+        {/* ===================================================
+            SHARED CANDIDATE NAVBAR
+        ==================================================== */}
 
-        {/*
-          The navbar is fixed and exactly 88px high.
-
-          This spacer reserves that exact amount of
-          vertical space before the page content begins.
-          It is intentionally separate from the main
-          content so the Outlet can never slide behind
-          the fixed header.
-        */}
-        <div
-          aria-hidden="true"
-          className="h-[88px] w-full"
+        <CandidateNavBar
+          tabs={fullAccessTabs}
         />
+
+        {/* ===================================================
+            PAGE CONTENT
+
+            Transparent so the global AppWatermark remains
+            visible behind candidate pages.
+        ==================================================== */}
 
         <main
           className="
@@ -136,6 +118,8 @@ export default function CandidateLayout() {
             bg-transparent
             px-4
             pb-12
+            pt-[112px]
+
             sm:px-6
             lg:px-8
           "
@@ -143,30 +127,12 @@ export default function CandidateLayout() {
           <Outlet />
         </main>
 
-        {isFreePlan && (
-          <div
-            className="
-              relative
-              z-20
-              border-t
-              border-brand-border/70
-              bg-white/85
-              px-4
-              py-3
-              text-center
-              text-xs
-              font-semibold
-              text-brand-textMuted
-              backdrop-blur-md
-            "
-          >
-            You are currently on the{" "}
-            <span className="font-bold text-brand-primary">
-              Free Plan
-            </span>
-            . Upgrade to unlock full access.
-          </div>
-        )}
+        {/* ===================================================
+            FOOTER
+
+            Semi-transparent so the global skyline does not
+            disappear behind a solid white strip.
+        ==================================================== */}
 
         <footer
           className="
@@ -191,12 +157,15 @@ export default function CandidateLayout() {
               py-5
               text-xs
               text-brand-textMuted
+
               sm:flex-row
             "
           >
             <span>
-              © {new Date().getFullYear()} UpperLevel Group.
-              All rights reserved.
+              ©{' '}
+              {new Date().getFullYear()}{' '}
+              UpperLevel Group. All rights
+              reserved.
             </span>
 
             <div
@@ -208,16 +177,30 @@ export default function CandidateLayout() {
                 gap-5
               "
             >
-              <span>Privacy Policy</span>
-              <span>Terms of Service</span>
-              <span>Support</span>
+              <span>
+                Privacy Policy
+              </span>
+
+              <span>
+                Terms of Service
+              </span>
+
+              <span>
+                Support
+              </span>
             </div>
           </div>
         </footer>
 
+        {/* ===================================================
+            FIRST-TIME USER ONBOARDING
+        ==================================================== */}
+
         {showOnboarding && (
           <CandidateOnboarding
-            onComplete={handleOnboardingComplete}
+            onComplete={
+              handleOnboardingComplete
+            }
           />
         )}
       </div>

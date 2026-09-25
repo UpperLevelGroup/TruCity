@@ -5,14 +5,14 @@ import {
 
 import PublicLayout from "../layouts/PublicLayout";
 
-import Home from "../pages/Home";
-import Dashboard from "../pages/Dashboard";
+import Home from "../features/homepage/Home";
+//import Dashboard from "../features/homepage/Dashboard";
 
-import Login from "../features/auth/components/Login";
-import ForgotPassword from "../features/auth/components/ForgotPassword";
-import RoleChoice from "../features/auth/components/RoleChoice";
-import RegisterCandidate from "../features/auth/components/RegisterCandidate";
-import RegisterCompany from "../features/auth/components/RegisterCompany";
+import Login from "../features/auth/components/login/Login";
+import ForgotPassword from "../features/auth/components/login/ForgotPassword";
+import RoleChoice from "../features/auth/components/register/RoleChoice";
+import RegisterCandidate from "../features/auth/components/register/RegisterCandidate";
+import RegisterCompany from "../features/auth/components/register/RegisterCompany";
 
 import AdminLayout from "../layouts/AdminLayout";
 import AdminDashboard from "../features/admin/pages/AdminDashboard";
@@ -84,10 +84,10 @@ export default function AppRoutes() {
           element={<RegisterCompany />}
         />
 
-        <Route
+  {/*      <Route
           path="/dashboard"
           element={<Dashboard />}
-        />
+        />*/}
       </Route>
 
       {/* =====================================================
