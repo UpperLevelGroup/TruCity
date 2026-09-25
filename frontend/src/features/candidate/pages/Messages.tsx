@@ -669,39 +669,22 @@ export default function Messages() {
     );
 
     addNotification({
-      type:
-        'system',
+  id: `interview-${Date.now()}`,
+  type: 'system',
+  title:
+    response === 'accepted'
+      ? 'Interview accepted'
+      : 'Interview declined',
+  message:
+    response === 'accepted'
+      ? `You accepted the interview with ${interviewMessage.from} for ${interview.jobTitle}.`
+      : `You declined the interview with ${interviewMessage.from} for ${interview.jobTitle}.`,
+  time: 'Just now',
+  read: false,
+  destination: '/candidate/messages',
+});
 
-      title:
-        response ===
-        'accepted'
-          ? 'Interview accepted'
-          : 'Interview declined',
-
-      message:
-        response ===
-        'accepted'
-          ? `You accepted the interview with ${interviewMessage.from} for ${interview.jobTitle}.`
-          : `You declined the interview with ${interviewMessage.from} for ${interview.jobTitle}.`,
-
-      time:
-        'Just now',
-
-      read:
-        false,
-
-      destination:
-        '/candidate/messages',
-    });
-
-    /*
-     * Production backend:
-     *
-     * Update the SAME employer-created interview:
-     *
-     * interview.id = interview.interviewId
-     * status = response
-     */
+    
   };
 
   /* =========================================================
