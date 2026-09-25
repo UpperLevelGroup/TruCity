@@ -10,7 +10,6 @@ import {
   Check,
   CheckCircle2,
   Clock3,
-  Copy,
   FileText,
   Headphones,
   Heart,
