@@ -20,7 +20,7 @@ const ONBOARDING_STORAGE_KEY =
 
 const fullAccessTabs = [
   {
-    to: '/candidate/feed',
+    to: '/candidate',
     label: 'Home',
     icon: 'home',
   },

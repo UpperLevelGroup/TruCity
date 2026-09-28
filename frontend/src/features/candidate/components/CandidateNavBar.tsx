@@ -25,11 +25,14 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import trucityNavLogo from '../../../assets/trucity-nav-logo.png';
+
 import {
   useNotifications,
   type CandidateNotification,
   type NotificationType,
 } from '../../../context/NotificationsContext';
+
 
 /* =========================================================
    TYPES
@@ -168,7 +171,7 @@ export function CandidateNavBar({
         ================================================== */}
 
         <NavLink
-          to="/candidate/feed"
+          to="/candidate"
           aria-label="TruCity candidate home"
           className="
             relative
@@ -185,7 +188,7 @@ export function CandidateNavBar({
           "
         >
           <img
-            src="/trucity-nav-logo.png"
+            src={trucityNavLogo}
             alt="TruCity"
             draggable={false}
             className="
