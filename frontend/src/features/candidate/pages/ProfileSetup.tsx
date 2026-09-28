@@ -22,7 +22,6 @@ import {
 
 import {
   clearPendingCandidateRegistration,
-  getPendingCandidateRegistration,
 } from '../../auth/components/register/candidateRegistrationStorage';
 
 type Mode = 'idle' | 'live' | 'done';
@@ -52,41 +51,7 @@ const JOB_INDUSTRIES = [
 export default function ProfileSetup() {
   const navigate = useNavigate();
 
-  /* =========================================================
-     REGISTRATION DETAILS
-  ========================================================= */
-
-  const [registeredFirstName, setRegisteredFirstName] =
-    useState('');
-
-  const [registeredLastName, setRegisteredLastName] =
-    useState('');
-
-  const [registeredEmail, setRegisteredEmail] =
-    useState('');
-
   
-  useEffect(() => {
-    const registration =
-      getPendingCandidateRegistration();
-
-    if (!registration) {
-      return;
-    }
-
-    setRegisteredFirstName(
-      registration.firstName,
-    );
-
-    setRegisteredLastName(
-      registration.lastName,
-    );
-
-    setRegisteredEmail(
-      registration.email,
-    );
-  }, []);
-
   /* =========================================================
      FACE PHOTO
   ========================================================= */
