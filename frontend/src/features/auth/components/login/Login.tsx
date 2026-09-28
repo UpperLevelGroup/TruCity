@@ -176,11 +176,11 @@ export default function Login({
       body={
         <>
           <p>
-            Your next opportunity is still waiting.
+            We'll do the vetting for you.
           </p>
 
           <p className="mt-7 font-semibold text-brand-primary">
-            Sign in and keep moving forward.
+            Sign in to connect.
           </p>
         </>
       }

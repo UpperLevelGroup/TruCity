@@ -20,6 +20,11 @@ import {
   Video,
 } from 'lucide-react';
 
+import {
+  clearPendingCandidateRegistration,
+  getPendingCandidateRegistration,
+} from '../../auth/components/register/candidateRegistrationStorage';
+
 type Mode = 'idle' | 'live' | 'done';
 
 const EXPERIENCE_RANGES = [
@@ -46,6 +51,46 @@ const JOB_INDUSTRIES = [
 
 export default function ProfileSetup() {
   const navigate = useNavigate();
+
+  /* =========================================================
+     REGISTRATION DETAILS
+  ========================================================= */
+
+  const [registeredFirstName, setRegisteredFirstName] =
+    useState('');
+
+  const [registeredLastName, setRegisteredLastName] =
+    useState('');
+
+  const [registeredEmail, setRegisteredEmail] =
+    useState('');
+
+  /*
+   * Load the non-sensitive information saved during
+   * candidate registration.
+   *
+   * Password is never loaded or stored here.
+   */
+  useEffect(() => {
+    const registration =
+      getPendingCandidateRegistration();
+
+    if (!registration) {
+      return;
+    }
+
+    setRegisteredFirstName(
+      registration.firstName,
+    );
+
+    setRegisteredLastName(
+      registration.lastName,
+    );
+
+    setRegisteredEmail(
+      registration.email,
+    );
+  }, []);
 
   /* =========================================================
      FACE PHOTO
@@ -507,6 +552,16 @@ export default function ProfileSetup() {
     if (!isComplete) {
       return;
     }
+
+    /*
+     * The registration details are now available in this
+     * component and can be used by the profile API when that
+     * integration is added.
+     *
+     * Clear them only when leaving Profile Setup so they are
+     * not left in sessionStorage indefinitely.
+     */
+    clearPendingCandidateRegistration();
 
     navigate('/candidate/choose-plan');
   };
@@ -1050,63 +1105,11 @@ export default function ProfileSetup() {
                         idNumber.length > 0 &&
                         !isIdValid
                       }
-                      className={`
-                        min-h-[50px]
-                        w-full
-                        rounded-[14px]
-                        border
-                        bg-white
-                        px-4
-                        py-3
-                        pr-[90px]
-                        text-[14px]
-                        text-brand-dark
-                        outline-none
-                        transition
-
-                        placeholder:text-brand-textMuted/60
-
-                        focus:ring-4
-
-                        ${
-                          idNumber.length > 0 &&
-                          !isIdValid
-                            ? `
-                              border-brand-warning
-                              focus:border-brand-warning
-                              focus:ring-brand-warning/20
-                            `
-                            : isIdValid
-                              ? `
-                                border-brand-emerald
-                                focus:border-brand-emerald
-                                focus:ring-brand-emerald/20
-                              `
-                              : `
-                                border-brand-border
-                                focus:border-brand-accent
-                                focus:ring-brand-accent/15
-                              `
-                        }
-                      `}
+                      className={`...`}
                     />
 
                     <div
-                      className={`
-                        pointer-events-none
-                        absolute
-                        right-4
-                        top-1/2
-                        -translate-y-1/2
-                        text-[11px]
-                        font-bold
-
-                        ${
-                          isIdValid
-                            ? 'text-brand-emerald'
-                            : 'text-brand-textMuted'
-                        }
-                      `}
+                      className={`...`}
                     >
                       {idNumber.length} / 13
                     </div>

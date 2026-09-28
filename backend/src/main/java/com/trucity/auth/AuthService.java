@@ -6,9 +6,11 @@ import com.trucity.user.Role;
 import com.trucity.user.RoleRepository;
 import com.trucity.user.User;
 import com.trucity.user.UserRepository;
+import com.trucity.candidate.CandidateProfile;
+
+import com.trucity.candidate.CandidateProfileRepository;
 
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,15 +25,11 @@ import java.util.HashSet;
 public class AuthService {
 
     private final UserRepository userRepository;
-
     private final JwtService jwtService;
-
     private final RoleRepository roleRepository;
-
     private final PasswordEncoder passwordEncoder;
-
     private final AuditService auditService;
-
+    private final CandidateProfileRepository candidateProfileRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
 
 
@@ -40,84 +38,114 @@ public class AuthService {
      * REGISTER
      * =========================================================
      */
-
     @Transactional
     public AuthResponse register(RegisterRequest request) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+    if (userRepository.existsByEmail(request.getEmail())) {
 
-            throw new RuntimeException(
-                    "Email already registered"
-            );
-        }
-
-        Role candidateRole =
-                roleRepository
-                        .findByName("CANDIDATE")
-                        .orElseThrow(
-                                () -> new RuntimeException(
-                                        "CANDIDATE role does not exist"
-                                )
-                        );
-
-        User user = User.builder()
-
-                .firstName(
-                        request.getFirstName()
-                )
-
-                .lastName(
-                        request.getLastName()
-                )
-
-                .email(
-                        request.getEmail()
-                )
-
-                .passwordHash(
-                        passwordEncoder.encode(
-                                request.getPassword()
-                        )
-                )
-
-                .roles(
-                        new HashSet<>()
-                )
-
-                .enabled(true)
-
-                .build();
-
-        user.getRoles()
-                .add(candidateRole);
-
-        User savedUser =
-                userRepository.save(user);
-
-        auditService.log(
-                savedUser.getId(),
-                "CANDIDATE_REGISTERED",
-                "Candidate account registered: "
-                        + savedUser.getEmail()
+        throw new RuntimeException(
+                "Email already registered"
         );
-
-        String token =
-                jwtService.generateToken(
-                        savedUser.getEmail()
-                );
-
-        return AuthResponse.builder()
-
-                .accessToken(token)
-
-                .refreshToken(null)
-
-                .role(
-                        candidateRole.getName()
-                )
-
-                .build();
     }
+
+    Role candidateRole =
+            roleRepository
+                    .findByName("CANDIDATE")
+                    .orElseThrow(
+                            () -> new RuntimeException(
+                                    "CANDIDATE role does not exist"
+                            )
+                    );
+
+    User user = User.builder()
+
+            .firstName(
+                    request.getFirstName()
+            )
+
+            .lastName(
+                    request.getLastName()
+            )
+
+            .email(
+                    request.getEmail()
+            )
+
+            .passwordHash(
+                    passwordEncoder.encode(
+                            request.getPassword()
+                    )
+            )
+
+            .roles(
+                    new HashSet<>()
+            )
+
+            .enabled(true)
+
+            .build();
+
+    user.getRoles()
+            .add(candidateRole);
+
+    User savedUser =
+            userRepository.save(user);
+
+
+    /*
+     * =========================================================
+     * CREATE INITIAL CANDIDATE PROFILE
+     * =========================================================
+     *
+     * The profile is linked directly to the newly-created user.
+     *
+     * Profile details such as headline, bio, location and
+     * experience can be completed later during Profile Setup.
+     */
+
+    CandidateProfile candidateProfile =
+            CandidateProfile.builder()
+
+                    .userId(
+                            savedUser.getId()
+                    )
+
+                    .yearsExperience(0)
+
+                    .profileCompletion(0)
+
+                    .build();
+
+    candidateProfileRepository.save(
+            candidateProfile
+    );
+
+
+    auditService.log(
+            savedUser.getId(),
+            "CANDIDATE_REGISTERED",
+            "Candidate account registered: "
+                    + savedUser.getEmail()
+    );
+
+    String token =
+            jwtService.generateToken(
+                    savedUser.getEmail()
+            );
+
+    return AuthResponse.builder()
+
+            .accessToken(token)
+
+            .refreshToken(null)
+
+            .role(
+                    candidateRole.getName()
+            )
+
+            .build();
+}
+
 
 
     /*

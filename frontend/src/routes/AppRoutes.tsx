@@ -6,7 +6,7 @@ import {
 import PublicLayout from "../layouts/PublicLayout";
 
 import Home from "../features/homepage/Home";
-//import Dashboard from "../features/homepage/Dashboard";
+// import Dashboard from "../features/homepage/Dashboard";
 
 import Login from "../features/auth/components/login/Login";
 import ForgotPassword from "../features/auth/components/login/ForgotPassword";
@@ -37,6 +37,7 @@ import CompanyDashboard from "../features/company/pages/CompanyDashboard";
 import CandidateLayout from "../features/candidate/components/CandidateLayout";
 import CandidateDashboard from "../features/candidate/pages/CandidateDashboard";
 import CandidateVerify from "../features/candidate/pages/CandidateVerify";
+import CandidateOnboardingPage from "../features/candidate/pages/CandidateOnboardingPage";
 import ChoosePlan from "../features/candidate/pages/ChoosePlan";
 import CompanyFeed from "../features/candidate/pages/CompanyFeed";
 import CvBuilder from "../features/candidate/pages/CvBuilder";
@@ -59,43 +60,79 @@ export default function AppRoutes() {
       />
 
       <Route element={<PublicLayout />}>
+        {/* Login */}
         <Route
           path="/login"
           element={<Login />}
         />
 
+        {/* Forgot Password */}
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
         />
 
+        {/* Registration Role Choice */}
         <Route
           path="/register"
           element={<RoleChoice />}
         />
 
+        {/* Candidate Registration */}
         <Route
           path="/register/candidate"
           element={<RegisterCandidate />}
         />
 
+        {/* Company Registration */}
         <Route
           path="/register/company"
           element={<RegisterCompany />}
         />
 
-  {/*      <Route
+        {/*
+        <Route
           path="/dashboard"
           element={<Dashboard />}
-        />*/}
+        />
+        */}
       </Route>
+
+      {/* =====================================================
+          CANDIDATE ONBOARDING
+
+          IMPORTANT:
+          This route intentionally remains OUTSIDE
+          CandidateLayout.
+
+          Registration flow:
+
+          /register/candidate
+                  ↓
+          /candidate/onboarding
+                  ↓
+          /candidate/profile/setup
+                  ↓
+          /candidate/choose-plan
+                  ↓
+          /candidate/feed
+
+          Keeping onboarding outside CandidateLayout prevents
+          CandidateLayout's normal candidate redirects from
+          interfering with the registration process.
+      ====================================================== */}
+
+      <Route
+        path="/candidate/onboarding"
+        element={<CandidateOnboardingPage />}
+      />
 
       {/* =====================================================
           CANDIDATE PLAN SELECTION
 
-          This route must remain OUTSIDE CandidateLayout
-          because CandidateLayout redirects users without
-          a selected plan here.
+          This route remains OUTSIDE CandidateLayout because
+          CandidateLayout can redirect users without a selected
+          plan here.
       ====================================================== */}
 
       <Route
@@ -108,7 +145,6 @@ export default function AppRoutes() {
       ====================================================== */}
 
       <Route element={<CandidateLayout />}>
-
         {/* Candidate Dashboard */}
         <Route
           path="/candidate"
@@ -180,56 +216,67 @@ export default function AppRoutes() {
       ====================================================== */}
 
       <Route element={<AdminLayout />}>
+        {/* Admin Dashboard */}
         <Route
           path="/admin"
           element={<AdminDashboard />}
         />
 
+        {/* Users */}
         <Route
           path="/admin/users"
           element={<AdminUsers />}
         />
 
+        {/* Candidates */}
         <Route
           path="/admin/candidates"
           element={<AdminCandidates />}
         />
 
+        {/* Employers */}
         <Route
           path="/admin/employers"
           element={<AdminEmployers />}
         />
 
+        {/* Jobs */}
         <Route
           path="/admin/jobs"
           element={<AdminJobs />}
         />
 
+        {/* Applications */}
         <Route
           path="/admin/applications"
           element={<AdminApplications />}
         />
 
+        {/* Messages */}
         <Route
           path="/admin/messages"
           element={<AdminMessages />}
         />
 
+        {/* Verifications */}
         <Route
           path="/admin/verifications"
           element={<AdminVerifications />}
         />
 
+        {/* Reports */}
         <Route
           path="/admin/reports"
           element={<AdminReports />}
         />
 
+        {/* Analytics */}
         <Route
           path="/admin/analytics"
           element={<AdminAnalytics />}
         />
 
+        {/* Settings */}
         <Route
           path="/admin/settings"
           element={<AdminSettings />}
