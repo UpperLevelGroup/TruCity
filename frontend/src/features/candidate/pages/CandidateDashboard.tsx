@@ -2983,4 +2983,3 @@ export default function CandidateDashboard() {
     </div>
   );
 }
-

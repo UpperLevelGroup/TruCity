@@ -6,7 +6,6 @@ import {
 import PublicLayout from "../layouts/PublicLayout";
 
 import Home from "../features/homepage/Home";
-// import Dashboard from "../features/homepage/Dashboard";
 
 import Login from "../features/auth/components/login/Login";
 import ForgotPassword from "../features/auth/components/login/ForgotPassword";

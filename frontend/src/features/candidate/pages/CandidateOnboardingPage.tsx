@@ -13,15 +13,13 @@ export default function CandidateOnboardingPage() {
      * =====================================================
      * MARK ONBOARDING AS COMPLETE
      * =====================================================
-     *
-     * This prevents the existing CandidateLayout logic
-     * from showing onboarding again.
      */
     localStorage.setItem(
       ONBOARDING_COMPLETE_KEY,
       'true',
     );
 
+  
     navigate(
       '/candidate/profile/setup',
       {

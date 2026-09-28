@@ -65,12 +65,7 @@ export default function ProfileSetup() {
   const [registeredEmail, setRegisteredEmail] =
     useState('');
 
-  /*
-   * Load the non-sensitive information saved during
-   * candidate registration.
-   *
-   * Password is never loaded or stored here.
-   */
+  
   useEffect(() => {
     const registration =
       getPendingCandidateRegistration();

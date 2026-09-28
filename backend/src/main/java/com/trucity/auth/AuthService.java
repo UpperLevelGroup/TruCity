@@ -94,13 +94,8 @@ public class AuthService {
 
     /*
      * =========================================================
-     * CREATE INITIAL CANDIDATE PROFILE
+     * CREATES INITIAL CANDIDATE PROFILE
      * =========================================================
-     *
-     * The profile is linked directly to the newly-created user.
-     *
-     * Profile details such as headline, bio, location and
-     * experience can be completed later during Profile Setup.
      */
 
     CandidateProfile candidateProfile =
