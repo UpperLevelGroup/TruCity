@@ -5,7 +5,6 @@ export default function AuthPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Login mode when visiting /login
   const isLoginMode = location.pathname === "/login";
 
   const [email, setEmail] = useState("");

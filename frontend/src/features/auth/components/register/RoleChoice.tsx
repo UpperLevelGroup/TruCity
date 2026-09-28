@@ -905,9 +905,6 @@ function PublicNavLink({
   );
 }
 
-/* =========================================================
-   MOBILE / TABLET PUBLIC NAV LINK
-========================================================= */
 
 function MobilePublicNavLink({
   to,

@@ -7,6 +7,12 @@ export interface PendingCandidateRegistration {
 const STORAGE_KEY =
   'trucity-pending-candidate-registration';
 
+/**
+ * Store only non-sensitive registration information.
+ *
+ * IMPORTANT:
+ * Passwords are deliberately NOT stored here.
+ */
 export function savePendingCandidateRegistration(
   data: PendingCandidateRegistration,
 ): void {

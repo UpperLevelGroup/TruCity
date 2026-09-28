@@ -22,15 +22,6 @@ export default function CandidateOnboardingPage() {
       'true',
     );
 
-    /*
-     * =====================================================
-     * CONTINUE TO PROFILE SETUP
-     * =====================================================
-     *
-     * The registration details saved by
-     * candidateRegistrationStorage remain available in
-     * sessionStorage for ProfileSetup to use.
-     */
     navigate(
       '/candidate/profile/setup',
       {
