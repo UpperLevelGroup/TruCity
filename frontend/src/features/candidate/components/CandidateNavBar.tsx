@@ -352,7 +352,7 @@ function CandidateDesktopNavLink({
       to={tab.to}
       end={
         tab.to ===
-        '/candidate/feed'
+        '/candidate'
       }
       className={({
         isActive,
@@ -448,7 +448,7 @@ function CandidateMobileNavLink({
       to={tab.to}
       end={
         tab.to ===
-        '/candidate/feed'
+        '/candidate'
       }
       aria-label={
         tab.label

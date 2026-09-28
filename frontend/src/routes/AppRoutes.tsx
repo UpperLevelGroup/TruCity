@@ -100,25 +100,6 @@ export default function AppRoutes() {
       {/* =====================================================
           CANDIDATE ONBOARDING
 
-          IMPORTANT:
-          This route intentionally remains OUTSIDE
-          CandidateLayout.
-
-          Registration flow:
-
-          /register/candidate
-                  ↓
-          /candidate/onboarding
-                  ↓
-          /candidate/profile/setup
-                  ↓
-          /candidate/choose-plan
-                  ↓
-          /candidate/feed
-
-          Keeping onboarding outside CandidateLayout prevents
-          CandidateLayout's normal candidate redirects from
-          interfering with the registration process.
       ====================================================== */}
 
       <Route
@@ -129,10 +110,7 @@ export default function AppRoutes() {
       {/* =====================================================
           CANDIDATE PLAN SELECTION
 
-          This route remains OUTSIDE CandidateLayout because
-          CandidateLayout can redirect users without a selected
-          plan here.
-      ====================================================== */}
+          ====================================================== */}
 
       <Route
         path="/candidate/choose-plan"

@@ -256,7 +256,9 @@ export default function Login({
           onSubmit={handleSubmit}
           className="space-y-5"
         >
-          {/* EMAIL */}
+          {/* =================================================
+              EMAIL
+          ================================================== */}
 
           <div>
             <label
@@ -313,7 +315,9 @@ export default function Login({
             />
           </div>
 
-          {/* PASSWORD */}
+          {/* =================================================
+              PASSWORD
+          ================================================== */}
 
           <div>
             <div
@@ -359,7 +363,9 @@ export default function Login({
               </Link>
             </div>
 
-            {/* PASSWORD INPUT + EYE BUTTON */}
+            {/* =================================================
+                PASSWORD INPUT + VISIBILITY TOGGLE
+            ================================================== */}
 
             <div className="relative">
               <input
@@ -386,7 +392,7 @@ export default function Login({
                   bg-white
                   px-4
                   py-3
-                  pr-12
+                  pr-14
                   text-[14px]
                   font-normal
                   text-brand-dark
@@ -407,9 +413,16 @@ export default function Login({
                 "
               />
 
+              {/* PASSWORD VISIBILITY BUTTON */}
+
               <button
                 type="button"
                 aria-label={
+                  showPassword
+                    ? 'Hide password'
+                    : 'Show password'
+                }
+                title={
                   showPassword
                     ? 'Hide password'
                     : 'Show password'
@@ -423,21 +436,24 @@ export default function Login({
                 disabled={submitting}
                 className="
                   absolute
-                  right-3
+                  right-2
                   top-1/2
+                  z-10
                   flex
-                  h-9
-                  w-9
+                  h-10
+                  w-10
                   -translate-y-1/2
                   items-center
                   justify-center
                   rounded-lg
-                  text-brand-textMuted
+                  bg-transparent
+                  text-brand-primary
+                  opacity-100
                   transition-all
                   duration-150
 
                   hover:bg-brand-accent/10
-                  hover:text-brand-primary
+                  hover:text-brand-accent
 
                   focus-visible:outline-none
                   focus-visible:ring-4
@@ -449,14 +465,14 @@ export default function Login({
               >
                 {showPassword ? (
                   <EyeOff
-                    size={19}
-                    strokeWidth={2}
+                    size={20}
+                    strokeWidth={2.25}
                     aria-hidden="true"
                   />
                 ) : (
                   <Eye
-                    size={19}
-                    strokeWidth={2}
+                    size={20}
+                    strokeWidth={2.25}
                     aria-hidden="true"
                   />
                 )}
