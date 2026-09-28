@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type { SyntheticEvent } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
 import AuthShell from '../../../../components/ui/AuthShell';
 import { loginUser } from '../../../../api/authApi';
@@ -16,6 +17,7 @@ export default function Login({
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -357,42 +359,109 @@ export default function Login({
               </Link>
             </div>
 
-            <input
-              id="login-password"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) =>
-                setPassword(event.target.value)
-              }
-              disabled={submitting}
-              className="
-                min-h-[50px]
-                w-full
-                rounded-[14px]
-                border
-                border-brand-border
-                bg-white
-                px-4
-                py-3
-                text-[14px]
-                font-normal
-                text-brand-dark
-                outline-none
-                transition-all
-                duration-200
+            {/* PASSWORD INPUT + EYE BUTTON */}
 
-                hover:border-brand-accent/60
+            <div className="relative">
+              <input
+                id="login-password"
+                type={
+                  showPassword
+                    ? 'text'
+                    : 'password'
+                }
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) =>
+                  setPassword(event.target.value)
+                }
+                disabled={submitting}
+                placeholder="Enter your password"
+                className="
+                  min-h-[50px]
+                  w-full
+                  rounded-[14px]
+                  border
+                  border-brand-border
+                  bg-white
+                  px-4
+                  py-3
+                  pr-12
+                  text-[14px]
+                  font-normal
+                  text-brand-dark
+                  outline-none
+                  transition-all
+                  duration-200
 
-                focus:border-brand-accent
-                focus:ring-4
-                focus:ring-brand-accent/10
+                  placeholder:text-brand-textMuted/65
 
-                disabled:cursor-not-allowed
-                disabled:opacity-60
-              "
-            />
+                  hover:border-brand-accent/60
+
+                  focus:border-brand-accent
+                  focus:ring-4
+                  focus:ring-brand-accent/10
+
+                  disabled:cursor-not-allowed
+                  disabled:opacity-60
+                "
+              />
+
+              <button
+                type="button"
+                aria-label={
+                  showPassword
+                    ? 'Hide password'
+                    : 'Show password'
+                }
+                aria-pressed={showPassword}
+                onClick={() =>
+                  setShowPassword(
+                    (current) => !current,
+                  )
+                }
+                disabled={submitting}
+                className="
+                  absolute
+                  right-3
+                  top-1/2
+                  flex
+                  h-9
+                  w-9
+                  -translate-y-1/2
+                  items-center
+                  justify-center
+                  rounded-lg
+                  text-brand-textMuted
+                  transition-all
+                  duration-150
+
+                  hover:bg-brand-accent/10
+                  hover:text-brand-primary
+
+                  focus-visible:outline-none
+                  focus-visible:ring-4
+                  focus-visible:ring-brand-accent/15
+
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                {showPassword ? (
+                  <EyeOff
+                    size={19}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Eye
+                    size={19}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* =================================================

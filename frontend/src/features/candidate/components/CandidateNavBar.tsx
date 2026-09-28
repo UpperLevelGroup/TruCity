@@ -54,7 +54,7 @@ type CandidateNavBarProps = {
 
 const DEFAULT_TABS: CandidateNavTab[] = [
   {
-    to: '/candidate/feed',
+    to: '/candidate',
     label: 'Home',
   },
   {
@@ -83,7 +83,7 @@ const DEFAULT_TABS: CandidateNavTab[] = [
 ========================================================= */
 
 const NAV_ICONS: Record<string, LucideIcon> = {
-  '/candidate/feed': Home,
+  '/candidate': Home,
   '/candidate/messages': MessageSquare,
   '/candidate/hub': BookOpenCheck,
   '/candidate/cv': FileText,
