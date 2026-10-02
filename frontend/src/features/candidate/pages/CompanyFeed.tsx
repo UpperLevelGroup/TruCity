@@ -95,10 +95,21 @@ interface Job {
   id: string;
   title: string;
   company: string;
+  companyId?: string;
   location: string;
   salary: string;
   posted: string;
   department: string;
+  description: string;
+  employmentType?: string;
+  workplaceType?: string;
+  qualifications?: string;
+  experienceRequired?: string;
+  skills: readonly string[];
+  responsibilities?: string;
+  benefits?: string;
+  applicationDeadline?: string;
+  status: string;
 }
 
 interface CompanyFeedProps {
@@ -2835,60 +2846,6 @@ function JobCard({
         </button>
       </div>
     </article>
-  );
-}
-
-/* =========================================================
-   PRIMARY ACTION
-========================================================= */
-
-interface PrimaryActionButtonProps {
-  onClick: () => void;
-  icon?: ReactNode;
-  children: ReactNode;
-}
-
-function PrimaryActionButton({
-  onClick,
-  icon,
-  children,
-}: PrimaryActionButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={
-        onClick
-      }
-      className="
-        flex
-        min-h-[42px]
-        items-center
-        justify-center
-        gap-2
-        rounded-[13px]
-        px-4
-        text-[12px]
-        font-bold
-        text-white
-        shadow-[0_8px_20px_rgba(0,70,109,0.16)]
-        transition-all
-        duration-200
-
-        hover:-translate-y-0.5
-
-        focus-visible:outline-none
-        focus-visible:ring-4
-        focus-visible:ring-brand-accent/25
-      "
-      style={{
-        background:
-          'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
-      }}
-    >
-      {icon}
-
-      {children}
-    </button>
   );
 }
 
