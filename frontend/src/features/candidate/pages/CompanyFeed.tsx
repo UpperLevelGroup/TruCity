@@ -91,27 +91,6 @@ interface Company {
   requirements: readonly string[];
 }
 
-interface Job {
-  id: string;
-  title: string;
-  company: string;
-  companyId?: string;
-  location: string;
-  salary: string;
-  posted: string;
-  department: string;
-  description: string;
-  employmentType?: string;
-  workplaceType?: string;
-  qualifications?: string;
-  experienceRequired?: string;
-  skills: readonly string[];
-  responsibilities?: string;
-  benefits?: string;
-  applicationDeadline?: string;
-  status: string;
-}
-
 interface CompanyFeedProps {
   onChat?: (
     company: string,
@@ -673,7 +652,7 @@ export default function CompanyFeed({
           await api.get<
             BackendJobResponse[]
           >(
-            '/api/candidate/jobs/open',
+            '/api/jobs/open',
           );
 
         if (!Array.isArray(
@@ -1119,7 +1098,7 @@ export default function CompanyFeed({
           await api.get<
             BackendJobResponse[]
           >(
-            '/api/candidate/jobs/open',
+            '/api/jobs/open',
           );
 
         const activeJobs =
