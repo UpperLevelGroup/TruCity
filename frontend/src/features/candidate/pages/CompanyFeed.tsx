@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 
@@ -18,15 +19,12 @@ import {
   Flag,
   Layers,
   MapPin,
-  MessageSquare,
   Search,
   Send,
   X,
 } from 'lucide-react';
 
-import {
-  useNavigate,
-} from 'react-router-dom';
+import api from '../../../api/axios';
 
 import {
   useNotifications,
@@ -60,6 +58,14 @@ const INDUSTRY_COLORS = {
     badge:
       'border-brand-border bg-brand-surface text-brand-primary',
   },
+
+  'Verified Employer': {
+    avatar:
+      'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)',
+
+    badge:
+      'border-brand-accent/25 bg-brand-accent/10 text-brand-primary',
+  },
 } as const;
 
 type Industry =
@@ -75,6 +81,7 @@ type ActiveTab =
 ========================================================= */
 
 interface Company {
+  id: string;
   name: string;
   industry: Industry;
   location: string;
@@ -85,7 +92,7 @@ interface Company {
 }
 
 interface Job {
-  id: number;
+  id: string;
   title: string;
   company: string;
   location: string;
@@ -121,174 +128,281 @@ interface ItemDetails {
     | 'job';
 
   companyName?: string;
-  jobId?: number;
+  jobId?: string;
 }
 
 /* =========================================================
-   DATA
+   BACKEND DATA
 ========================================================= */
 
-const COMPANIES:
-  readonly Company[] = [
-    {
-      name:
-        'Apex Tech Solutions',
+interface Job {
+  id: string;
+  title: string;
+  company: string;
+  companyId?: string;
+  location: string;
+  salary: string;
+  posted: string;
+  department: string;
+  description: string;
+  employmentType?: string;
+  workplaceType?: string;
+  qualifications?: string;
+  experienceRequired?: string;
+  skills: readonly string[];
+  responsibilities?: string;
+  benefits?: string;
+  applicationDeadline?: string;
+  status: string;
+}
 
-      industry:
-        'FinTech & Banking',
+interface BackendJobResponse {
+  id: string;
+  companyId?: string | null;
+  companyName?: string | null;
+  title?: string | null;
+  department?: string | null;
+  description?: string | null;
+  location?: string | null;
+  workplaceType?: string | null;
+  employmentType?: string | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  salaryCurrency?: string | null;
+  salaryNegotiable?: boolean | null;
+  qualifications?: string | null;
+  experienceRequired?: string | null;
+  skills?: string[] | null;
+  responsibilities?: string | null;
+  benefits?: string | null;
+  applicationDeadline?: string | null;
+  status?: string | null;
+  createdAt?: string | null;
+}
 
-      location:
-        'Sandton, GP',
+function formatSalary(
+  job: BackendJobResponse,
+): string {
+  const currency =
+    job.salaryCurrency ||
+    'ZAR';
 
-      roles: [
-        'Senior Java Engineer',
-        'React Native Dev',
-        'DevOps Lead',
-      ],
+  const min =
+    job.salaryMin != null
+      ? Number(job.salaryMin)
+      : null;
 
-      bio:
-        'Leading digital payments provider expanding software engineering teams across Gauteng.',
+  const max =
+    job.salaryMax != null
+      ? Number(job.salaryMax)
+      : null;
 
-      about:
-        'Apex Tech Solutions is a premier financial technology institution driving innovation in digital banking infrastructure across South Africa. We cultivate a collaborative, high-performance engineering culture focusing on scalable, secure microservices and modern mobile experiences.',
+  if (min != null && max != null) {
+    return `${currency} ${min.toLocaleString()} - ${max.toLocaleString()} / pm`;
+  }
 
-      requirements: [
-        'Minimum 3+ years of professional software development experience.',
-        'Strong proficiency in modern object-oriented programming or reactive frameworks.',
-        "Bachelor's degree in Computer Science, Information Technology, or equivalent practical experience.",
-        'Demonstrated track record of delivering production-ready features in agile environments.',
-      ],
+  if (min != null) {
+    return `${currency} ${min.toLocaleString()}+ / pm`;
+  }
+
+  if (job.salaryNegotiable) {
+    return 'Salary negotiable';
+  }
+
+  return 'Salary not specified';
+}
+
+function formatPostedDate(
+  createdAt?: string | null,
+): string {
+  if (!createdAt) {
+    return 'Recently posted';
+  }
+
+  const date = new Date(createdAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Recently posted';
+  }
+
+  const diffMs =
+    Date.now() -
+    date.getTime();
+
+  const diffHours =
+    Math.max(
+      0,
+      Math.floor(
+        diffMs / 3600000,
+      ),
+    );
+
+  if (diffHours < 1) {
+    return 'Just now';
+  }
+
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+
+  const diffDays =
+    Math.floor(
+      diffHours / 24,
+    );
+
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
+
+  return date.toLocaleDateString();
+}
+
+function mapBackendJob(
+  job: BackendJobResponse,
+): Job {
+  return {
+    id: job.id,
+    companyId:
+      job.companyId ??
+      undefined,
+    title:
+      job.title?.trim() ||
+      'Untitled Position',
+    company:
+      job.companyName?.trim() ||
+      'Unknown Company',
+    location:
+      job.location?.trim() ||
+      'Location not specified',
+    salary:
+      formatSalary(job),
+    posted:
+      formatPostedDate(
+        job.createdAt,
+      ),
+    department:
+      job.department?.trim() ||
+      'General',
+    description:
+      job.description?.trim() ||
+      'No job description has been provided by the employer.',
+    employmentType:
+      job.employmentType?.trim() ||
+      undefined,
+    workplaceType:
+      job.workplaceType?.trim() ||
+      undefined,
+    qualifications:
+      job.qualifications?.trim() ||
+      undefined,
+    experienceRequired:
+      job.experienceRequired?.trim() ||
+      undefined,
+    skills:
+      Array.isArray(job.skills)
+        ? job.skills.filter(Boolean)
+        : [],
+    responsibilities:
+      job.responsibilities?.trim() ||
+      undefined,
+    benefits:
+      job.benefits?.trim() ||
+      undefined,
+    applicationDeadline:
+      job.applicationDeadline ??
+      undefined,
+    status:
+      job.status?.trim().toUpperCase() ||
+      'OPEN',
+  };
+}
+
+function buildCompanies(
+  jobs: readonly Job[],
+): Company[] {
+  const grouped =
+    new Map<string, Job[]>();
+
+  jobs.forEach((job) => {
+    const key =
+      job.companyId ||
+      job.company;
+
+    const current =
+      grouped.get(key) || [];
+
+    grouped.set(key, [
+      ...current,
+      job,
+    ]);
+  });
+
+  return Array.from(
+    grouped.entries(),
+  ).map(
+    ([id, companyJobs]) => {
+      const first =
+        companyJobs[0];
+
+      const requirements =
+        Array.from(
+          new Set(
+            companyJobs.flatMap(
+              (job) => [
+                ...(job.qualifications
+                  ? [job.qualifications]
+                  : []),
+                ...(job.experienceRequired
+                  ? [job.experienceRequired]
+                  : []),
+                ...job.skills,
+              ],
+            ),
+          ),
+        );
+
+      const descriptions =
+        companyJobs
+          .map(
+            (job) =>
+              job.description,
+          )
+          .filter(Boolean);
+
+      return {
+        id,
+        name: first.company,
+        industry:
+          'Verified Employer',
+        location:
+          first.location,
+        roles:
+          Array.from(
+            new Set(
+              companyJobs.map(
+                (job) =>
+                  job.title,
+              ),
+            ),
+          ),
+        bio:
+          `${companyJobs.length} open role${companyJobs.length === 1 ? '' : 's'} currently published on TruCity.`,
+        about:
+          descriptions.length > 0
+            ? descriptions
+                .slice(0, 3)
+                .join(' ')
+            : 'This employer has published opportunities on TruCity.',
+        requirements:
+          requirements.length > 0
+            ? requirements
+            : [
+                'Review the job-specific requirements before applying.',
+              ],
+      };
     },
-
-    {
-      name:
-        'Vanguard Logistics Hub',
-
-      industry:
-        'Supply Chain & IoT',
-
-      location:
-        'Midrand, GP',
-
-      roles: [
-        'QA Automation Lead',
-        'C# Backend Dev',
-      ],
-
-      bio:
-        'National enterprise modernising warehousing and automated delivery networks.',
-
-      about:
-        'Vanguard Logistics Hub operates at the intersection of supply chain automation and IoT technology. We build robust backend systems and real-time tracking engines that power automated distribution networks nationwide.',
-
-      requirements: [
-        'Proven background in backend system architecture or quality engineering frameworks.',
-        'Familiarity with cloud platforms and containerised microservices.',
-        'Strong analytical problem-solving skills and attention to system performance optimisation.',
-      ],
-    },
-
-    {
-      name:
-        'Innovate Digital Corp',
-
-      industry:
-        'AdTech',
-
-      location:
-        'Cape Town, WC',
-
-      roles: [
-        'Frontend Engineer',
-        'Data Analyst',
-      ],
-
-      bio:
-        "Building performance marketing infrastructure for Africa's fastest-growing brands.",
-
-      about:
-        'Innovate Digital Corp specialises in high-throughput advertising technology and data analytics pipelines. Our engineering teams build responsive user interfaces and robust data pipelines that process millions of daily user interactions.',
-
-      requirements: [
-        'Solid expertise in modern JavaScript/TypeScript frameworks and state management.',
-        'Experience working with data visualisation tools, RESTful APIs, or GraphQL endpoints.',
-        'Passion for clean code, responsive design principles, and rigorous code reviews.',
-      ],
-    },
-  ];
-
-const JOBS:
-  readonly Job[] = [
-    {
-      id: 1,
-      title: 'Senior Java Engineer',
-      company: 'Apex Tech Solutions',
-      location: 'Sandton, GP',
-      salary: 'R85,000 - R110,000 / pm',
-      posted: '2d ago',
-      department: 'Engineering',
-    },
-
-    {
-      id: 2,
-      title: 'React Native Dev',
-      company: 'Apex Tech Solutions',
-      location: 'Sandton, GP',
-      salary: 'R60,000 - R80,000 / pm',
-      posted: '1d ago',
-      department: 'Mobile Engineering',
-    },
-
-    {
-      id: 3,
-      title: 'DevOps Lead',
-      company: 'Apex Tech Solutions',
-      location: 'Sandton, GP',
-      salary: 'R90,000 - R120,000 / pm',
-      posted: '3d ago',
-      department: 'Infrastructure',
-    },
-
-    {
-      id: 4,
-      title: 'QA Automation Lead',
-      company: 'Vanguard Logistics Hub',
-      location: 'Midrand, GP',
-      salary: 'R65,000 - R85,000 / pm',
-      posted: '5h ago',
-      department: 'Quality Assurance',
-    },
-
-    {
-      id: 5,
-      title: 'C# Backend Dev',
-      company: 'Vanguard Logistics Hub',
-      location: 'Midrand, GP',
-      salary: 'R70,000 - R90,000 / pm',
-      posted: '4d ago',
-      department: 'Backend Engineering',
-    },
-
-    {
-      id: 6,
-      title: 'Frontend Engineer',
-      company: 'Innovate Digital Corp',
-      location: 'Cape Town, WC',
-      salary: 'R55,000 - R75,000 / pm',
-      posted: 'Just now',
-      department: 'Frontend Engineering',
-    },
-
-    {
-      id: 7,
-      title: 'Data Analyst',
-      company: 'Innovate Digital Corp',
-      location: 'Cape Town, WC',
-      salary: 'R45,000 - R65,000 / pm',
-      posted: '1w ago',
-      department: 'Data Intelligence',
-    },
-  ];
+  );
+}
 
 /* =========================================================
    COMPANY AVATAR
@@ -299,12 +413,16 @@ function CompanyAvatar({
   industry,
   size = 'md',
 }: CompanyAvatarProps) {
-  const background =
+  const industryStyle =
     industry
       ? INDUSTRY_COLORS[
-          industry
-        ].avatar
-      : 'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)';
+          industry as keyof typeof INDUSTRY_COLORS
+        ]
+      : undefined;
+
+  const background =
+    industryStyle?.avatar ||
+    'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)';
 
   const sizeClasses = {
     sm:
@@ -346,12 +464,9 @@ function CompanyAvatar({
 ========================================================= */
 
 export default function CompanyFeed({
-  onChat = () => {},
+  onChat: _onChat,
   onReport = () => {},
 }: CompanyFeedProps) {
-  const navigate =
-    useNavigate();
-
   const {
     addNotification,
   } = useNotifications();
@@ -365,10 +480,36 @@ export default function CompanyFeed({
     );
 
   const [
+    jobs,
+    setJobs,
+  ] =
+    useState<Job[]>([]);
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    loadError,
+    setLoadError,
+  ] =
+    useState('');
+
+  const [
+    applyingJobId,
+    setApplyingJobId,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
     appliedJobs,
     setAppliedJobs,
   ] =
-    useState<number[]>(
+    useState<string[]>(
       () => {
         try {
           const stored =
@@ -380,34 +521,18 @@ export default function CompanyFeed({
             return [];
           }
 
-          const parsed:
-            unknown =
-            JSON.parse(
-              stored,
-            );
+          const parsed =
+            JSON.parse(stored);
 
-          if (
-            !Array.isArray(
-              parsed,
-            )
-          ) {
-            return [];
-          }
-
-          return parsed.filter(
-            (
-              value,
-            ): value is number =>
-              typeof value ===
-                'number' &&
-              JOBS.some(
-                (
-                  job,
-                ) =>
-                  job.id ===
-                  value,
-              ),
-          );
+          return Array.isArray(
+            parsed,
+          )
+            ? parsed.filter(
+                (value) =>
+                  typeof value ===
+                  'string',
+              )
+            : [];
         } catch {
           return [];
         }
@@ -426,25 +551,19 @@ export default function CompanyFeed({
     companyFilter,
     setCompanyFilter,
   ] =
-    useState(
-      'All',
-    );
+    useState('All');
 
   const [
     jobFilter,
     setJobFilter,
   ] =
-    useState(
-      'All',
-    );
+    useState('All');
 
   const [
     jobSearchQuery,
     setJobSearchQuery,
   ] =
-    useState(
-      '',
-    );
+    useState('');
 
   const [
     selectedItemDetails,
@@ -458,7 +577,7 @@ export default function CompanyFeed({
     savedJobs,
     setSavedJobs,
   ] =
-    useState<number[]>(
+    useState<string[]>(
       () => {
         try {
           const stored =
@@ -470,34 +589,18 @@ export default function CompanyFeed({
             return [];
           }
 
-          const parsed:
-            unknown =
-            JSON.parse(
-              stored,
-            );
+          const parsed =
+            JSON.parse(stored);
 
-          if (
-            !Array.isArray(
-              parsed,
-            )
-          ) {
-            return [];
-          }
-
-          return parsed.filter(
-            (
-              value,
-            ): value is number =>
-              typeof value ===
-                'number' &&
-              JOBS.some(
-                (
-                  job,
-                ) =>
-                  job.id ===
-                  value,
-              ),
-          );
+          return Array.isArray(
+            parsed,
+          )
+            ? parsed.filter(
+                (value) =>
+                  typeof value ===
+                  'string',
+              )
+            : [];
         } catch {
           return [];
         }
@@ -520,214 +623,255 @@ export default function CompanyFeed({
             return [];
           }
 
-          const parsed:
-            unknown =
-            JSON.parse(
-              stored,
-            );
+          const parsed =
+            JSON.parse(stored);
 
-          if (
-            !Array.isArray(
-              parsed,
-            )
-          ) {
-            return [];
-          }
-
-          return parsed.filter(
-            (
-              value,
-            ): value is string =>
-              typeof value ===
-                'string' &&
-              COMPANIES.some(
-                (
-                  company,
-                ) =>
-                  company.name ===
-                  value,
-              ),
-          );
+          return Array.isArray(
+            parsed,
+          )
+            ? parsed.filter(
+                (value) =>
+                  typeof value ===
+                  'string',
+              )
+            : [];
         } catch {
           return [];
         }
       },
     );
 
-  /* =========================================================
-     PERSISTENCE
-  ========================================================= */
+  const companies =
+    useMemo(
+      () =>
+        buildCompanies(
+          jobs,
+        ),
+      [jobs],
+    );
 
-  useEffect(
-    () => {
+  useEffect(() => {
+    let mounted = true;
+
+    const loadFeed = async () => {
       try {
-        localStorage.setItem(
-          'trucity-candidate-applied-jobs',
-          JSON.stringify(
-            appliedJobs,
-          ),
-        );
-      } catch (
-        error
-      ) {
+        setLoading(true);
+        setLoadError('');
+
+        const response =
+          await api.get<
+            BackendJobResponse[]
+          >(
+            '/api/candidate/jobs/open',
+          );
+
+        if (!Array.isArray(
+          response.data,
+        )) {
+          throw new Error(
+            'The server returned an invalid jobs response.',
+          );
+        }
+
+        const activeJobs =
+          response.data
+            .map(
+              mapBackendJob,
+            )
+            .filter(
+              (job) =>
+                job.status ===
+                  'OPEN' ||
+                job.status ===
+                  'ACTIVE',
+            );
+
+        if (mounted) {
+          setJobs(
+            activeJobs,
+          );
+        }
+      } catch (error) {
         console.error(
-          'Unable to persist applied jobs:',
+          'Failed to load candidate opportunities:',
           error,
         );
-      }
-    },
-    [
-      appliedJobs,
-    ],
-  );
 
-  useEffect(
-    () => {
-      try {
-        localStorage.setItem(
-          'trucity-saved-jobs',
-          JSON.stringify(
-            savedJobs,
+        if (mounted) {
+          setJobs([]);
+          setLoadError(
+            'Unable to load live opportunities. Please try again.',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadFeed();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'trucity-candidate-applied-jobs',
+        JSON.stringify(
+          appliedJobs,
+        ),
+      );
+    } catch (error) {
+      console.error(
+        'Unable to persist applied jobs:',
+        error,
+      );
+    }
+  }, [appliedJobs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'trucity-saved-jobs',
+        JSON.stringify(
+          savedJobs,
+        ),
+      );
+    } catch (error) {
+      console.error(
+        'Unable to persist saved jobs:',
+        error,
+      );
+    }
+  }, [savedJobs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'trucity-saved-companies',
+        JSON.stringify(
+          savedCompanies,
+        ),
+      );
+    } catch (error) {
+      console.error(
+        'Unable to persist saved companies:',
+        error,
+      );
+    }
+  }, [savedCompanies]);
+
+  useEffect(() => {
+    if (!selectedItemDetails) {
+      return;
+    }
+
+    const previous =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      'hidden';
+
+    return () => {
+      document.body.style.overflow =
+        previous;
+    };
+  }, [selectedItemDetails]);
+
+  const companyFilters =
+    useMemo(
+      () => [
+        'All',
+        ...Array.from(
+          new Set(
+            companies
+              .map(
+                (company) =>
+                  company.industry,
+              )
+              .filter(Boolean),
           ),
-        );
-      } catch (
-        error
-      ) {
-        console.error(
-          'Unable to persist saved jobs:',
-          error,
-        );
-      }
-    },
-    [
-      savedJobs,
-    ],
-  );
+        ),
+      ],
+      [companies],
+    );
 
-  useEffect(
-    () => {
-      try {
-        localStorage.setItem(
-          'trucity-saved-companies',
-          JSON.stringify(
-            savedCompanies,
+  const jobFilters =
+    useMemo(
+      () => {
+        const values =
+          jobs.flatMap(
+            (job) => [
+              job.department,
+              job.employmentType ||
+                '',
+            ],
+          );
+
+        return [
+          'All',
+          ...Array.from(
+            new Set(
+              values.filter(
+                Boolean,
+              ),
+            ),
           ),
-        );
-      } catch (
-        error
-      ) {
-        console.error(
-          'Unable to persist saved companies:',
-          error,
-        );
-      }
-    },
-    [
-      savedCompanies,
-    ],
-  );
-
-  /* =========================================================
-     MODAL SCROLL LOCK
-  ========================================================= */
-
-  useEffect(
-    () => {
-      if (
-        !selectedItemDetails
-      ) {
-        return;
-      }
-
-      const previous =
-        document.body
-          .style
-          .overflow;
-
-      document.body
-        .style
-        .overflow =
-        'hidden';
-
-      return () => {
-        document.body
-          .style
-          .overflow =
-          previous;
-      };
-    },
-    [
-      selectedItemDetails,
-    ],
-  );
-
-  /* =========================================================
-     FILTERS
-  ========================================================= */
-
-  const companyFilters = [
-    'All',
-    'FinTech',
-    'Supply Chain',
-    'AdTech',
-  ];
-
-  const jobFilters = [
-    'All',
-    'Engineer',
-    'Dev',
-    'DevOps',
-    'QA Automation',
-    'Data Analyst',
-  ];
+        ];
+      },
+      [jobs],
+    );
 
   const shownCompanies =
-    COMPANIES
+    companies
       .filter(
-        (
-          company,
-        ) =>
+        (company) =>
           companyFilter ===
             'All' ||
-          company.industry.includes(
-            companyFilter,
-          ),
+          company.industry
+            .toLowerCase()
+            .includes(
+              companyFilter.toLowerCase(),
+            ),
       )
       .filter(
-        (
-          company,
-        ) =>
+        (company) =>
           !dismissed.includes(
             company.name,
           ),
       );
 
   const shownJobs =
-    JOBS
+    jobs
       .filter(
-        (
-          job,
-        ) =>
+        (job) =>
           !dismissed.includes(
             job.company,
           ),
       )
       .filter(
-        (
-          job,
-        ) =>
+        (job) =>
           jobFilter ===
             'All' ||
-          job.title
+          job.department
             .toLowerCase()
             .includes(
               jobFilter.toLowerCase(),
-            ),
+            ) ||
+          Boolean(
+            job.employmentType
+              ?.toLowerCase()
+              .includes(
+                jobFilter.toLowerCase(),
+              ),
+          ),
       )
       .filter(
-        (
-          job,
-        ) => {
+        (job) => {
           const query =
             jobSearchQuery
               .trim()
@@ -737,41 +881,33 @@ export default function CompanyFeed({
             return true;
           }
 
-          return (
-            job.title
-              .toLowerCase()
-              .includes(
-                query,
-              ) ||
-            job.location
-              .toLowerCase()
-              .includes(
-                query,
-              ) ||
-            job.department
-              .toLowerCase()
-              .includes(
-                query,
-              )
-          );
+          return [
+            job.title,
+            job.company,
+            job.location,
+            job.department,
+            job.description,
+            job.employmentType ||
+              '',
+            job.skills.join(' '),
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(query);
         },
       );
 
   const savedJobItems =
-    JOBS.filter(
-      (
-        job,
-      ) =>
+    jobs.filter(
+      (job) =>
         savedJobs.includes(
           job.id,
         ),
     );
 
   const savedCompanyItems =
-    COMPANIES.filter(
-      (
-        company,
-      ) =>
+    companies.filter(
+      (company) =>
         savedCompanies.includes(
           company.name,
         ),
@@ -781,35 +917,20 @@ export default function CompanyFeed({
     savedJobs.length > 0 ||
     savedCompanies.length > 0;
 
-  /* =========================================================
-     SAVE ACTIONS
-  ========================================================= */
-
   const toggleSaveJob = (
-    jobId: number,
+    jobId: string,
   ) => {
     setSavedJobs(
-      (
-        current,
-      ) => {
-        const alreadySaved =
-          current.includes(
-            jobId,
-          );
-
-        return alreadySaved
+      (current) =>
+        current.includes(jobId)
           ? current.filter(
-              (
-                id,
-              ) =>
-                id !==
-                jobId,
+              (id) =>
+                id !== jobId,
             )
           : [
               ...current,
               jobId,
-            ];
-      },
+            ],
     );
   };
 
@@ -817,161 +938,211 @@ export default function CompanyFeed({
     companyName: string,
   ) => {
     setSavedCompanies(
-      (
-        current,
-      ) => {
-        const alreadySaved =
-          current.includes(
-            companyName,
-          );
-
-        return alreadySaved
+      (current) =>
+        current.includes(
+          companyName,
+        )
           ? current.filter(
-              (
-                name,
-              ) =>
+              (name) =>
                 name !==
                 companyName,
             )
           : [
               ...current,
               companyName,
-            ];
-      },
+            ],
     );
   };
 
-  /* =========================================================
-     EXPRESS INTEREST
-  ========================================================= */
+  const handleExpressInterest =
+    async (
+      job: Job,
+    ) => {
+      if (
+        appliedJobs.includes(
+          job.id,
+        ) ||
+        applyingJobId
+      ) {
+        return;
+      }
 
-  const handleExpressInterest = (
-    job: Job,
-  ) => {
-    if (
-      appliedJobs.includes(
-        job.id,
-      )
-    ) {
-      return;
-    }
+      try {
+        setApplyingJobId(
+          job.id,
+        );
 
-    setAppliedJobs(
-      (
-        current,
-      ) => [
-        ...current,
-        job.id,
-      ],
-    );
+        /*
+         * The authenticated candidate is resolved by the
+         * backend from the JWT. Only the selected job id is
+         * sent by the browser.
+         */
+        await api.post(
+          '/api/candidate/applications',
+          {
+            jobId: job.id,
+          },
+        );
 
-    addNotification({
-      id: `application-${job.id}-${Date.now()}`,
-      
-      type: 'application',
+        setAppliedJobs(
+          (current) =>
+            current.includes(
+              job.id,
+            )
+              ? current
+              : [
+                  ...current,
+                  job.id,
+                ],
+        );
 
-      title:'Application submitted',
+        addNotification({
+          id: `application-${job.id}-${Date.now()}`,
+          type: 'application',
+          title:
+            'Application submitted',
+          message:
+            `Your TruCity profile was submitted to ${job.company} for the ${job.title} position.`,
+          time: 'Just now',
+          read: false,
+          destination:
+            '/candidate/feed',
+        });
+      } catch (error: any) {
+        console.error(
+          'Failed to submit application:',
+          error,
+        );
 
-      message:`Your TruCity profile was submitted to ${job.company} for the ${job.title} position.`,
+        const message =
+          error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          'Unable to submit your application. Please try again.';
 
-      time:'Just now',
-
-      read:false,
-
-      destination:'/candidate/feed',
-    });
-  };
-
-  /* =========================================================
-     CONTACT COMPANY
-  ========================================================= */
-
-  const handleContactCompany = (
-    companyName: string,
-  ) => {
-    onChat(
-      companyName,
-    );
-
-    navigate(
-      '/candidate/messages',
-      {
-        state: {
-          source:
-            'company-contact',
-
-          company:
-            companyName,
-
-          allowCvAttachment:
-            true,
-        },
-      },
-    );
-  };
-
-  /* =========================================================
-     DETAILS
-  ========================================================= */
+        addNotification({
+          id: `application-error-${job.id}-${Date.now()}`,
+          type: 'system',
+          title:
+            'Application not submitted',
+          message:
+            typeof message ===
+            'string'
+              ? message
+              : 'Unable to submit your application. Please try again.',
+          time: 'Just now',
+          read: false,
+          destination:
+            '/candidate/feed',
+        });
+      } finally {
+        setApplyingJobId(
+          null,
+        );
+      }
+    };
 
   const openJobDetails = (
     job: Job,
   ) => {
-    setSelectedItemDetails(
-      {
-        title:
-          job.title,
+    const requirements =
+      [
+        job.experienceRequired,
+        job.qualifications,
+        ...job.skills,
+        job.workplaceType,
+        job.employmentType,
+        job.benefits,
+      ].filter(
+        (
+          value,
+        ): value is string =>
+          Boolean(
+            value &&
+              value.trim(),
+          ),
+      );
 
-        subtitle:
-          `${job.company} · ${job.location}`,
-
-        description:
-          `We are looking for a dedicated ${job.title} to join our high-performing team in ${job.department}. You will play a key role in building high-impact systems, collaborating cross-functionally, and driving professional standards.`,
-
-        metaList: [
-          'Professional experience matching the core role requirements.',
-          'Strong understanding of modern systems, integrations and professional workflows.',
-          'Strong communication skills and a collaborative team mindset.',
-          `Competitive compensation package: ${job.salary}.`,
-        ],
-
-        type:
-          'job',
-
-        companyName:
-          job.company,
-
-        jobId:
-          job.id,
-      },
-    );
+    setSelectedItemDetails({
+      title: job.title,
+      subtitle:
+        `${job.company} · ${job.location}`,
+      description:
+        job.description,
+      metaList:
+        requirements.length > 0
+          ? requirements
+          : [
+              'Review the complete job description before applying.',
+            ],
+      type: 'job',
+      companyName:
+        job.company,
+      jobId: job.id,
+    });
   };
 
   const openCompanyDetails = (
     company: Company,
   ) => {
-    setSelectedItemDetails(
-      {
-        title:
-          company.name,
-
-        subtitle:
-          `${company.industry} · ${company.location}`,
-
-        description:
-          company.about,
-
-        metaList:
-          company.requirements,
-
-        type:
-          'company',
-
-        companyName:
-          company.name,
-      },
-    );
+    setSelectedItemDetails({
+      title: company.name,
+      subtitle:
+        `${company.industry} · ${company.location}`,
+      description:
+        company.about,
+      metaList:
+        company.requirements,
+      type: 'company',
+      companyName:
+        company.name,
+    });
   };
+
+  const reloadFeed =
+    async () => {
+      try {
+        setLoading(true);
+        setLoadError('');
+
+        const response =
+          await api.get<
+            BackendJobResponse[]
+          >(
+            '/api/candidate/jobs/open',
+          );
+
+        const activeJobs =
+          Array.isArray(
+            response.data,
+          )
+            ? response.data
+                .map(
+                  mapBackendJob,
+                )
+                .filter(
+                  (job) =>
+                    job.status ===
+                      'OPEN' ||
+                    job.status ===
+                      'ACTIVE',
+                )
+            : [];
+
+        setJobs(
+          activeJobs,
+        );
+      } catch (error) {
+        console.error(
+          'Failed to reload opportunities:',
+          error,
+        );
+        setLoadError(
+          'Unable to load live opportunities. Please try again.',
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
   return (
     <div
@@ -993,16 +1164,11 @@ export default function CompanyFeed({
           max-w-[1480px]
           px-4
           py-8
-
           sm:px-8
           lg:px-10
           lg:py-10
         "
       >
-        {/* =================================================
-            PAGE HEADER
-        ================================================== */}
-
         <section className="mb-8">
           <p
             className="
@@ -1025,13 +1191,11 @@ export default function CompanyFeed({
               leading-[1.08]
               tracking-[-0.035em]
               !text-brand-primary
-
               sm:text-[40px]
               lg:text-[48px]
             "
           >
             Find your next{' '}
-
             <span className="text-brand-gold">
               opportunity.
             </span>
@@ -1045,18 +1209,14 @@ export default function CompanyFeed({
               font-normal
               leading-7
               text-brand-textMuted
-
               sm:text-[16px]
             "
           >
-            Browse verified employers and apply to open roles
-            using your TruCity professional profile.
+            Browse live opportunities published
+            by employers on TruCity and apply
+            using your professional profile.
           </p>
         </section>
-
-        {/* =================================================
-            CONTROLS
-        ================================================== */}
 
         <div
           className="
@@ -1079,7 +1239,6 @@ export default function CompanyFeed({
               flex
               flex-col
               gap-3
-
               lg:flex-row
               lg:items-center
             "
@@ -1177,7 +1336,8 @@ export default function CompanyFeed({
                   text-brand-textMuted
                 "
               >
-                Browse verified companies currently hiring on TruCity.
+                Companies shown here are derived from
+                live employer job postings.
               </div>
             )}
 
@@ -1208,8 +1368,8 @@ export default function CompanyFeed({
                     text-brand-gold
                   "
                 />
-
-                Your bookmarked companies and jobs are stored here.
+                Your saved companies and roles are
+                stored on this device.
               </div>
             )}
           </div>
@@ -1245,357 +1405,416 @@ export default function CompanyFeed({
           )}
         </div>
 
-        {/* =================================================
-            COMPANIES
-        ================================================== */}
+        {loadError && (
+          <div
+            className="
+              mb-6
+              flex
+              flex-wrap
+              items-center
+              justify-between
+              gap-3
+              rounded-[18px]
+              border
+              border-brand-crimson/20
+              bg-brand-crimson/5
+              px-4
+              py-3
+              text-[13px]
+              font-semibold
+              text-brand-primary
+            "
+          >
+            <span>
+              {loadError}
+            </span>
 
-        {activeTab ===
-          'companies' && (
-          <div className="space-y-4">
-            {shownCompanies.length ===
-            0 ? (
-              <EmptyState
-                icon="company"
-                title="No companies available"
-                text="There are no companies in this category right now."
-              />
-            ) : (
-              shownCompanies.map(
-                (
-                  company,
-                ) => (
-                  <CompanyCard
-                    key={
-                      company.name
-                    }
-                    company={
-                      company
-                    }
-                    isSaved={savedCompanies.includes(
-                      company.name,
-                    )}
-                    onMessage={() =>
-                      handleContactCompany(
-                        company.name,
-                      )
-                    }
-                    onToggleSave={() =>
-                      toggleSaveCompany(
-                        company.name,
-                      )
-                    }
-                    onOpenInfo={() =>
-                      openCompanyDetails(
-                        company,
-                      )
-                    }
-                    onReport={() =>
-                      onReport(
-                        company.name,
-                      )
-                    }
-                    onDismiss={() =>
-                      setDismissed(
-                        (
-                          current,
-                        ) =>
-                          current.includes(
-                            company.name,
-                          )
-                            ? current
-                            : [
-                                ...current,
-                                company.name,
-                              ],
-                      )
-                    }
-                  />
-                ),
-              )
-            )}
-          </div>
-        )}
-
-        {/* =================================================
-            JOBS
-        ================================================== */}
-
-        {activeTab ===
-          'jobs' && (
-          <div className="space-y-3">
-            {shownJobs.length ===
-            0 ? (
-              <EmptyState
-                icon="job"
-                title="No matching jobs"
-                text="No active roles match your search or current filters."
-              />
-            ) : (
-              shownJobs.map(
-                (
-                  job,
-                ) => {
-                  const company =
-                    COMPANIES.find(
-                      (
-                        item,
-                      ) =>
-                        item.name ===
-                        job.company,
-                    );
-
-                  return (
-                    <JobCard
-                      key={
-                        job.id
-                      }
-                      job={
-                        job
-                      }
-                      company={
-                        company
-                      }
-                      isSaved={savedJobs.includes(
-                        job.id,
-                      )}
-                      hasApplied={appliedJobs.includes(
-                        job.id,
-                      )}
-                      onToggleSave={() =>
-                        toggleSaveJob(
-                          job.id,
-                        )
-                      }
-                      onOpenInfo={() =>
-                        openJobDetails(
-                          job,
-                        )
-                      }
-                      onExpressInterest={() =>
-                        handleExpressInterest(
-                          job,
-                        )
-                      }
-                    />
-                  );
-                },
-              )
-            )}
-          </div>
-        )}
-
-        {/* =================================================
-            SAVED
-        ================================================== */}
-
-        {activeTab ===
-          'saved' && (
-          <div className="space-y-6">
-            <div
+            <button
+              type="button"
+              onClick={
+                reloadFeed
+              }
               className="
-                rounded-[24px]
+                rounded-[10px]
                 border
                 border-brand-border
-                bg-white/95
-                p-5
-                shadow-[0_14px_34px_rgba(0,70,109,0.06)]
+                bg-white
+                px-3
+                py-2
+                text-[12px]
+                font-bold
               "
             >
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-3
-                "
-              >
-                <div
-                  className="
-                    grid
-                    h-11
-                    w-11
-                    place-items-center
-                    rounded-[14px]
-                    border
-                    border-brand-gold/35
-                    bg-brand-gold/10
-                  "
-                >
-                  <Bookmark
-                    className="
-                      h-5
-                      w-5
-                      fill-brand-gold
-                      text-brand-gold
-                    "
+              Retry
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <div
+            className="
+              flex
+              min-h-[260px]
+              items-center
+              justify-center
+              rounded-[24px]
+              border
+              border-brand-border
+              bg-white/95
+              text-[14px]
+              font-semibold
+              text-brand-textMuted
+              shadow-[0_14px_34px_rgba(0,70,109,0.06)]
+            "
+          >
+            Loading live opportunities...
+          </div>
+        ) : (
+          <>
+            {activeTab ===
+              'companies' && (
+              <div className="space-y-4">
+                {shownCompanies.length ===
+                0 ? (
+                  <EmptyState
+                    icon="company"
+                    title="No companies available"
+                    text={
+                      jobs.length ===
+                      0
+                        ? 'No employers have published active opportunities yet.'
+                        : 'There are no companies matching your current filter.'
+                    }
                   />
-                </div>
-
-                <div>
-                  <h2
-                    className="
-                      !m-0
-                      text-[20px]
-                      font-bold
-                      !text-brand-primary
-                    "
-                  >
-                    Saved
-                  </h2>
-
-                  <p
-                    className="
-                      mt-1
-                      text-[12px]
-                      text-brand-textMuted
-                    "
-                  >
-                    Companies and roles you bookmarked for later.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {!hasSavedItems ? (
-              <SavedEmptyState
-                onBrowse={() =>
-                  setActiveTab(
-                    'companies',
+                ) : (
+                  shownCompanies.map(
+                    (
+                      company,
+                    ) => (
+                      <CompanyCard
+                        key={
+                          company.id
+                        }
+                        company={
+                          company
+                        }
+                        isSaved={savedCompanies.includes(
+                          company.name,
+                        )}
+                        onToggleSave={() =>
+                          toggleSaveCompany(
+                            company.name,
+                          )
+                        }
+                        onOpenInfo={() =>
+                          openCompanyDetails(
+                            company,
+                          )
+                        }
+                        onReport={() =>
+                          onReport(
+                            company.name,
+                          )
+                        }
+                        onDismiss={() =>
+                          setDismissed(
+                            (
+                              current,
+                            ) =>
+                              current.includes(
+                                company.name,
+                              )
+                                ? current
+                                : [
+                                    ...current,
+                                    company.name,
+                                  ],
+                          )
+                        }
+                      />
+                    ),
                   )
-                }
-              />
-            ) : (
-              <>
-                {savedCompanyItems.length >
-                  0 && (
-                  <section className="space-y-4">
-                    <SavedSectionHeading
-                      icon={
-                        <Building2 className="h-4 w-4" />
-                      }
-                      title="Saved Companies"
-                    />
+                )}
+              </div>
+            )}
 
-                    {savedCompanyItems.map(
-                      (
-                        company,
-                      ) => (
-                        <CompanyCard
+            {activeTab ===
+              'jobs' && (
+              <div className="space-y-3">
+                {shownJobs.length ===
+                0 ? (
+                  <EmptyState
+                    icon="job"
+                    title="No matching jobs"
+                    text={
+                      jobs.length ===
+                      0
+                        ? 'No active roles have been published yet.'
+                        : 'No active roles match your search or current filters.'
+                    }
+                  />
+                ) : (
+                  shownJobs.map(
+                    (job) => {
+                      const company =
+                        companies.find(
+                          (
+                            item,
+                          ) =>
+                            item.name ===
+                            job.company,
+                        );
+
+                      return (
+                        <JobCard
                           key={
-                            company.name
+                            job.id
+                          }
+                          job={
+                            job
                           }
                           company={
                             company
                           }
-                          isSaved
-                          onMessage={() =>
-                            handleContactCompany(
-                              company.name,
-                            )
+                          isSaved={savedJobs.includes(
+                            job.id,
+                          )}
+                          hasApplied={appliedJobs.includes(
+                            job.id,
+                          )}
+                          isApplying={
+                            applyingJobId ===
+                            job.id
                           }
                           onToggleSave={() =>
-                            toggleSaveCompany(
-                              company.name,
+                            toggleSaveJob(
+                              job.id,
                             )
                           }
                           onOpenInfo={() =>
-                            openCompanyDetails(
-                              company,
+                            openJobDetails(
+                              job,
                             )
                           }
-                          onReport={() =>
-                            onReport(
-                              company.name,
-                            )
-                          }
-                          onDismiss={() =>
-                            setDismissed(
-                              (
-                                current,
-                              ) =>
-                                current.includes(
-                                  company.name,
-                                )
-                                  ? current
-                                  : [
-                                      ...current,
-                                      company.name,
-                                    ],
+                          onExpressInterest={() =>
+                            handleExpressInterest(
+                              job,
                             )
                           }
                         />
-                      ),
-                    )}
-                  </section>
+                      );
+                    },
+                  )
                 )}
-
-                {savedJobItems.length >
-                  0 && (
-                  <section className="space-y-3">
-                    <SavedSectionHeading
-                      icon={
-                        <Briefcase className="h-4 w-4" />
-                      }
-                      title="Saved Jobs"
-                    />
-
-                    {savedJobItems.map(
-                      (
-                        job,
-                      ) => {
-                        const company =
-                          COMPANIES.find(
-                            (
-                              item,
-                            ) =>
-                              item.name ===
-                              job.company,
-                          );
-
-                        return (
-                          <JobCard
-                            key={
-                              job.id
-                            }
-                            job={
-                              job
-                            }
-                            company={
-                              company
-                            }
-                            isSaved
-                            hasApplied={appliedJobs.includes(
-                              job.id,
-                            )}
-                            onToggleSave={() =>
-                              toggleSaveJob(
-                                job.id,
-                              )
-                            }
-                            onOpenInfo={() =>
-                              openJobDetails(
-                                job,
-                              )
-                            }
-                            onExpressInterest={() =>
-                              handleExpressInterest(
-                                job,
-                              )
-                            }
-                          />
-                        );
-                      },
-                    )}
-                  </section>
-                )}
-              </>
+              </div>
             )}
-          </div>
+
+            {activeTab ===
+              'saved' && (
+              <div className="space-y-6">
+                <div
+                  className="
+                    rounded-[24px]
+                    border
+                    border-brand-border
+                    bg-white/95
+                    p-5
+                    shadow-[0_14px_34px_rgba(0,70,109,0.06)]
+                  "
+                >
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-3
+                    "
+                  >
+                    <div
+                      className="
+                        grid
+                        h-11
+                        w-11
+                        place-items-center
+                        rounded-[14px]
+                        border
+                        border-brand-gold/35
+                        bg-brand-gold/10
+                      "
+                    >
+                      <Bookmark
+                        className="
+                          h-5
+                          w-5
+                          fill-brand-gold
+                          text-brand-gold
+                        "
+                      />
+                    </div>
+
+                    <div>
+                      <h2
+                        className="
+                          !m-0
+                          text-[20px]
+                          font-bold
+                          !text-brand-primary
+                        "
+                      >
+                        Saved
+                      </h2>
+
+                      <p
+                        className="
+                          mt-1
+                          text-[12px]
+                          text-brand-textMuted
+                        "
+                      >
+                        Companies and roles you bookmarked
+                        for later.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {!hasSavedItems ? (
+                  <SavedEmptyState
+                    onBrowse={() =>
+                      setActiveTab(
+                        'companies',
+                      )
+                    }
+                  />
+                ) : (
+                  <>
+                    {savedCompanyItems.length >
+                      0 && (
+                      <section className="space-y-4">
+                        <SavedSectionHeading
+                          icon={
+                            <Building2 className="h-4 w-4" />
+                          }
+                          title="Saved Companies"
+                        />
+
+                        {savedCompanyItems.map(
+                          (
+                            company,
+                          ) => (
+                            <CompanyCard
+                              key={
+                                company.id
+                              }
+                              company={
+                                company
+                              }
+                              isSaved
+                                    onToggleSave={() =>
+                                toggleSaveCompany(
+                                  company.name,
+                                )
+                              }
+                              onOpenInfo={() =>
+                                openCompanyDetails(
+                                  company,
+                                )
+                              }
+                              onReport={() =>
+                                onReport(
+                                  company.name,
+                                )
+                              }
+                              onDismiss={() =>
+                                setDismissed(
+                                  (
+                                    current,
+                                  ) =>
+                                    current.includes(
+                                      company.name,
+                                    )
+                                      ? current
+                                      : [
+                                          ...current,
+                                          company.name,
+                                        ],
+                                )
+                              }
+                            />
+                          ),
+                        )}
+                      </section>
+                    )}
+
+                    {savedJobItems.length >
+                      0 && (
+                      <section className="space-y-3">
+                        <SavedSectionHeading
+                          icon={
+                            <Briefcase className="h-4 w-4" />
+                          }
+                          title="Saved Jobs"
+                        />
+
+                        {savedJobItems.map(
+                          (
+                            job,
+                          ) => {
+                            const company =
+                              companies.find(
+                                (
+                                  item,
+                                ) =>
+                                  item.name ===
+                                  job.company,
+                              );
+
+                            return (
+                              <JobCard
+                                key={
+                                  job.id
+                                }
+                                job={
+                                  job
+                                }
+                                company={
+                                  company
+                                }
+                                isSaved
+                                hasApplied={appliedJobs.includes(
+                                  job.id,
+                                )}
+                                isApplying={
+                                  applyingJobId ===
+                                  job.id
+                                }
+                                onToggleSave={() =>
+                                  toggleSaveJob(
+                                    job.id,
+                                  )
+                                }
+                                onOpenInfo={() =>
+                                  openJobDetails(
+                                    job,
+                                  )
+                                }
+                                onExpressInterest={() =>
+                                  handleExpressInterest(
+                                    job,
+                                  )
+                                }
+                              />
+                            );
+                          },
+                        )}
+                      </section>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </>
         )}
       </main>
-
-      {/* =====================================================
-          DETAILS MODAL
-      ====================================================== */}
 
       {selectedItemDetails && (
         <DetailModal
@@ -1612,41 +1831,35 @@ export default function CompanyFeed({
                 )
               : false
           }
+          isApplying={
+            selectedItemDetails.type ===
+              'job' &&
+            selectedItemDetails.jobId !==
+              undefined
+              ? applyingJobId ===
+                selectedItemDetails.jobId
+              : false
+          }
           onClose={() =>
             setSelectedItemDetails(
               null,
             )
           }
-          onContact={(
-            companyName,
-          ) => {
-            setSelectedItemDetails(
-              null,
-            );
-
-            handleContactCompany(
-              companyName,
-            );
-          }}
           onExpressInterest={(
             jobId,
           ) => {
             const job =
-              JOBS.find(
-                (
-                  item,
-                ) =>
+              jobs.find(
+                (item) =>
                   item.id ===
                   jobId,
               );
 
-            if (!job) {
-              return;
+            if (job) {
+              void handleExpressInterest(
+                job,
+              );
             }
-
-            handleExpressInterest(
-              job,
-            );
           }}
         />
       )}
@@ -2010,7 +2223,6 @@ function BookmarkButton({
 interface CompanyCardProps {
   company: Company;
   isSaved: boolean;
-  onMessage: () => void;
   onToggleSave: () => void;
   onOpenInfo: () => void;
   onReport: () => void;
@@ -2020,7 +2232,6 @@ interface CompanyCardProps {
 function CompanyCard({
   company,
   isSaved,
-  onMessage,
   onToggleSave,
   onOpenInfo,
   onReport,
@@ -2028,8 +2239,13 @@ function CompanyCard({
 }: CompanyCardProps) {
   const industryStyle =
     INDUSTRY_COLORS[
-      company.industry
-    ];
+      company.industry as keyof typeof INDUSTRY_COLORS
+    ] || {
+      avatar:
+        'linear-gradient(135deg, #00466D 0%, #1E92D2 100%)',
+      badge:
+        'border-brand-border bg-brand-surface text-brand-primary',
+    };
 
   return (
     <article
@@ -2241,17 +2457,6 @@ function CompanyCard({
             pt-4
           "
         >
-          <PrimaryActionButton
-            onClick={
-              onMessage
-            }
-            icon={
-              <MessageSquare className="h-4 w-4" />
-            }
-          >
-            Message Company
-          </PrimaryActionButton>
-
           <button
             type="button"
             onClick={
@@ -2365,6 +2570,7 @@ interface JobCardProps {
   onToggleSave: () => void;
   onOpenInfo: () => void;
   onExpressInterest: () => void;
+  isApplying?: boolean;
 }
 
 function JobCard({
@@ -2375,6 +2581,7 @@ function JobCard({
   onToggleSave,
   onOpenInfo,
   onExpressInterest,
+  isApplying = false,
 }: JobCardProps) {
   return (
     <article
@@ -2555,7 +2762,8 @@ function JobCard({
             onExpressInterest
           }
           disabled={
-            hasApplied
+            hasApplied ||
+            isApplying
           }
           className={`
             flex
@@ -2610,6 +2818,12 @@ function JobCard({
               />
 
               Applied
+            </>
+          ) : isApplying ? (
+            <>
+              <Clock className="h-3.5 w-3.5" />
+
+              Submitting...
             </>
           ) : (
             <>
@@ -2734,14 +2948,15 @@ function SavedSectionHeading({
 interface DetailModalProps {
   details: ItemDetails;
   isApplied: boolean;
+  isApplying?: boolean;
   onClose: () => void;
 
-  onContact: (
+  onContact?: (
     company: string,
   ) => void;
 
   onExpressInterest: (
-    jobId: number,
+    jobId: string,
   ) => void;
 }
 
@@ -2749,7 +2964,7 @@ function DetailModal({
   details,
   isApplied,
   onClose,
-  onContact,
+  isApplying,
   onExpressInterest,
 }: DetailModalProps) {
   return (
@@ -2959,7 +3174,8 @@ function DetailModal({
                   )
                 }
                 disabled={
-                  isApplied
+                  isApplied ||
+                  isApplying
                 }
                 className={`
                   flex
@@ -3013,6 +3229,12 @@ function DetailModal({
 
                     Applied
                   </>
+                ) : isApplying ? (
+                  <>
+                    <Clock className="h-3.5 w-3.5" />
+
+                    Submitting...
+                  </>
                 ) : (
                   <>
                     <Send className="h-3.5 w-3.5" />
@@ -3021,23 +3243,6 @@ function DetailModal({
                   </>
                 )}
               </button>
-            )}
-
-          {details.type ===
-            'company' &&
-            details.companyName && (
-              <PrimaryActionButton
-                onClick={() =>
-                  onContact(
-                    details.companyName!,
-                  )
-                }
-                icon={
-                  <MessageSquare className="h-3.5 w-3.5" />
-                }
-              >
-                Message Company
-              </PrimaryActionButton>
             )}
 
           <button

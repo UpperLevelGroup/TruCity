@@ -24,6 +24,8 @@ import {
   clearPendingCandidateRegistration,
 } from '../../auth/components/register/candidateRegistrationStorage';
 
+import api from '../../../api/axios';
+
 type Mode = 'idle' | 'live' | 'done';
 
 const EXPERIENCE_RANGES = [
@@ -140,11 +142,121 @@ export default function ProfileSetup() {
   const [experience, setExperience] =
     useState<string | null>(null);
 
+  const [faceData, setFaceData] =
+    useState<string | null>(null);
+
+  const [photoData, setPhotoData] =
+    useState<string | null>(null);
+
+  const [reelData, setReelData] =
+    useState<string | null>(null);
+
+  const [isLoadingProfile, setIsLoadingProfile] =
+    useState(true);
+
+  const [isSaving, setIsSaving] =
+    useState(false);
+
+  const [saveError, setSaveError] =
+    useState('');
+
   /* =========================================================
      VALIDATION
   ========================================================= */
 
   const isIdValid = /^\d{13}$/.test(idNumber);
+
+  const fileToDataUrl = (
+    file: Blob,
+  ): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Could not read the selected file.'));
+        }
+      };
+
+      reader.onerror = () =>
+        reject(
+          reader.error ??
+            new Error('Could not read the selected file.'),
+        );
+
+      reader.readAsDataURL(file);
+    });
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadExistingProfileSetup = async () => {
+      try {
+        setIsLoadingProfile(true);
+        setSaveError('');
+
+        const response =
+          await api.get<{
+            idNumber?: string | null;
+            industry?: string | null;
+            experience?: string | null;
+            facePhoto?: string | null;
+            fullBodyPhoto?: string | null;
+            introReel?: {
+              fileName?: string;
+              fileSize?: string;
+              uploadedAt?: string;
+              dataUrl?: string | null;
+            } | null;
+          }>('/api/candidate/profile/setup');
+
+        if (!mounted) {
+          return;
+        }
+
+        const data = response.data;
+
+        setIdNumber(data.idNumber ?? '');
+        setIndustry(data.industry ?? '');
+        setExperience(data.experience ?? null);
+
+        if (data.facePhoto) {
+          setFacePreview(data.facePhoto);
+          setFaceData(data.facePhoto);
+          setFaceMode('done');
+        }
+
+        if (data.fullBodyPhoto) {
+          setPhotoPreview(data.fullBodyPhoto);
+          setPhotoData(data.fullBodyPhoto);
+          setPhotoMode('done');
+        }
+
+        if (data.introReel?.dataUrl) {
+          setReelPreview(data.introReel.dataUrl);
+          setReelData(data.introReel.dataUrl);
+          setReelMode('done');
+        }
+      } catch (error) {
+        console.error(
+          'Failed to load candidate profile setup:',
+          error,
+        );
+      } finally {
+        if (mounted) {
+          setIsLoadingProfile(false);
+        }
+      }
+    };
+
+    void loadExistingProfileSetup();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleIdNumberChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -269,9 +381,10 @@ export default function ProfileSetup() {
       canvas.height,
     );
 
-    setFacePreview(
-      canvas.toDataURL('image/jpeg'),
-    );
+    const imageData = canvas.toDataURL('image/jpeg');
+
+    setFacePreview(imageData);
+    setFaceData(imageData);
 
     faceStreamRef.current
       ?.getTracks()
@@ -290,6 +403,7 @@ export default function ProfileSetup() {
     faceStreamRef.current = null;
 
     setFacePreview(null);
+    setFaceData(null);
     setFaceMode('idle');
   };
 
@@ -302,8 +416,15 @@ export default function ProfileSetup() {
       return;
     }
 
-    setFacePreview(URL.createObjectURL(file));
-    setFaceMode('done');
+    void fileToDataUrl(file)
+      .then((dataUrl) => {
+        setFacePreview(dataUrl);
+        setFaceData(dataUrl);
+        setFaceMode('done');
+      })
+      .catch(() => {
+        alert('Could not read that image. Please choose another photo.');
+      });
   };
 
   /* =========================================================
@@ -347,9 +468,10 @@ export default function ProfileSetup() {
       canvas.height,
     );
 
-    setPhotoPreview(
-      canvas.toDataURL('image/jpeg'),
-    );
+    const imageData = canvas.toDataURL('image/jpeg');
+
+    setPhotoPreview(imageData);
+    setPhotoData(imageData);
 
     photoStreamRef.current
       ?.getTracks()
@@ -368,6 +490,7 @@ export default function ProfileSetup() {
     photoStreamRef.current = null;
 
     setPhotoPreview(null);
+    setPhotoData(null);
     setPhotoMode('idle');
   };
 
@@ -380,8 +503,15 @@ export default function ProfileSetup() {
       return;
     }
 
-    setPhotoPreview(URL.createObjectURL(file));
-    setPhotoMode('done');
+    void fileToDataUrl(file)
+      .then((dataUrl) => {
+        setPhotoPreview(dataUrl);
+        setPhotoData(dataUrl);
+        setPhotoMode('done');
+      })
+      .catch(() => {
+        alert('Could not read that image. Please choose another photo.');
+      });
   };
 
   /* =========================================================
@@ -430,9 +560,14 @@ export default function ProfileSetup() {
           },
         );
 
-        setReelPreview(
-          URL.createObjectURL(blob),
-        );
+        void fileToDataUrl(blob)
+          .then((dataUrl) => {
+            setReelPreview(dataUrl);
+            setReelData(dataUrl);
+          })
+          .catch(() => {
+            alert('Could not prepare the recorded video for upload.');
+          });
 
         stream
           .getTracks()
@@ -480,6 +615,7 @@ export default function ProfileSetup() {
     reelStreamRef.current = null;
 
     setReelPreview(null);
+    setReelData(null);
     setSecondsLeft(30);
     setReelMode('idle');
   };
@@ -493,8 +629,15 @@ export default function ProfileSetup() {
       return;
     }
 
-    setReelPreview(URL.createObjectURL(file));
-    setReelMode('done');
+    void fileToDataUrl(file)
+      .then((dataUrl) => {
+        setReelPreview(dataUrl);
+        setReelData(dataUrl);
+        setReelMode('done');
+      })
+      .catch(() => {
+        alert('Could not read that video. Please choose another video.');
+      });
   };
 
   /* =========================================================
@@ -508,22 +651,49 @@ export default function ProfileSetup() {
     Boolean(industry) &&
     Boolean(experience);
 
-  const handleContinue = () => {
-    if (!isComplete) {
+  const handleContinue = async () => {
+    if (!isComplete || isSaving) {
       return;
     }
 
-    /*
-     * The registration details are now available in this
-     * component and can be used by the profile API when that
-     * integration is added.
-     *
-     * Clear them only when leaving Profile Setup so they are
-     * not left in sessionStorage indefinitely.
-     */
-    clearPendingCandidateRegistration();
+    try {
+      setIsSaving(true);
+      setSaveError('');
 
-    navigate('/candidate/choose-plan');
+      await api.put(
+        '/api/candidate/profile/setup',
+        {
+          idNumber,
+          industry,
+          experience,
+          facePhoto: faceData,
+          fullBodyPhoto: photoData,
+          introReel: reelData
+            ? {
+                fileName: 'candidate-intro-reel.webm',
+                fileSize: '',
+                uploadedAt: new Date().toISOString(),
+                dataUrl: reelData,
+              }
+            : null,
+        },
+      );
+
+      clearPendingCandidateRegistration();
+
+      navigate('/candidate/choose-plan');
+    } catch (error) {
+      console.error(
+        'Failed to save candidate profile setup:',
+        error,
+      );
+
+      setSaveError(
+        'We could not save your profile right now. Please try again.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -1040,6 +1210,32 @@ export default function ProfileSetup() {
                 Add the information below so employers
                 can get a complete view of your profile.
               </p>
+
+              {isLoadingProfile && (
+                <p className="mt-3 text-[12px] font-semibold text-brand-textMuted">
+                  Loading your saved profile...
+                </p>
+              )}
+
+              {saveError && (
+                <div
+                  role="alert"
+                  className="
+                    mt-4
+                    rounded-[14px]
+                    border
+                    border-red-200
+                    bg-red-50
+                    px-4
+                    py-3
+                    text-[12px]
+                    font-semibold
+                    text-red-700
+                  "
+                >
+                  {saveError}
+                </div>
+              )}
             </div>
 
             <div className="space-y-7">
@@ -1528,8 +1724,10 @@ export default function ProfileSetup() {
 
               <button
                 type="button"
-                disabled={!isComplete}
-                onClick={handleContinue}
+                disabled={!isComplete || isSaving || isLoadingProfile}
+                onClick={() => {
+                  void handleContinue();
+                }}
                 className="
                   group
                   mt-3

@@ -27,6 +27,8 @@ import {
   X,
 } from 'lucide-react';
 
+import api from '../../../api/axios';
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -48,6 +50,7 @@ interface DocItem {
   status: 'verified' | 'pending' | 'none';
   fileName?: string;
   fileSize?: string;
+  dataUrl?: string;
 }
 
 interface ProjectItem {
@@ -71,6 +74,7 @@ interface IntroReelMeta {
   fileName: string;
   fileSize: string;
   uploadedAt: string;
+  dataUrl?: string;
 }
 
 type GalleryImageCategory =
@@ -91,85 +95,42 @@ interface GalleryImage {
 }
 
 /* =========================================================
-   STORAGE
+   BACKEND PROFILE STORAGE
 ========================================================= */
 
-const FACE_PHOTO_STORAGE_KEY =
-  'trucity-profile-face-photo';
+const PROFILE_ENDPOINT = '/api/candidate/profile';
+const PROFILE_MEDIA_ENDPOINT = '/api/candidate/profile/media';
 
-const GALLERY_STORAGE_KEY =
-  'trucity-profile-gallery';
+interface BackendCandidateProfile {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  headline?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  yearsExperience?: number | null;
+  skills?: string[] | null;
+}
 
-const INTRO_REEL_META_STORAGE_KEY =
-  'trucity-intro-reel-meta';
-
-/* =========================================================
-   DEFAULT DATA
-========================================================= */
-
-const DEFAULT_DOCS: DocItem[] = [
-  {
-    id: 1,
-    name: 'SA ID Document',
-    status: 'none',
-  },
-  {
-    id: 2,
-    name: 'Matric Certificate',
-    status: 'none',
-  },
-  {
-    id: 3,
-    name: 'Police Clearance',
-    status: 'none',
-  },
-  {
-    id: 4,
-    name: 'Proof of Qualification',
-    status: 'none',
-  },
-];
-
-const DEFAULT_PROJECTS: ProjectItem[] = [
-  {
-    id: 1,
-    name: 'TruCity Mobile App',
-    tech: 'React Native · TypeScript',
-    status: 'Active Development',
-    desc:
-      'Cross-platform mobile product focused on location-aware opportunities and professional services.',
-  },
-  {
-    id: 2,
-    name: 'BLE Sensor Telemetry System',
-    tech: 'C++ · ESP32-C3 · Python',
-    status: 'Completed',
-    desc:
-      'Embedded telemetry project transmitting real-time device data over Bluetooth Low Energy.',
-  },
-  {
-    id: 3,
-    name: 'Hospital Management System',
-    tech: 'Java · PostgreSQL',
-    status: 'Completed',
-    desc:
-      'Relational application for structured patient, appointment and administrative record management.',
-  },
-];
+interface BackendProfileMedia {
+  facePhoto?: string | null;
+  galleryImages?: GalleryImage[] | null;
+  documents?: DocItem[] | null;
+  projects?: ProjectItem[] | null;
+  reelMeta?: IntroReelMeta | null;
+  preferences?: {
+    availability?: 'full-time' | 'contract';
+  } | null;
+}
 
 /* =========================================================
    HELPERS
 ========================================================= */
 
-function getStoredValue(key: string) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function imageFileToDataUrl(file: File) {
+function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
 
@@ -211,6 +172,15 @@ function createGalleryId() {
     .slice(2)}`;
 }
 
+async function saveProfileMedia(
+  patch: Partial<BackendProfileMedia>,
+): Promise<void> {
+  await api.put(
+    PROFILE_MEDIA_ENDPOINT,
+    patch,
+  );
+}
+
 /* =========================================================
    MAIN PROFILE
 ========================================================= */
@@ -226,121 +196,45 @@ export function Profile({
   ======================================================= */
 
   const [facePhoto, setFacePhoto] =
-    useState<string | null>(() =>
-      getStoredValue(
-        FACE_PHOTO_STORAGE_KEY,
-      ),
-    );
+    useState<string | null>(null);
+
+  const [profileName, setProfileName] =
+    useState('Candidate');
+
+  const [profileHeadline, setProfileHeadline] =
+    useState('Professional profile');
+
+  const [profileLocation, setProfileLocation] =
+    useState('Location not provided');
+
+  const [profileError, setProfileError] =
+    useState('');
 
   /* =======================================================
      GALLERY
   ======================================================= */
 
   const [galleryImages, setGalleryImages] =
-    useState<GalleryImage[]>(() => {
-      try {
-        const stored =
-          localStorage.getItem(
-            GALLERY_STORAGE_KEY,
-          );
-
-        if (!stored) {
-          return [];
-        }
-
-        const parsed: unknown =
-          JSON.parse(stored);
-
-        if (!Array.isArray(parsed)) {
-          return [];
-        }
-
-        return parsed.filter(
-          (
-            item,
-          ): item is GalleryImage => {
-            if (
-              !item ||
-              typeof item !== 'object'
-            ) {
-              return false;
-            }
-
-            const candidate =
-              item as Partial<GalleryImage>;
-
-            return (
-              typeof candidate.id ===
-                'string' &&
-              typeof candidate.name ===
-                'string' &&
-              typeof candidate.image ===
-                'string' &&
-              typeof candidate.uploadedAt ===
-                'string' &&
-              typeof candidate.category ===
-                'string'
-            );
-          },
-        );
-      } catch {
-        return [];
-      }
-    });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        GALLERY_STORAGE_KEY,
-        JSON.stringify(
-          galleryImages,
-        ),
-      );
-    } catch (error) {
-      console.error(
-        'Unable to persist gallery images:',
-        error,
-      );
-    }
-  }, [galleryImages]);
+    useState<GalleryImage[]>([]);
 
   /* =======================================================
      DOCUMENTS
   ======================================================= */
 
-  const [docs, setDocs] =
-    useState<DocItem[]>(DEFAULT_DOCS);
+  const [docs, setDocs] = useState<DocItem[]>([]);
 
   /* =======================================================
      PROJECTS
   ======================================================= */
 
-  const [projects, setProjects] =
-    useState<ProjectItem[]>(
-      DEFAULT_PROJECTS,
-    );
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
 
   /* =======================================================
      INTRO REEL
   ======================================================= */
 
   const [reelMeta, setReelMeta] =
-    useState<IntroReelMeta | null>(
-      () => {
-        try {
-          const stored =
-            localStorage.getItem(
-              INTRO_REEL_META_STORAGE_KEY,
-            );
-
-          return stored
-            ? JSON.parse(stored)
-            : null;
-        } catch {
-          return null;
-        }
-      },
-    );
+    useState<IntroReelMeta | null>(null);
 
   const [
     reelPreviewUrl,
@@ -348,33 +242,91 @@ export function Profile({
   ] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      if (reelMeta) {
-        localStorage.setItem(
-          INTRO_REEL_META_STORAGE_KEY,
-          JSON.stringify(reelMeta),
+    let mounted = true;
+
+    const loadProfile = async () => {
+      try {
+        setProfileError('');
+
+        const [profileResponse, mediaResponse] =
+          await Promise.all([
+            api.get<BackendCandidateProfile>(
+              PROFILE_ENDPOINT,
+            ),
+            api.get<BackendProfileMedia>(
+              PROFILE_MEDIA_ENDPOINT,
+            ),
+          ]);
+
+        if (!mounted) {
+          return;
+        }
+
+        const profile = profileResponse.data;
+        const media = mediaResponse.data;
+
+        setProfileName(
+          `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() ||
+            'Candidate',
+        );
+        setProfileHeadline(
+          profile.headline?.trim() ||
+            'Professional profile',
+        );
+        setProfileLocation(
+          profile.location?.trim() ||
+            'Location not provided',
         );
 
-        return;
-      }
+        setFacePhoto(media.facePhoto ?? null);
+        setGalleryImages(
+          Array.isArray(media.galleryImages)
+            ? media.galleryImages
+            : [],
+        );
+        setDocs(
+          Array.isArray(media.documents)
+            ? media.documents
+            : [],
+        );
+        setProjects(
+          Array.isArray(media.projects)
+            ? media.projects
+            : [],
+        );
+        setReelMeta(media.reelMeta ?? null);
 
-      localStorage.removeItem(
-        INTRO_REEL_META_STORAGE_KEY,
-      );
-    } catch (error) {
-      console.error(
-        'Unable to persist intro reel metadata:',
-        error,
-      );
-    }
-  }, [reelMeta]);
+        if (media.reelMeta?.dataUrl) {
+          setReelPreviewUrl(media.reelMeta.dataUrl);
+        }
+
+      } catch (error) {
+        console.error('Unable to load candidate profile:', error);
+        if (mounted) {
+          setProfileError(
+            'Unable to load your profile from TruCity. Please refresh and try again.',
+          );
+        }
+      } finally {
+        if (mounted) {
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (reelPreviewUrl) {
-        URL.revokeObjectURL(
-          reelPreviewUrl,
-        );
+      if (
+        reelPreviewUrl &&
+        reelPreviewUrl.startsWith('blob:')
+      ) {
+        URL.revokeObjectURL(reelPreviewUrl);
       }
     };
   }, [reelPreviewUrl]);
@@ -460,7 +412,16 @@ export function Profile({
           lg:px-8
         "
       >
+        {profileError && (
+          <div className="rounded-[16px] border border-brand-crimson/20 bg-brand-crimson/5 px-4 py-3 text-[12px] font-bold text-brand-crimson">
+            {profileError}
+          </div>
+        )}
+
         <ProfileHeader
+          profileName={profileName}
+          profileHeadline={profileHeadline}
+          profileLocation={profileLocation}
           facePhoto={facePhoto}
           setFacePhoto={
             setFacePhoto
@@ -639,6 +600,9 @@ export function Profile({
 ========================================================= */
 
 interface ProfileHeaderProps {
+  profileName: string;
+  profileHeadline: string;
+  profileLocation: string;
   facePhoto: string | null;
 
   setFacePhoto: (
@@ -667,6 +631,9 @@ interface ProfileHeaderProps {
 }
 
 function ProfileHeader({
+  profileName,
+  profileHeadline,
+  profileLocation,
   facePhoto,
   setFacePhoto,
   reelMeta,
@@ -703,16 +670,12 @@ function ProfileHeader({
 
       try {
         const image =
-          await imageFileToDataUrl(
-            file,
-          );
+          await fileToDataUrl(file);
 
         setFacePhoto(image);
-
-        localStorage.setItem(
-          FACE_PHOTO_STORAGE_KEY,
-          image,
-        );
+        await saveProfileMedia({
+          facePhoto: image,
+        });
       } catch (error) {
         console.error(
           'Unable to update profile photo:',
@@ -723,7 +686,7 @@ function ProfileHeader({
       event.target.value = '';
     };
 
-  const handleReelChange = (
+  const handleReelChange = async (
     event:
       React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -748,27 +711,31 @@ function ProfileHeader({
     const previewUrl =
       URL.createObjectURL(file);
 
-    setReelPreviewUrl(
-      previewUrl,
-    );
+    const dataUrl =
+      await fileToDataUrl(file);
 
-    setReelMeta({
+    const nextMeta: IntroReelMeta = {
       fileName: file.name,
-
       fileSize: `${(
         file.size /
         (1024 * 1024)
       ).toFixed(1)} MB`,
-
       uploadedAt:
         new Date().toISOString(),
+      dataUrl,
+    };
+
+    setReelPreviewUrl(previewUrl);
+    setReelMeta(nextMeta);
+    await saveProfileMedia({
+      reelMeta: nextMeta,
     });
 
     event.target.value = '';
   };
 
   const handleRemoveReel =
-    () => {
+    async () => {
       if (reelPreviewUrl) {
         URL.revokeObjectURL(
           reelPreviewUrl,
@@ -777,6 +744,9 @@ function ProfileHeader({
 
       setReelPreviewUrl(null);
       setReelMeta(null);
+      await api.delete(
+        `${PROFILE_MEDIA_ENDPOINT}/reel`,
+      );
 
       if (
         reelInputRef.current
@@ -1059,7 +1029,13 @@ function ProfileHeader({
                     text-brand-primary
                   "
                 >
-                  LN
+                  {profileName
+                    .split(' ')
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join('')
+                    .toUpperCase() || 'C'}
                 </div>
               )}
 
@@ -1097,7 +1073,7 @@ function ProfileHeader({
                 !text-brand-primary
               "
             >
-              Luthando
+              {profileName}
             </h1>
 
             <p
@@ -1108,7 +1084,7 @@ function ProfileHeader({
                 text-brand-textMuted
               "
             >
-              Software Engineer · Mobile & Web Development
+              {profileHeadline}
             </p>
 
             <div
@@ -1125,7 +1101,7 @@ function ProfileHeader({
             >
               <span className="flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
-                Johannesburg, Gauteng
+                {profileLocation}
               </span>
 
               <span className="flex items-center gap-1.5">
@@ -1148,32 +1124,63 @@ function ProfileDetails() {
   const [editing, setEditing] =
     useState(false);
 
+  const [profileSaving, setProfileSaving] =
+    useState(false);
+
   const [form, setForm] =
     useState<ProfileForm>({
-      headline:
-        'Software Developer · Full-Stack & Embedded Systems',
-
-      email:
-        'luthando.dev@gmail.com',
-
-      phone: '081 234 5678',
-
-      location:
-        'Johannesburg, Gauteng',
-
-      bio:
-        'Software development graduate with experience across mobile, web and embedded systems. Skilled in React Native, TypeScript, Node.js, Java and database-driven applications, with a strong interest in building reliable digital products and practical technology solutions.',
-
-      skills: [
-        'React Native',
-        'TypeScript',
-        'Node.js',
-        'Java',
-        'PostgreSQL',
-        'Git',
-        'C++ / IoT',
-      ],
+      headline: '',
+      email: '',
+      phone: '',
+      location: '',
+      bio: '',
+      skills: [],
     });
+
+  useEffect(() => {
+    let mounted = true;
+
+    api.get<BackendCandidateProfile>(
+      PROFILE_ENDPOINT,
+    )
+      .then(({ data }) => {
+        if (!mounted) return;
+
+        setForm({
+          headline: data.headline ?? '',
+          email: data.email ?? '',
+          phone: data.phone ?? '',
+          location: data.location ?? '',
+          bio: data.bio ?? '',
+          skills: Array.isArray(data.skills)
+            ? data.skills
+            : [],
+        });
+      })
+      .catch((error) => {
+        console.error(
+          'Unable to load candidate profile details:',
+          error,
+        );
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const saveProfile = async () => {
+    await api.put(
+      PROFILE_ENDPOINT,
+      {
+        headline: form.headline,
+        phone: form.phone,
+        location: form.location,
+        bio: form.bio,
+        skills: form.skills,
+      },
+    );
+  };
 
   const [newSkill, setNewSkill] =
     useState('');
@@ -1216,9 +1223,24 @@ function ProfileDetails() {
   if (editing) {
     return (
       <form
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
-          setEditing(false);
+
+          try {
+            setProfileSaving(true);
+            await saveProfile();
+            setEditing(false);
+          } catch (error) {
+            console.error(
+              'Unable to save candidate profile:',
+              error,
+            );
+            window.alert(
+              'Your profile could not be saved. Please try again.',
+            );
+          } finally {
+            setProfileSaving(false);
+          }
         }}
         className="
           max-w-[820px]
@@ -1349,6 +1371,7 @@ function ProfileDetails() {
             <FormField
               label="Email"
               value={form.email}
+              readOnly
               onChange={(value) =>
                 setForm({
                   ...form,
@@ -1516,9 +1539,12 @@ function ProfileDetails() {
             pt-5
           "
         >
-          <PrimaryButton type="submit">
+          <PrimaryButton
+            type="submit"
+            disabled={profileSaving}
+          >
             <Save className="h-4 w-4" />
-            Save changes
+            {profileSaving ? 'Saving...' : 'Save changes'}
           </PrimaryButton>
         </div>
       </form>
@@ -1747,7 +1773,7 @@ function GallerySection({
       event:
         React.ChangeEvent<HTMLInputElement>,
     ) => {
-      const files =
+      const files: File[] =
         Array.from(
           event.target.files ?? [],
         );
@@ -1776,29 +1802,26 @@ function GallerySection({
               ): Promise<GalleryImage> => ({
                 id:
                   createGalleryId(),
-
                 name: file.name,
-
                 category:
                   selectedCategory,
-
                 image:
-                  await imageFileToDataUrl(
-                    file,
-                  ),
-
+                  await fileToDataUrl(file),
                 uploadedAt:
                   new Date().toISOString(),
               }),
             ),
           );
 
-        setImages(
-          (current) => [
-            ...uploaded,
-            ...current,
-          ],
-        );
+        const nextImages = [
+          ...uploaded,
+          ...images,
+        ];
+
+        setImages(nextImages);
+        await saveProfileMedia({
+          galleryImages: nextImages,
+        });
       } catch (error) {
         console.error(
           'Unable to upload gallery images:',
@@ -1812,12 +1835,14 @@ function GallerySection({
   const handleDelete = (
     id: string,
   ) => {
-    setImages((current) =>
-      current.filter(
-        (image) =>
-          image.id !== id,
-      ),
+    const nextImages = images.filter(
+      (image) => image.id !== id,
     );
+
+    setImages(nextImages);
+    void saveProfileMedia({
+      galleryImages: nextImages,
+    });
 
     setSelectedImage(
       (current) =>
@@ -1832,16 +1857,19 @@ function GallerySection({
     category:
       GalleryImageCategory,
   ) => {
-    setImages((current) =>
-      current.map((image) =>
-        image.id === id
-          ? {
-              ...image,
-              category,
-            }
-          : image,
-      ),
+    const nextImages = images.map((image) =>
+      image.id === id
+        ? {
+            ...image,
+            category,
+          }
+        : image,
     );
+
+    setImages(nextImages);
+    void saveProfileMedia({
+      galleryImages: nextImages,
+    });
 
     setSelectedImage(
       (current) =>
@@ -2531,7 +2559,7 @@ function DocumentsSection({
       >
     >({});
 
-  const handleFileUpload = (
+  const handleFileUpload = async (
     id: number,
     event:
       React.ChangeEvent<HTMLInputElement>,
@@ -2548,19 +2576,27 @@ function DocumentsSection({
       (1024 * 1024)
     ).toFixed(2)} MB`;
 
-    setDocs((current) =>
-      current.map((document) =>
+    const dataUrl =
+      await fileToDataUrl(file);
+
+    const nextDocs = docs.map(
+      (document) =>
         document.id === id
           ? {
               ...document,
-              status: 'pending',
+              status: 'pending' as const,
               fileName:
                 file.name,
               fileSize: size,
+              dataUrl,
             }
           : document,
-      ),
     );
+
+    setDocs(nextDocs);
+    await saveProfileMedia({
+      documents: nextDocs,
+    });
 
     event.target.value = '';
   };
@@ -2790,13 +2826,20 @@ function ProjectsSection({
       return;
     }
 
-    setProjects((current) => [
-      {
-        id: Date.now(),
-        ...newProject,
-      },
-      ...current,
-    ]);
+    const project: ProjectItem = {
+      id: Date.now(),
+      ...newProject,
+    };
+
+    const nextProjects = [
+      project,
+      ...projects,
+    ];
+
+    setProjects(nextProjects);
+    void saveProfileMedia({
+      projects: nextProjects,
+    });
 
     setNewProject({
       name: '',
@@ -3030,19 +3073,57 @@ function PreferencesSection() {
   const [
     availability,
     setAvailability,
-  ] = useState('full-time');
+  ] = useState<'full-time' | 'contract'>('full-time');
 
   const [saved, setSaved] =
     useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
+  const [saving, setSaving] =
+    useState(false);
 
-    window.setTimeout(
-      () =>
-        setSaved(false),
-      2500,
-    );
+  useEffect(() => {
+    api.get<BackendProfileMedia>(
+      PROFILE_MEDIA_ENDPOINT,
+    )
+      .then(({ data }) => {
+        setAvailability(
+          data.preferences?.availability === 'contract'
+            ? 'contract'
+            : 'full-time',
+        );
+      })
+      .catch((error) => {
+        console.error(
+          'Unable to load candidate preferences:',
+          error,
+        );
+      });
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      await saveProfileMedia({
+        preferences: {
+          availability,
+        },
+      });
+      setSaved(true);
+      window.setTimeout(
+        () => setSaved(false),
+        2500,
+      );
+    } catch (error) {
+      console.error(
+        'Unable to save candidate preferences:',
+        error,
+      );
+      window.alert(
+        'Your preferences could not be saved. Please try again.',
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -3100,6 +3181,7 @@ function PreferencesSection() {
       <div className="flex flex-wrap items-center gap-4">
         <PrimaryButton
           onClick={handleSave}
+          disabled={saving}
         >
           {saved ? (
             <CheckCircle2 className="h-4 w-4" />
@@ -3200,12 +3282,14 @@ interface FormFieldProps {
   onChange: (
     value: string,
   ) => void;
+  readOnly?: boolean;
 }
 
 function FormField({
   label,
   value,
   onChange,
+  readOnly = false,
 }: FormFieldProps) {
   return (
     <div>
@@ -3223,6 +3307,7 @@ function FormField({
 
       <input
         value={value}
+        readOnly={readOnly}
         onChange={(event) =>
           onChange(
             event.target.value,
