@@ -20,6 +20,17 @@ import type {
 |--------------------------------------------------------------------------
 | BACKEND CANDIDATE RESPONSE
 |--------------------------------------------------------------------------
+|
+| Lightweight candidate response.
+|
+| IMPORTANT:
+| This endpoint is intentionally lightweight and is used for candidate
+| lists such as Talent Feed.
+|
+| Full candidate profiles are loaded separately through:
+|
+| /api/company/candidate-details/{candidateId}
+|
 */
 
 interface BackendCandidateResponse {
@@ -364,8 +375,7 @@ function mapJob(
   return {
     id: job.id,
 
-    companyId:
-      job.companyId,
+    companyId: job.companyId,
 
     companyName:
       job.companyName ||
@@ -463,7 +473,6 @@ function mapJob(
       undefined,
   };
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -688,6 +697,16 @@ export const companyService = {
   |--------------------------------------------------------------------------
   | REAL BACKEND — CANDIDATES
   |--------------------------------------------------------------------------
+  |
+  | Lightweight candidate listing.
+  |
+  | This endpoint is appropriate for Talent Feed because it does not load
+  | large profile media, documents, projects, or videos.
+  |
+  | Detailed candidate information is loaded separately by:
+  |
+  | candidateDetails.service.ts
+  |
   */
 
   async getCandidates(): Promise<
@@ -729,8 +748,16 @@ export const companyService = {
 
   /*
   |--------------------------------------------------------------------------
-  | REAL BACKEND — SINGLE CANDIDATE
+  | REAL BACKEND — SINGLE LIGHTWEIGHT CANDIDATE
   |--------------------------------------------------------------------------
+  |
+  | This intentionally remains lightweight.
+  |
+  | Do NOT use this method for the full "View Profile" experience.
+  |
+  | Full candidate details are retrieved by candidateDetails.service.ts
+  | from /api/company/candidate-details/{candidateId}.
+  |
   */
 
   async getCandidate(
@@ -738,6 +765,10 @@ export const companyService = {
   ): Promise<
     CompanyCandidate | null
   > {
+    if (!candidateId) {
+      return null;
+    }
+
     const candidates =
       await this.getCandidates();
 
@@ -875,14 +906,18 @@ export const companyService = {
   | REAL BACKEND — CANDIDATE OPEN JOBS
   |--------------------------------------------------------------------------
   |
-  | Loads active jobs that are available to candidates.
+  | Loads active/open jobs that are available to candidates.
   |
   */
 
-  async getOpenJobs(): Promise<CompanyJob[]> {
+  async getOpenJobs(): Promise<
+    CompanyJob[]
+  > {
     try {
       const response =
-        await api.get<BackendJobResponse[]>(
+        await api.get<
+          BackendJobResponse[]
+        >(
           "/api/jobs/open"
         );
 
@@ -912,20 +947,20 @@ export const companyService = {
     }
   },
 
-
   /*
   |--------------------------------------------------------------------------
   | REAL BACKEND — SINGLE COMPANY JOB
   |--------------------------------------------------------------------------
   |
-  | Used by the View Details functionality so the frontend can request
-  | the latest version of a specific job from PostgreSQL.
+  | Used by View Details to request the latest version of a job.
   |
   */
 
   async getJob(
     jobId: string
-  ): Promise<CompanyJob | null> {
+  ): Promise<
+    CompanyJob | null
+  > {
     try {
       if (!jobId) {
         throw new Error(
@@ -972,9 +1007,6 @@ export const companyService = {
   |--------------------------------------------------------------------------
   | REAL BACKEND — CREATE COMPANY JOB
   |--------------------------------------------------------------------------
-  |
-  | Sends the complete job posting to Spring Boot.
-  |
   */
 
   async createJob(
@@ -1091,11 +1123,6 @@ export const companyService = {
   |--------------------------------------------------------------------------
   | REAL BACKEND — UPDATE COMPANY JOB
   |--------------------------------------------------------------------------
-  |
-  | PUT /api/jobs/company/{id}
-  |
-  | Updates an existing job belonging to the authenticated employer.
-  |
   */
 
   async updateJob(
@@ -1220,12 +1247,10 @@ export const companyService = {
   | REAL BACKEND — DELETE COMPANY JOB
   |--------------------------------------------------------------------------
   |
-  | Important:
-  |
   | The backend decides whether permanent deletion is allowed.
   |
-  | Jobs with applications should NOT be permanently deleted because
-  | applications reference jobs in PostgreSQL.
+  | Jobs with applications should not be permanently deleted because
+  | applications reference those jobs.
   |
   */
 
@@ -1259,14 +1284,8 @@ export const companyService = {
   | REAL BACKEND — CLOSE COMPANY JOB
   |--------------------------------------------------------------------------
   |
-  | Closing is different from deleting.
-  |
-  | DELETE:
-  |   Permanently removes a job when allowed.
-  |
-  | CLOSE:
-  |   Keeps the job and application history but prevents it from being
-  |   treated as an active vacancy.
+  | Closing preserves the job and application history while preventing
+  | the vacancy from being treated as active.
   |
   */
 
@@ -1315,10 +1334,8 @@ export const companyService = {
   | REAL BACKEND — MESSAGES
   |--------------------------------------------------------------------------
   |
-  | There is NO localStorage here.
-  |
-  | Conversations are stored in PostgreSQL through the Spring Boot
-  | messaging API.
+  | Conversations are stored in PostgreSQL through Spring Boot.
+  | No messaging data is stored in localStorage.
   |
   */
 
@@ -1575,28 +1592,89 @@ export const companyService = {
   */
 
   async saveProfile(
-    profile: CompanyProfile
-  ): Promise<CompanyProfile> {
-    const response =
-      await api.put<
-        CompanyProfile
-      >(
-        "/api/company/profile",
-        profile
-      );
+  profile: CompanyProfile
+): Promise<CompanyProfile> {
 
-    if (
-      !response.data ||
-      typeof response.data !==
-        "object"
-    ) {
-      throw new Error(
-        "The server returned an invalid company profile."
-      );
-    }
+  if (!profile) {
+    throw new Error(
+      "Company profile is required."
+    );
+  }
 
-    return response.data;
-  },
+  const response =
+    await api.put<CompanyProfile>(
+      "/api/company/profile",
+      {
+        legalName:
+          profile.legalName?.trim(),
+
+        tradingName:
+          profile.tradingName?.trim() || null,
+
+        companyRegNo:
+          profile.companyRegNo?.trim(),
+
+        website:
+          profile.website?.trim() || null,
+
+        industry:
+          profile.industry?.trim() || null,
+
+        region:
+          profile.region?.trim() || null,
+
+        registeredAddress:
+          profile.registeredAddress?.trim() || null,
+
+        companyEmail:
+          profile.companyEmail?.trim() || null,
+
+        phone:
+          profile.phone?.trim() || null,
+
+        companyDescription:
+          profile.companyDescription?.trim() || null,
+
+        representativeName:
+          profile.representativeName?.trim() || null,
+
+        representativeEmail:
+          profile.representativeEmail?.trim() || null,
+
+        representativePhone:
+          profile.representativePhone?.trim() || null,
+
+        representativeRole:
+          profile.representativeRole?.trim() || null,
+
+        verificationStatus:
+          "NOT_VERIFIED",
+
+        billingContactName:
+          profile.billingContactName?.trim() || null,
+
+        billingContactEmail:
+          profile.billingContactEmail?.trim() || null,
+
+        invoicingAddress:
+          profile.invoicingAddress?.trim() || null,
+
+        agreeToTerms:
+          Boolean(profile.agreeToTerms),
+      }
+    );
+
+  if (
+    !response.data ||
+    typeof response.data !== "object"
+  ) {
+    throw new Error(
+      "The server returned an invalid company profile."
+    );
+  }
+
+  return response.data;
+},
 
   /*
   |--------------------------------------------------------------------------

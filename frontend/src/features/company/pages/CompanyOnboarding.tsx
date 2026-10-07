@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logo from '../../../assets/branding/trucity-logo.png';
+import logo from "../../../assets/trucity-nav-logo.png";
+import api from '../../../api/axios';
 
 type IdType = 'National ID' | 'Passport';
 type PaymentMethod = 'Paystack' | 'Invoice';
@@ -46,6 +47,37 @@ interface CompanyOnboardingData {
   agreeTerms: boolean;
 }
 
+interface BackendCompanyProfile {
+  id: string;
+  legalName: string;
+  tradingName?: string | null;
+  companyRegNo: string;
+  website?: string | null;
+  industry?: string | null;
+  region?: string | null;
+  registeredAddress?: string | null;
+  companyEmail?: string | null;
+  phone?: string | null;
+  companyDescription?: string | null;
+
+  representativeName?: string | null;
+  representativeEmail?: string | null;
+  representativePhone?: string | null;
+  representativeRole?: string | null;
+
+  verificationStatus?: string | null;
+
+  billingContactName?: string | null;
+  billingContactEmail?: string | null;
+  invoicingAddress?: string | null;
+  agreeToTerms?: boolean;
+}
+
+interface ApiErrorResponse {
+  message?: string;
+  error?: string;
+}
+
 const STORAGE_KEY = 'trucity_company_onboarding';
 const STEP_KEY = 'trucity_company_onboarding_step';
 const SUBMISSION_KEY = 'trucity_company_onboarding_submission';
@@ -78,7 +110,7 @@ const initialFormData: CompanyOnboardingData = {
   repIdPhoto: null,
   proofOfAuthority: null,
 
-  verificationStatus: 'Pending Direct CIPC Check',
+  verificationStatus: 'NOT_VERIFIED',
 
   billingName: '',
   billingEmail: '',
@@ -107,7 +139,7 @@ const STEPS = [
   {
     number: 4,
     title: 'Verification',
-    description: 'Preliminary company verification',
+    description: 'Company verification status',
   },
   {
     number: 5,
@@ -115,6 +147,54 @@ const STEPS = [
     description: 'Final billing and agreement',
   },
 ];
+
+const getApiErrorMessage = (
+  error: unknown,
+): string => {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error
+  ) {
+    const response = (
+      error as {
+        response?: {
+          data?: ApiErrorResponse | string;
+        };
+      }
+    ).response;
+
+    const data = response?.data;
+
+    if (typeof data === 'string' && data.trim()) {
+      return data;
+    }
+
+    if (
+      data &&
+      typeof data === 'object' &&
+      'message' in data &&
+      typeof data.message === 'string'
+    ) {
+      return data.message;
+    }
+
+    if (
+      data &&
+      typeof data === 'object' &&
+      'error' in data &&
+      typeof data.error === 'string'
+    ) {
+      return data.error;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'We could not save your company profile. Please try again.';
+};
 
 export const CompanyOnboarding: React.FC = () => {
   const navigate = useNavigate();
@@ -128,45 +208,60 @@ export const CompanyOnboarding: React.FC = () => {
 
     const parsedStep = Number(savedStep);
 
-    return parsedStep >= 1 && parsedStep <= 5 ? parsedStep : 1;
+    return parsedStep >= 1 && parsedStep <= 5
+      ? parsedStep
+      : 1;
   });
 
   const [formData, setFormData] =
-    useState<CompanyOnboardingData>(initialFormData);
+    useState<CompanyOnboardingData>(
+      initialFormData,
+    );
 
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationComplete, setVerificationComplete] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  /*
+   * CIPC is intentionally not called from the frontend.
+   *
+   * The backend stores new companies as NOT_VERIFIED.
+   * An admin/verifier can review the company later.
+   */
+  const [verificationComplete, setVerificationComplete] =
+    useState(true);
+
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
+
+  const [isLoadingProfile, setIsLoadingProfile] =
+    useState(true);
+
+  const [errorMessage, setErrorMessage] =
+    useState('');
 
   const totalSteps = 5;
 
   /*
-   * Restore previously saved onboarding information.
+   * Restore locally saved onboarding information first.
    *
-   * File objects cannot safely be stored in localStorage, so only
-   * file metadata is persisted.
+   * This allows an employer to leave onboarding and return
+   * without losing the information already entered.
    */
   useEffect(() => {
     try {
-      const savedData = localStorage.getItem(STORAGE_KEY);
+      const savedData =
+        localStorage.getItem(STORAGE_KEY);
 
-      if (!savedData) {
+      if (savedData) {
+        const parsedData =
+          JSON.parse(savedData) as Partial<CompanyOnboardingData>;
+
+        setFormData((prev) => ({
+          ...prev,
+          ...parsedData,
+          verificationStatus:
+            'NOT_VERIFIED',
+        }));
+
+        setIsLoadingProfile(false);
         return;
-      }
-
-      const parsedData =
-        JSON.parse(savedData) as Partial<CompanyOnboardingData>;
-
-      setFormData((prev) => ({
-        ...prev,
-        ...parsedData,
-      }));
-
-      if (
-        parsedData.verificationStatus ===
-        'Verification Check Completed'
-      ) {
-        setVerificationComplete(true);
       }
     } catch (error) {
       console.error(
@@ -176,12 +271,148 @@ export const CompanyOnboarding: React.FC = () => {
 
       localStorage.removeItem(STORAGE_KEY);
     }
+
+    /*
+     * If there is no local draft, try to restore an existing
+     * company profile from the backend.
+     *
+     * This is useful if the employer previously submitted
+     * onboarding and then returned to this page.
+     */
+    const loadExistingProfile = async () => {
+      try {
+        const response =
+          await api.get<BackendCompanyProfile>(
+            '/api/company/profile',
+          );
+
+        const profile = response.data;
+
+        if (!profile) {
+          return;
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+
+          legalName:
+            profile.legalName ??
+            prev.legalName,
+
+          tradingName:
+            profile.tradingName ??
+            prev.tradingName,
+
+          companyRegNo:
+            profile.companyRegNo ??
+            prev.companyRegNo,
+
+          website:
+            profile.website ??
+            prev.website,
+
+          industry:
+            profile.industry ??
+            prev.industry,
+
+          region:
+            profile.region ??
+            prev.region,
+
+          registeredAddress:
+            profile.registeredAddress ??
+            prev.registeredAddress,
+
+          companyEmail:
+            profile.companyEmail ??
+            prev.companyEmail,
+
+          phone:
+            profile.phone ??
+            prev.phone,
+
+          companyDescription:
+            profile.companyDescription ??
+            prev.companyDescription,
+
+          repFullName:
+            profile.representativeName ??
+            prev.repFullName,
+
+          repEmail:
+            profile.representativeEmail ??
+            prev.repEmail,
+
+          repPhone:
+            profile.representativePhone ??
+            prev.repPhone,
+
+          repTitle:
+            profile.representativeRole ??
+            prev.repTitle,
+
+          billingName:
+            profile.billingContactName ??
+            prev.billingName,
+
+          billingEmail:
+            profile.billingContactEmail ??
+            prev.billingEmail,
+
+          invoicingAddress:
+            profile.invoicingAddress ??
+            prev.invoicingAddress,
+
+          agreeTerms:
+            profile.agreeToTerms ??
+            prev.agreeTerms,
+
+          /*
+           * The backend deliberately owns the real verification
+           * status. For new onboarding this should be
+           * NOT_VERIFIED.
+           */
+          verificationStatus:
+            profile.verificationStatus ||
+            'NOT_VERIFIED',
+        }));
+
+        /*
+         * Step 4 is informational because there is no live CIPC
+         * integration. The employer can continue immediately.
+         */
+        setVerificationComplete(true);
+      } catch (error) {
+        /*
+         * A missing company profile is normal for a newly
+         * registered employer, so we don't show an error here.
+         *
+         * Authentication/API errors will be surfaced when
+         * the employer attempts the final submission.
+         */
+        console.debug(
+          'No existing company profile to restore:',
+          error,
+        );
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    void loadExistingProfile();
   }, []);
 
   /*
-   * Persist onboarding progress whenever the form or step changes.
+   * Persist onboarding progress whenever the form changes.
+   *
+   * This is a draft only. The actual company record is saved
+   * to PostgreSQL when the employer completes Step 5.
    */
   useEffect(() => {
+    if (isLoadingProfile) {
+      return;
+    }
+
     try {
       localStorage.setItem(
         STORAGE_KEY,
@@ -198,7 +429,11 @@ export const CompanyOnboarding: React.FC = () => {
         error,
       );
     }
-  }, [formData, currentStep]);
+  }, [
+    formData,
+    currentStep,
+    isLoadingProfile,
+  ]);
 
   const updateField = <
     K extends keyof CompanyOnboardingData
@@ -235,10 +470,15 @@ export const CompanyOnboarding: React.FC = () => {
       | 'proofOfAuthority',
     file: File | null,
   ) => {
-    updateField(field, fileToMetadata(file));
+    updateField(
+      field,
+      fileToMetadata(file),
+    );
   };
 
-  const validateStep = (step: number): boolean => {
+  const validateStep = (
+    step: number,
+  ): boolean => {
     setErrorMessage('');
 
     if (step === 1) {
@@ -251,7 +491,7 @@ export const CompanyOnboarding: React.FC = () => {
 
       if (!formData.companyRegNo.trim()) {
         setErrorMessage(
-          'Please enter the company CIPC registration number.',
+          'Please enter the company registration number.',
         );
         return false;
       }
@@ -262,7 +502,7 @@ export const CompanyOnboarding: React.FC = () => {
         )
       ) {
         setErrorMessage(
-          'Please enter the CIPC registration number in the format 2023/123456/07.',
+          'Please enter the company registration number in the format 2023/123456/07.',
         );
         return false;
       }
@@ -311,7 +551,9 @@ export const CompanyOnboarding: React.FC = () => {
         return false;
       }
 
-      if (formData.companyDescription.length > 400) {
+      if (
+        formData.companyDescription.length > 400
+      ) {
         setErrorMessage(
           'Company description must be 400 characters or less.',
         );
@@ -371,9 +613,15 @@ export const CompanyOnboarding: React.FC = () => {
     }
 
     if (step === 4) {
+      /*
+       * There is no external CIPC verification requirement.
+       *
+       * All newly submitted companies are saved as
+       * NOT_VERIFIED and can be reviewed by an admin/verifier.
+       */
       if (!verificationComplete) {
         setErrorMessage(
-          'Please complete the verification check before continuing.',
+          'Please continue with the verification-pending status.',
         );
         return false;
       }
@@ -412,33 +660,209 @@ export const CompanyOnboarding: React.FC = () => {
     return true;
   };
 
-  const runVerification = () => {
+  /*
+   * Step 4 does not contact CIPC.
+   *
+   * It simply confirms that the company can proceed with
+   * NOT_VERIFIED status. This status is persisted by the
+   * backend and can later be changed by an authorised admin
+   * or verifier.
+   */
+  const acknowledgeVerificationStatus = () => {
     setErrorMessage('');
-    setIsVerifying(true);
-    setVerificationComplete(false);
+    setVerificationComplete(true);
 
-    /*
-     * Demo verification only.
-     *
-     * The real CIPC verification service can later be connected
-     * through companyService without changing this page's UI.
-     */
-    window.setTimeout(() => {
-      setIsVerifying(false);
-      setVerificationComplete(true);
-
-      setFormData((prev) => ({
-        ...prev,
-        verificationStatus:
-          'Verification Check Completed',
-      }));
-    }, 1200);
+    setFormData((prev) => ({
+      ...prev,
+      verificationStatus: 'NOT_VERIFIED',
+    }));
   };
 
-  const handleNext = (
+  /*
+   * Submit the completed company profile to the Spring Boot
+   * backend.
+   *
+   * The backend:
+   *   1. Creates/updates companies
+   *   2. Links the employer through employer_profiles
+   *   3. Saves billing information
+   *   4. Stores verification_status = NOT_VERIFIED
+   */
+  const submitCompanyProfile = async () => {
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    const backendPayload = {
+      legalName: formData.legalName.trim(),
+      tradingName:
+        formData.tradingName.trim() || null,
+      companyRegNo:
+        formData.companyRegNo.trim(),
+      website:
+        formData.website.trim(),
+      industry:
+        formData.industry.trim(),
+      region:
+        formData.region.trim(),
+      registeredAddress:
+        formData.registeredAddress.trim(),
+      companyEmail:
+        formData.companyEmail.trim(),
+      phone:
+        formData.phone.trim(),
+      companyDescription:
+        formData.companyDescription.trim(),
+
+      representativeName:
+        formData.repFullName.trim(),
+      representativeEmail:
+        formData.repEmail.trim(),
+      representativePhone:
+        formData.repPhone.trim(),
+      representativeRole:
+        formData.repTitle.trim(),
+
+      /*
+       * CIPC is not being called.
+       * The backend will store this as NOT_VERIFIED.
+       */
+      verificationStatus: 'NOT_VERIFIED',
+
+      billingContactName:
+        formData.billingName.trim(),
+      billingContactEmail:
+        formData.billingEmail.trim(),
+      invoicingAddress:
+        formData.invoicingAddress.trim(),
+      agreeToTerms:
+        formData.agreeTerms,
+    };
+
+    try {
+      const response =
+        await api.put<BackendCompanyProfile>(
+          '/api/company/profile',
+          backendPayload,
+        );
+
+      const savedProfile = response.data;
+
+      /*
+       * Keep the frontend representation aligned with the
+       * backend response.
+       */
+      const completedFormData: CompanyOnboardingData = {
+        ...formData,
+        verificationStatus:
+          savedProfile?.verificationStatus ||
+          'NOT_VERIFIED',
+      };
+
+      const completedOnboarding = {
+        ...completedFormData,
+        submittedAt:
+          new Date().toISOString(),
+        onboardingStatus: 'Submitted',
+        backendCompanyId:
+          savedProfile?.id ?? null,
+      };
+
+      /*
+       * Keep a local record for the frontend's existing
+       * onboarding/profile workflows.
+       */
+      localStorage.setItem(
+        SUBMISSION_KEY,
+        JSON.stringify(
+          completedOnboarding,
+        ),
+      );
+
+      localStorage.setItem(
+        PROFILE_KEY,
+        JSON.stringify({
+          id:
+            savedProfile?.id ?? null,
+          legalName:
+            savedProfile?.legalName ??
+            formData.legalName,
+          tradingName:
+            savedProfile?.tradingName ??
+            formData.tradingName,
+          region:
+            savedProfile?.region ??
+            formData.region,
+          companyRegNo:
+            savedProfile?.companyRegNo ??
+            formData.companyRegNo,
+          website:
+            savedProfile?.website ??
+            formData.website,
+          industry:
+            savedProfile?.industry ??
+            formData.industry,
+          registeredAddress:
+            savedProfile?.registeredAddress ??
+            formData.registeredAddress,
+          companyEmail:
+            savedProfile?.companyEmail ??
+            formData.companyEmail,
+          phone:
+            savedProfile?.phone ??
+            formData.phone,
+          companySize:
+            formData.companySize,
+          companyDescription:
+            savedProfile?.companyDescription ??
+            formData.companyDescription,
+          verificationStatus:
+            savedProfile?.verificationStatus ??
+            'NOT_VERIFIED',
+        }),
+      );
+
+      /*
+       * The database is now the source of truth, so the
+       * temporary onboarding draft can be removed.
+       */
+      localStorage.removeItem(
+        STORAGE_KEY,
+      );
+
+      localStorage.removeItem(
+        STEP_KEY,
+      );
+
+      alert(
+        'Onboarding complete! Your company has been submitted and is pending verification.',
+      );
+
+      navigate('/company', {
+      replace: true,
+      });
+      
+    } catch (error) {
+      console.error(
+        'Failed to save company profile:',
+        error,
+      );
+
+      setErrorMessage(
+        getApiErrorMessage(error),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNext = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
 
     if (!validateStep(currentStep)) {
       return;
@@ -449,60 +873,14 @@ export const CompanyOnboarding: React.FC = () => {
       return;
     }
 
-    const completedOnboarding = {
-      ...formData,
-      submittedAt: new Date().toISOString(),
-      onboardingStatus: 'Submitted',
-    };
-
-    try {
-      localStorage.setItem(
-        SUBMISSION_KEY,
-        JSON.stringify(completedOnboarding),
-      );
-
-      localStorage.setItem(
-        PROFILE_KEY,
-        JSON.stringify({
-          legalName: formData.legalName,
-          tradingName: formData.tradingName,
-          region: formData.region,
-          companyRegNo: formData.companyRegNo,
-          website: formData.website,
-          industry: formData.industry,
-          registeredAddress:
-            formData.registeredAddress,
-          companyEmail: formData.companyEmail,
-          phone: formData.phone,
-          companySize: formData.companySize,
-          companyDescription:
-            formData.companyDescription,
-          verificationStatus:
-            formData.verificationStatus,
-        }),
-      );
-
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(STEP_KEY);
-
-      alert(
-        'Onboarding complete! Your company has been submitted for verification.',
-      );
-
-      navigate('/dashboard');
-    } catch (error) {
-      console.error(
-        'Failed to save completed onboarding:',
-        error,
-      );
-
-      setErrorMessage(
-        'We could not save your onboarding submission. Please try again.',
-      );
-    }
+    await submitCompanyProfile();
   };
 
   const handlePrev = () => {
+    if (isSubmitting) {
+      return;
+    }
+
     if (currentStep > 1) {
       setErrorMessage('');
       setCurrentStep((prev) => prev - 1);
@@ -512,9 +890,13 @@ export const CompanyOnboarding: React.FC = () => {
   const handleDescriptionChange = (
     event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
-    const value = event.target.value.slice(0, 400);
+    const value =
+      event.target.value.slice(0, 400);
 
-    updateField('companyDescription', value);
+    updateField(
+      'companyDescription',
+      value,
+    );
   };
 
   const progressPercentage =
@@ -1023,11 +1405,6 @@ export const CompanyOnboarding: React.FC = () => {
             color: #15803D;
           }
 
-          .verification-icon.loading {
-            background: rgba(30,146,210,0.12);
-            color: #1E92D2;
-          }
-
           .verification-title {
             margin: 0 0 6px;
             color: #00273D;
@@ -1322,9 +1699,11 @@ export const CompanyOnboarding: React.FC = () => {
       </div>
 
       <div className="onboarding-watermark watermark-city">
-        {Array.from({ length: 12 }).map((_, index) => (
-          <span key={index} />
-        ))}
+        {Array.from({ length: 12 }).map(
+          (_, index) => (
+            <span key={index} />
+          ),
+        )}
       </div>
 
       <div className="onboarding-container">
@@ -1369,9 +1748,9 @@ export const CompanyOnboarding: React.FC = () => {
               </h1>
 
               <p>
-                Complete your company information so TruCity
-                can verify your organisation and connect you
-                with skilled professionals.
+                Complete your company information so
+                TruCity can review your organisation and
+                connect you with skilled professionals.
               </p>
             </div>
 
@@ -1389,7 +1768,9 @@ export const CompanyOnboarding: React.FC = () => {
                     className={`step-item ${
                       isActive ? 'active' : ''
                     } ${
-                      isCompleted ? 'completed' : ''
+                      isCompleted
+                        ? 'completed'
+                        : ''
                     }`}
                   >
                     <div className="step-number">
@@ -1399,8 +1780,13 @@ export const CompanyOnboarding: React.FC = () => {
                     </div>
 
                     <div className="step-copy">
-                      <strong>{step.title}</strong>
-                      <span>{step.description}</span>
+                      <strong>
+                        {step.title}
+                      </strong>
+
+                      <span>
+                        {step.description}
+                      </span>
                     </div>
                   </div>
                 );
@@ -1408,7 +1794,7 @@ export const CompanyOnboarding: React.FC = () => {
             </div>
 
             <div className="progress-footer">
-              TruCity verified employer onboarding
+              TruCity employer onboarding
             </div>
           </aside>
 
@@ -1416,11 +1802,15 @@ export const CompanyOnboarding: React.FC = () => {
             <div className="mobile-progress">
               <div className="mobile-progress-top">
                 <span>
-                  STEP {currentStep} OF {totalSteps}
+                  STEP {currentStep} OF{' '}
+                  {totalSteps}
                 </span>
 
                 <span>
-                  {Math.round(progressPercentage)}%
+                  {Math.round(
+                    progressPercentage,
+                  )}
+                  %
                 </span>
               </div>
 
@@ -1441,11 +1831,19 @@ export const CompanyOnboarding: React.FC = () => {
                 </p>
 
                 <h2 className="form-title">
-                  {STEPS[currentStep - 1].title}
+                  {
+                    STEPS[
+                      currentStep - 1
+                    ].title
+                  }
                 </h2>
 
                 <p className="form-description">
-                  {STEPS[currentStep - 1].description}
+                  {
+                    STEPS[
+                      currentStep - 1
+                    ].description
+                  }
                 </p>
               </div>
             </div>
@@ -1470,7 +1868,8 @@ export const CompanyOnboarding: React.FC = () => {
                     <label className="field-label">
                       Legal Company Name *
                       <span>
-                        helps us verify your company quickly
+                        helps us identify your
+                        organisation
                       </span>
                     </label>
 
@@ -1479,7 +1878,9 @@ export const CompanyOnboarding: React.FC = () => {
                       required
                       className="field-input"
                       placeholder="Official registered legal name"
-                      value={formData.legalName}
+                      value={
+                        formData.legalName
+                      }
                       onChange={(e) =>
                         updateField(
                           'legalName',
@@ -1492,14 +1893,18 @@ export const CompanyOnboarding: React.FC = () => {
                   <div className="field">
                     <label className="field-label">
                       Trading Name
-                      <span>Optional</span>
+                      <span>
+                        Optional
+                      </span>
                     </label>
 
                     <input
                       type="text"
                       className="field-input"
                       placeholder="Public operating name if different"
-                      value={formData.tradingName}
+                      value={
+                        formData.tradingName
+                      }
                       onChange={(e) =>
                         updateField(
                           'tradingName',
@@ -1520,7 +1925,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="2023/123456/07"
-                        value={formData.companyRegNo}
+                        value={
+                          formData.companyRegNo
+                        }
                         onChange={(e) =>
                           updateField(
                             'companyRegNo',
@@ -1540,7 +1947,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="https://company.com"
-                        value={formData.website}
+                        value={
+                          formData.website
+                        }
                         onChange={(e) =>
                           updateField(
                             'website',
@@ -1559,7 +1968,9 @@ export const CompanyOnboarding: React.FC = () => {
 
                       <select
                         className="field-select"
-                        value={formData.region}
+                        value={
+                          formData.region
+                        }
                         onChange={(e) =>
                           updateField(
                             'region',
@@ -1570,27 +1981,35 @@ export const CompanyOnboarding: React.FC = () => {
                         <option value="Gauteng">
                           Gauteng
                         </option>
+
                         <option value="Western Cape">
                           Western Cape
                         </option>
+
                         <option value="KwaZulu-Natal">
                           KwaZulu-Natal
                         </option>
+
                         <option value="Eastern Cape">
                           Eastern Cape
                         </option>
+
                         <option value="Free State">
                           Free State
                         </option>
+
                         <option value="Limpopo">
                           Limpopo
                         </option>
+
                         <option value="Mpumalanga">
                           Mpumalanga
                         </option>
+
                         <option value="North West">
                           North West
                         </option>
+
                         <option value="Northern Cape">
                           Northern Cape
                         </option>
@@ -1604,7 +2023,9 @@ export const CompanyOnboarding: React.FC = () => {
 
                       <select
                         className="field-select"
-                        value={formData.industry}
+                        value={
+                          formData.industry
+                        }
                         onChange={(e) =>
                           updateField(
                             'industry',
@@ -1615,27 +2036,35 @@ export const CompanyOnboarding: React.FC = () => {
                         <option value="Technology">
                           Technology
                         </option>
+
                         <option value="Finance">
                           Finance
                         </option>
+
                         <option value="Healthcare">
                           Healthcare
                         </option>
+
                         <option value="Retail">
                           Retail
                         </option>
+
                         <option value="Construction">
                           Construction
                         </option>
+
                         <option value="Education">
                           Education
                         </option>
+
                         <option value="Manufacturing">
                           Manufacturing
                         </option>
+
                         <option value="Professional Services">
                           Professional Services
                         </option>
+
                         <option value="Other">
                           Other
                         </option>
@@ -1653,7 +2082,9 @@ export const CompanyOnboarding: React.FC = () => {
                       rows={2}
                       className="field-textarea"
                       placeholder="Full physical corporate address"
-                      value={formData.registeredAddress}
+                      value={
+                        formData.registeredAddress
+                      }
                       onChange={(e) =>
                         updateField(
                           'registeredAddress',
@@ -1679,7 +2110,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="info@company.com"
-                        value={formData.companyEmail}
+                        value={
+                          formData.companyEmail
+                        }
                         onChange={(e) =>
                           updateField(
                             'companyEmail',
@@ -1699,7 +2132,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="+27 11 000 0000"
-                        value={formData.phone}
+                        value={
+                          formData.phone
+                        }
                         onChange={(e) =>
                           updateField(
                             'phone',
@@ -1718,7 +2153,9 @@ export const CompanyOnboarding: React.FC = () => {
 
                       <select
                         className="field-select"
-                        value={formData.companySize}
+                        value={
+                          formData.companySize
+                        }
                         onChange={(e) =>
                           updateField(
                             'companySize',
@@ -1729,18 +2166,23 @@ export const CompanyOnboarding: React.FC = () => {
                         <option value="1-10 employees">
                           1-10 employees
                         </option>
+
                         <option value="11-50 employees">
                           11-50 employees
                         </option>
+
                         <option value="51-200 employees">
                           51-200 employees
                         </option>
+
                         <option value="201-500 employees">
                           201-500 employees
                         </option>
+
                         <option value="501-1000 employees">
                           501-1000 employees
                         </option>
+
                         <option value="1000+ employees">
                           1000+ employees
                         </option>
@@ -1750,14 +2192,18 @@ export const CompanyOnboarding: React.FC = () => {
                     <div className="field">
                       <label className="field-label">
                         Social Links
-                        <span>Optional</span>
+                        <span>
+                          Optional
+                        </span>
                       </label>
 
                       <input
                         type="text"
                         className="field-input"
                         placeholder="LinkedIn, X, Facebook..."
-                        value={formData.socialLinks}
+                        value={
+                          formData.socialLinks
+                        }
                         onChange={(e) =>
                           updateField(
                             'socialLinks',
@@ -1776,20 +2222,27 @@ export const CompanyOnboarding: React.FC = () => {
                     <div className="file-field">
                       <input
                         type="file"
-                        required={!formData.logo}
+                        required={
+                          !formData.logo
+                        }
                         accept="image/png, image/jpeg"
                         className="file-input"
                         onChange={(e) =>
                           handleFileChange(
                             'logo',
-                            e.target.files?.[0] ?? null,
+                            e.target.files?.[0] ??
+                              null,
                           )
                         }
                       />
 
                       {formData.logo && (
                         <p className="selected-file">
-                          Selected: {formData.logo.name}
+                          Selected:{' '}
+                          {
+                            formData.logo
+                              .name
+                          }
                         </p>
                       )}
                     </div>
@@ -1806,12 +2259,20 @@ export const CompanyOnboarding: React.FC = () => {
                       maxLength={400}
                       className="field-textarea"
                       placeholder="Short business summary (max 400 characters)..."
-                      value={formData.companyDescription}
-                      onChange={handleDescriptionChange}
+                      value={
+                        formData.companyDescription
+                      }
+                      onChange={
+                        handleDescriptionChange
+                      }
                     />
 
                     <div className="character-count">
-                      {formData.companyDescription.length}
+                      {
+                        formData
+                          .companyDescription
+                          .length
+                      }
                       /400
                     </div>
                   </div>
@@ -1832,7 +2293,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="Authorised full name"
-                        value={formData.repFullName}
+                        value={
+                          formData.repFullName
+                        }
                         onChange={(e) =>
                           updateField(
                             'repFullName',
@@ -1852,7 +2315,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="e.g. Director"
-                        value={formData.repTitle}
+                        value={
+                          formData.repTitle
+                        }
                         onChange={(e) =>
                           updateField(
                             'repTitle',
@@ -1874,7 +2339,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="representative@company.com"
-                        value={formData.repEmail}
+                        value={
+                          formData.repEmail
+                        }
                         onChange={(e) =>
                           updateField(
                             'repEmail',
@@ -1894,7 +2361,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="+27 82 000 0000"
-                        value={formData.repPhone}
+                        value={
+                          formData.repPhone
+                        }
                         onChange={(e) =>
                           updateField(
                             'repPhone',
@@ -1913,17 +2382,21 @@ export const CompanyOnboarding: React.FC = () => {
 
                       <select
                         className="field-select"
-                        value={formData.idType}
+                        value={
+                          formData.idType
+                        }
                         onChange={(e) =>
                           updateField(
                             'idType',
-                            e.target.value as IdType,
+                            e.target
+                              .value as IdType,
                           )
                         }
                       >
                         <option value="National ID">
                           South African National ID
                         </option>
+
                         <option value="Passport">
                           Passport
                         </option>
@@ -1940,7 +2413,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="Document number"
-                        value={formData.idNumber}
+                        value={
+                          formData.idNumber
+                        }
                         onChange={(e) =>
                           updateField(
                             'idNumber',
@@ -1959,13 +2434,16 @@ export const CompanyOnboarding: React.FC = () => {
                     <div className="file-field">
                       <input
                         type="file"
-                        required={!formData.repIdPhoto}
+                        required={
+                          !formData.repIdPhoto
+                        }
                         accept="image/png, image/jpeg, application/pdf"
                         className="file-input"
                         onChange={(e) =>
                           handleFileChange(
                             'repIdPhoto',
-                            e.target.files?.[0] ?? null,
+                            e.target.files?.[0] ??
+                              null,
                           )
                         }
                       />
@@ -1973,7 +2451,11 @@ export const CompanyOnboarding: React.FC = () => {
                       {formData.repIdPhoto && (
                         <p className="selected-file">
                           Selected:{' '}
-                          {formData.repIdPhoto.name}
+                          {
+                            formData
+                              .repIdPhoto
+                              .name
+                          }
                         </p>
                       )}
                     </div>
@@ -1987,13 +2469,16 @@ export const CompanyOnboarding: React.FC = () => {
                     <div className="file-field">
                       <input
                         type="file"
-                        required={!formData.proofOfAuthority}
+                        required={
+                          !formData.proofOfAuthority
+                        }
                         accept="image/png, image/jpeg, application/pdf"
                         className="file-input"
                         onChange={(e) =>
                           handleFileChange(
                             'proofOfAuthority',
-                            e.target.files?.[0] ?? null,
+                            e.target.files?.[0] ??
+                              null,
                           )
                         }
                       />
@@ -2001,16 +2486,21 @@ export const CompanyOnboarding: React.FC = () => {
                       {formData.proofOfAuthority && (
                         <p className="selected-file">
                           Selected:{' '}
-                          {formData.proofOfAuthority.name}
+                          {
+                            formData
+                              .proofOfAuthority
+                              .name
+                          }
                         </p>
                       )}
                     </div>
                   </div>
 
                   <div className="info-box">
-                    Your representative information is used to
-                    establish who is authorised to act on behalf
-                    of the company.
+                    Your representative information
+                    is used to establish who is
+                    authorised to act on behalf of the
+                    company.
                   </div>
                 </>
               )}
@@ -2019,75 +2509,31 @@ export const CompanyOnboarding: React.FC = () => {
               {currentStep === 4 && (
                 <>
                   <div className="verification-card">
-                    <div
-                      className={`verification-icon ${
-                        verificationComplete
-                          ? 'complete'
-                          : isVerifying
-                            ? 'loading'
-                            : ''
-                      }`}
-                    >
-                      {verificationComplete
-                        ? '✓'
-                        : isVerifying
-                          ? '…'
-                          : '✓'}
+                    <div className="verification-icon complete">
+                      ✓
                     </div>
 
-                    {!verificationComplete &&
-                      !isVerifying && (
-                        <>
-                          <h3 className="verification-title">
-                            Ready for preliminary verification
-                          </h3>
+                    <h3 className="verification-title">
+                      Verification pending review
+                    </h3>
 
-                          <p className="verification-text">
-                            TruCity will perform a preliminary
-                            check using your CIPC registration
-                            number and company information.
-                          </p>
+                    <p className="verification-text">
+                      TruCity is currently not connected
+                      to a live CIPC verification API.
+                      Your company can therefore proceed
+                      with onboarding without an automated
+                      CIPC check.
+                    </p>
 
-                          <button
-                            type="button"
-                            className="verification-button"
-                            onClick={runVerification}
-                          >
-                            Run Verification Check
-                          </button>
-                        </>
-                      )}
-
-                    {isVerifying && (
-                      <>
-                        <h3 className="verification-title">
-                          Checking company information...
-                        </h3>
-
-                        <p className="verification-text">
-                          Checking registration number{' '}
-                          <strong>
-                            {formData.companyRegNo ||
-                              'Pending'}
-                          </strong>
-                          .
-                        </p>
-                      </>
-                    )}
-
-                    {verificationComplete && (
-                      <>
-                        <h3 className="verification-title">
-                          Verification check completed
-                        </h3>
-
-                        <p className="verification-text">
-                          Your company information has passed
-                          the preliminary verification step and
-                          is ready for final submission.
-                        </p>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      className="verification-button"
+                      onClick={
+                        acknowledgeVerificationStatus
+                      }
+                    >
+                      Continue with Verification Pending
+                    </button>
                   </div>
 
                   <div className="verification-summary">
@@ -2097,7 +2543,8 @@ export const CompanyOnboarding: React.FC = () => {
                       </div>
 
                       <div className="summary-value">
-                        {formData.companyRegNo || 'Pending'}
+                        {formData.companyRegNo ||
+                          'Pending'}
                       </div>
                     </div>
 
@@ -2106,23 +2553,20 @@ export const CompanyOnboarding: React.FC = () => {
                         STATUS
                       </div>
 
-                      <div
-                        className={`summary-value ${
-                          verificationComplete
-                            ? 'complete'
-                            : 'pending'
-                        }`}
-                      >
-                        {formData.verificationStatus}
+                      <div className="summary-value pending">
+                        NOT_VERIFIED
                       </div>
                     </div>
                   </div>
 
                   <div className="info-box">
-                    This is currently a preliminary/demo
-                    verification step. The production CIPC
-                    verification service can be connected later
-                    without changing this onboarding interface.
+                    Your registration number and company
+                    information will be stored securely in
+                    TruCity. An authorised TruCity admin or
+                    verifier can review the company and
+                    update its verification status later.
+                    No fake or simulated CIPC verification
+                    is being performed.
                   </div>
                 </>
               )}
@@ -2141,7 +2585,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="Person responsible for invoices"
-                        value={formData.billingName}
+                        value={
+                          formData.billingName
+                        }
                         onChange={(e) =>
                           updateField(
                             'billingName',
@@ -2161,7 +2607,9 @@ export const CompanyOnboarding: React.FC = () => {
                         required
                         className="field-input"
                         placeholder="billing@company.com"
-                        value={formData.billingEmail}
+                        value={
+                          formData.billingEmail
+                        }
                         onChange={(e) =>
                           updateField(
                             'billingEmail',
@@ -2182,7 +2630,9 @@ export const CompanyOnboarding: React.FC = () => {
                       rows={2}
                       className="field-textarea"
                       placeholder="Official invoicing address"
-                      value={formData.invoicingAddress}
+                      value={
+                        formData.invoicingAddress
+                      }
                       onChange={(e) =>
                         updateField(
                           'invoicingAddress',
@@ -2196,14 +2646,18 @@ export const CompanyOnboarding: React.FC = () => {
                     <div className="field">
                       <label className="field-label">
                         Tax / VAT Number
-                        <span>Optional</span>
+                        <span>
+                          Optional
+                        </span>
                       </label>
 
                       <input
                         type="text"
                         className="field-input"
                         placeholder="Optional VAT number"
-                        value={formData.taxVatNumber}
+                        value={
+                          formData.taxVatNumber
+                        }
                         onChange={(e) =>
                           updateField(
                             'taxVatNumber',
@@ -2220,7 +2674,9 @@ export const CompanyOnboarding: React.FC = () => {
 
                       <select
                         className="field-select"
-                        value={formData.paymentMethod}
+                        value={
+                          formData.paymentMethod
+                        }
                         onChange={(e) =>
                           updateField(
                             'paymentMethod',
@@ -2232,6 +2688,7 @@ export const CompanyOnboarding: React.FC = () => {
                         <option value="Paystack">
                           Paystack
                         </option>
+
                         <option value="Invoice">
                           Invoice
                         </option>
@@ -2244,7 +2701,9 @@ export const CompanyOnboarding: React.FC = () => {
                       type="checkbox"
                       id="final-terms"
                       required
-                      checked={formData.agreeTerms}
+                      checked={
+                        formData.agreeTerms
+                      }
                       onChange={(e) =>
                         updateField(
                           'agreeTerms',
@@ -2267,10 +2726,16 @@ export const CompanyOnboarding: React.FC = () => {
                   </div>
 
                   <div className="info-box">
-                    Your company profile will be submitted for
-                    verification after you complete this step.
-                    Payment processing is not performed by this
-                    onboarding form.
+                    Your company profile will be saved to
+                    TruCity when you complete this step.
+                    The company will initially have a
+                    <strong>
+                      {' '}
+                      NOT_VERIFIED
+                    </strong>{' '}
+                    status and can be reviewed by an
+                    authorised TruCity administrator or
+                    verifier.
                   </div>
                 </>
               )}
@@ -2281,6 +2746,7 @@ export const CompanyOnboarding: React.FC = () => {
                     type="button"
                     className="back-button"
                     onClick={handlePrev}
+                    disabled={isSubmitting}
                   >
                     ← Back
                   </button>
@@ -2292,14 +2758,17 @@ export const CompanyOnboarding: React.FC = () => {
                   type="submit"
                   className="next-button"
                   disabled={
-                    currentStep === 4 &&
-                    (!verificationComplete ||
-                      isVerifying)
+                    isSubmitting ||
+                    (currentStep === 4 &&
+                      !verificationComplete)
                   }
                 >
-                  {currentStep === totalSteps
-                    ? 'Complete & Finish →'
-                    : 'Save & Continue →'}
+                  {isSubmitting
+                    ? 'Saving Company...'
+                    : currentStep ===
+                        totalSteps
+                      ? 'Complete & Finish →'
+                      : 'Save & Continue →'}
                 </button>
               </div>
             </form>

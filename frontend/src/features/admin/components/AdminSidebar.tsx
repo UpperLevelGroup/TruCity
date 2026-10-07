@@ -4,7 +4,7 @@ import {
   getCurrentUser,
   type CurrentUser,
 } from "../admin.service";
-import TruCityLogo from "./TruCityLogo";
+import TruCityLogo from "../../../assets/trucity-nav-logo.png";
 
 const navigation = [
   {
@@ -56,6 +56,11 @@ const navigation = [
         label: "Messages",
         path: "/admin/messages",
         icon: "✉",
+      },
+      {
+        label: "Guidance Hubs",
+        path: "/admin/guidance",
+        icon: "▣",
       },
     ],
   },
@@ -218,11 +223,13 @@ export default function AdminSidebar() {
       ================================================= */}
 
       <div className="admin-brand">
-        <TruCityLogo
-          width={165}
-          className="admin-brand-logo"
-        />
-      </div>
+       <img
+         src={TruCityLogo}
+         alt="TruCity"
+         className="admin-brand-logo"
+         width={165}
+       />
+       </div>
 
       {/* =================================================
           NAVIGATION

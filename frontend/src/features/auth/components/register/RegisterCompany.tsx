@@ -1,7 +1,19 @@
 import React, { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
+import api from "../../../../api/axios";
 
-export default function AuthPage() {
+interface AuthResponse {
+  accessToken?: string | null;
+  refreshToken?: string | null;
+  role?: string | null;
+}
+
+interface ApiErrorResponse {
+  message?: string;
+  error?: string;
+}
+
+export default function RegisterCompany() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -11,16 +23,14 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
   const [activeModal, setActiveModal] = useState<
     "none" | "about" | "contact"
   >("none");
 
-  // Password requirements:
-  // - Minimum 8 characters
-  // - Uppercase
-  // - Lowercase
-  // - Number
-  // - Special character
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState("");
+
   const passwordRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>-]).{8,}$/;
 
@@ -28,25 +38,365 @@ export default function AuthPage() {
   const isPasswordMatch = password === confirmPassword;
 
   const isFormValid = isLoginMode
-    ? email.trim().length > 0 && password.trim().length > 0
+    ? email.trim().length > 0 &&
+      password.trim().length > 0
     : email.trim().length > 0 &&
       isPasswordValid &&
       isPasswordMatch;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  /*
+   * ------------------------------------------------------------
+   * ERROR HANDLING
+   * ------------------------------------------------------------
+   */
+
+  const getErrorMessage = (error: unknown): string => {
+    const axiosError = error as {
+      response?: {
+        status?: number;
+        data?: ApiErrorResponse | string;
+      };
+      message?: string;
+    };
+
+    const status = axiosError?.response?.status;
+    const data = axiosError?.response?.data;
+
+    if (typeof data === "string" && data.trim()) {
+      return data;
+    }
+
+    if (data && typeof data === "object") {
+      if (typeof data.message === "string") {
+        return data.message;
+      }
+
+      if (typeof data.error === "string") {
+        return data.error;
+      }
+    }
+
+    if (status === 401) {
+      return "The email or password is incorrect.";
+    }
+
+    if (status === 403) {
+      return "You do not have permission to access this area.";
+    }
+
+    if (status === 409) {
+      return "An account with this email address already exists.";
+    }
+
+    if (status === 400) {
+      return "Please check your details and try again.";
+    }
+
+    if (axiosError?.message) {
+      return axiosError.message;
+    }
+
+    return "Something went wrong. Please try again.";
+  };
+
+  /*
+   * ------------------------------------------------------------
+   * STORE AUTHENTICATION
+   * ------------------------------------------------------------
+   */
+
+  const storeAuthentication = (
+    response: AuthResponse,
+  ) => {
+    console.log(
+      "TruCity authentication response:",
+      response,
+    );
+
+    const accessToken =
+      typeof response?.accessToken === "string"
+        ? response.accessToken.trim()
+        : "";
+
+    if (!accessToken) {
+      throw new Error(
+        "The server did not return an access token.",
+      );
+    }
+
+    localStorage.setItem(
+      "trucity_token",
+      accessToken,
+    );
+
+    localStorage.setItem(
+      "token",
+      accessToken,
+    );
+
+    const normalizedRole =
+      typeof response?.role === "string"
+        ? response.role
+            .replace("ROLE_", "")
+            .trim()
+            .toUpperCase()
+        : "";
+
+    if (normalizedRole) {
+      localStorage.setItem(
+        "trucity_role",
+        normalizedRole,
+      );
+
+      localStorage.setItem(
+        "role",
+        normalizedRole,
+      );
+    }
+
+    console.log(
+      "TruCity authentication stored:",
+      {
+        hasToken: true,
+        role: normalizedRole,
+      },
+    );
+
+    return {
+      accessToken,
+      role: normalizedRole,
+    };
+  };
+
+  /*
+   * ------------------------------------------------------------
+   * ROLE-BASED REDIRECT
+   * ------------------------------------------------------------
+   */
+
+  const redirectAfterAuthentication = (
+    role?: string,
+  ) => {
+    const normalizedRole =
+      role
+        ?.replace("ROLE_", "")
+        .trim()
+        .toUpperCase() || "";
+
+    console.log(
+      "TruCity redirect role:",
+      normalizedRole,
+    );
+
+    if (normalizedRole === "EMPLOYER") {
+      console.log(
+        "Redirecting employer to company onboarding",
+      );
+
+      navigate("/company/onboarding", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    if (normalizedRole === "CANDIDATE") {
+      navigate("/candidate/feed", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    if (normalizedRole === "ADMIN") {
+      navigate("/admin", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    if (normalizedRole === "VERIFIER") {
+      navigate("/admin", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    /*
+     * Company registration should never silently become
+     * an unknown role.
+     */
+    if (!isLoginMode) {
+      navigate("/company/onboarding", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    navigate("/", {
+      replace: true,
+    });
+  };
+
+  /*
+   * ------------------------------------------------------------
+   * SUBMIT
+   * ------------------------------------------------------------
+   */
+
+  const handleSubmit = async (
+    e: React.FormEvent,
+  ) => {
     e.preventDefault();
 
-    if (!isFormValid) return;
+    setServerError("");
 
-    if (isLoginMode) {
-      navigate("/company-select");
-    } else {
-      navigate("/verification");
+    if (!isFormValid || isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      /*
+       * ========================================================
+       * LOGIN
+       * ========================================================
+       */
+
+      if (isLoginMode) {
+        const response =
+          await api.post<AuthResponse>(
+            "/api/v1/auth/login",
+            {
+              email: email.trim(),
+              password,
+            },
+          );
+
+        console.log(
+          "TruCity login HTTP response:",
+          response,
+        );
+
+        const authResponse =
+          response.data;
+
+        const authentication =
+          storeAuthentication(
+            authResponse,
+          );
+
+        redirectAfterAuthentication(
+          authentication.role,
+        );
+
+        return;
+      }
+
+      /*
+       * ========================================================
+       * COMPANY REGISTRATION
+       * ========================================================
+       */
+
+      const emailName =
+        email
+          .trim()
+          .split("@")[0]
+          .replace(/[._-]+/g, " ")
+          .trim();
+
+      const firstName =
+        emailName
+          ? emailName
+              .split(" ")[0]
+              .replace(/^\w/, (character) =>
+                character.toUpperCase(),
+              )
+          : "Company";
+
+      const lastName = "Employer";
+
+      console.log(
+        "TruCity company registration request:",
+        {
+          firstName,
+          lastName,
+          email: email.trim(),
+          role: "EMPLOYER",
+        },
+      );
+
+      const response =
+        await api.post<AuthResponse>(
+          "/api/v1/auth/register",
+          {
+            firstName,
+            lastName,
+            email: email.trim(),
+            password,
+            role: "EMPLOYER",
+          },
+        );
+
+      console.log(
+        "TruCity company registration HTTP response:",
+        response,
+      );
+
+      const authResponse =
+        response.data;
+
+      /*
+       * Company registration is explicitly EMPLOYER.
+       *
+       * If the backend returns EMPLOYER, use it.
+       * If role is unexpectedly missing but a token exists,
+       * treat this specific registration flow as EMPLOYER.
+       */
+      const authentication =
+        storeAuthentication({
+          ...authResponse,
+          role:
+            authResponse.role ||
+            "EMPLOYER",
+        });
+
+      /*
+       * Immediately continue to company onboarding.
+       */
+      redirectAfterAuthentication(
+        authentication.role ||
+          "EMPLOYER",
+      );
+    } catch (error) {
+      console.error(
+        "TruCity authentication failed:",
+        error,
+      );
+
+      setServerError(
+        getErrorMessage(error),
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  /*
+   * ------------------------------------------------------------
+   * GOOGLE AUTH
+   * ------------------------------------------------------------
+   */
+
   const handleGoogleAuth = () => {
-    navigate(isLoginMode ? "/company-select" : "/verification");
+    setServerError(
+      "Google sign-in is not connected yet. Please use your TruCity email and password.",
+    );
   };
 
   return (
@@ -59,66 +409,38 @@ export default function AuthPage() {
     >
       {/* =========================================================
           BACKGROUND
-          Matches intern AuthPage visual treatment
       ========================================================== */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 flex items-center justify-center">
-        {/* Intern's dedicated city watermark */}
         <img
           src="/city-watermark.png"
           alt="City Watermark"
           className="absolute inset-0 w-full h-full object-cover opacity-[0.12] mix-blend-overlay z-10 pointer-events-none"
         />
 
-        {/* =====================================================
-            TOP LEFT DARK BLUE CIRCLE
-        ====================================================== */}
         <div className="absolute top-[-8%] left-[-5%] w-[320px] h-[320px] rounded-full bg-[#00273D] overflow-hidden">
           <div className="absolute inset-0 rounded-full border border-[#FFAD01] translate-x-6 translate-y-6 scale-90" />
         </div>
 
-        {/* =====================================================
-            TOP RIGHT GOLD DONUT
-        ====================================================== */}
         <div className="absolute top-[-10%] right-[-5%] w-[380px] h-[380px] rounded-full border-[65px] border-[#FFAD01] overflow-hidden">
           <div className="absolute inset-0 rounded-full border border-[#00273D]/40 -translate-x-8 -translate-y-8 scale-110" />
         </div>
 
-        {/* =====================================================
-            LARGE GOLD ORGANIC SHAPE
-        ====================================================== */}
         <div className="absolute top-[-5%] left-[-10%] w-[950px] h-[750px] rounded-[50%_40%_60%_50%/60%_50%_50%_40%] bg-[#FFAD01] opacity-75 blur-[1px]" />
 
-        {/* =====================================================
-            TOP RIGHT LIGHT GOLD BUBBLE
-        ====================================================== */}
         <div className="absolute top-[10%] right-[5%] w-[320px] h-[320px] rounded-full bg-[#FFD784] opacity-40 blur-2xl z-0" />
 
-        {/* =====================================================
-            MID RIGHT GOLD BUBBLE
-        ====================================================== */}
         <div className="absolute top-[45%] right-[15%] w-[200px] h-[200px] rounded-full bg-[#FFAD01] opacity-55 blur-xl z-0" />
 
-        {/* =====================================================
-            CENTER/LOWER BLUE CIRCLE
-            Exact intern positioning
-        ====================================================== */}
         <div className="absolute top-[72%] left-[10%] w-[220px] h-[220px] rounded-full bg-[#1E92D2] shadow-xl z-0 overflow-hidden">
           <div className="absolute inset-0 rounded-full border border-[#FFAD01] -translate-x-6 -translate-y-6 scale-95" />
         </div>
 
-        {/* =====================================================
-            BOTTOM RIGHT DARK BLUE CIRCLE
-        ====================================================== */}
         <div className="absolute bottom-[-8%] right-[-5%] w-[340px] h-[340px] rounded-full bg-[#00273D] overflow-hidden">
           <div className="absolute inset-0 rounded-full border border-[#FFAD01] -translate-x-8 -translate-y-8 scale-90" />
         </div>
 
-        {/* =====================================================
-            BOTTOM LEFT GOLD CIRCLE
-        ====================================================== */}
         <div className="absolute bottom-[-10%] left-[-5%] w-[300px] h-[300px] rounded-full bg-[#FFAD01]" />
 
-        {/* Bottom fade */}
         <div className="absolute bottom-0 left-0 right-0 h-[120px] bg-gradient-to-t from-slate-200/50 to-transparent pointer-events-none" />
       </div>
 
@@ -138,8 +460,13 @@ export default function AuthPage() {
 
           <div className="flex flex-col justify-center">
             <div className="text-[28px] font-[900] tracking-tight leading-[1.1]">
-              <span className="text-[#f59e0b]">Tru</span>
-              <span className="text-[#00466D]">City</span>
+              <span className="text-[#f59e0b]">
+                Tru
+              </span>
+
+              <span className="text-[#00466D]">
+                City
+              </span>
             </div>
 
             <div className="text-[8.5px] font-[800] text-[#00466D] tracking-[1.2px] mt-[2px] whitespace-nowrap">
@@ -181,9 +508,7 @@ export default function AuthPage() {
       <main className="relative z-10 flex-1 flex items-center justify-center px-6 lg:px-12 py-10">
         <div className="flex flex-wrap items-center justify-between w-full max-w-[1300px] gap-12">
 
-          {/* =====================================================
-              LEFT WELCOME SECTION
-          ====================================================== */}
+          {/* LEFT */}
           <div className="flex-1 min-w-[320px] max-w-[620px] relative z-10">
             <h1 className="text-4xl lg:text-[52px] font-black leading-tight tracking-tight mb-4 text-white drop-shadow-sm">
               WELCOME
@@ -233,13 +558,10 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* =====================================================
-              AUTH CARD
-          ====================================================== */}
+          {/* AUTH CARD */}
           <div className="flex-1 min-w-[340px] flex justify-center relative z-10">
             <div className="w-full max-w-[680px] bg-white rounded-3xl p-14 lg:p-16 border border-slate-200 shadow-2xl relative z-20">
 
-              {/* Back button */}
               {isLoginMode && (
                 <button
                   type="button"
@@ -251,7 +573,6 @@ export default function AuthPage() {
                 </button>
               )}
 
-              {/* Card heading */}
               <div className="mb-8 text-center pt-2">
                 <div
                   className="inline-block px-6 py-2.5 rounded-full text-white font-bold text-base shadow-md mb-3"
@@ -260,7 +581,9 @@ export default function AuthPage() {
                       "linear-gradient(135deg, #1E92D2 0%, #00273D 100%)",
                   }}
                 >
-                  {isLoginMode ? "Sign In Page" : "Sign Up Page"}
+                  {isLoginMode
+                    ? "Sign In Page"
+                    : "Sign Up Page"}
                 </div>
 
                 <h2
@@ -273,14 +596,24 @@ export default function AuthPage() {
                 </h2>
               </div>
 
-              {/* =================================================
-                  FORM
-              ================================================== */}
+              {serverError && (
+                <div
+                  className="mb-5 p-4 rounded-xl border text-sm font-semibold leading-relaxed"
+                  style={{
+                    backgroundColor: "#FFF5F5",
+                    borderColor: "#FECACA",
+                    color: "#B91C1C",
+                  }}
+                  role="alert"
+                >
+                  {serverError}
+                </div>
+              )}
+
               <form
                 onSubmit={handleSubmit}
                 className="flex flex-col gap-6"
               >
-                {/* Email */}
                 <div className="flex flex-col gap-2">
                   <label
                     className="text-sm font-bold"
@@ -293,14 +626,17 @@ export default function AuthPage() {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-4 rounded-xl border border-slate-300 text-base box-border outline-none bg-white font-medium focus:border-[#00466D]"
+                    disabled={isSubmitting}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setServerError("");
+                    }}
+                    className="w-full p-4 rounded-xl border border-slate-300 text-base box-border outline-none bg-white font-medium focus:border-[#00466D] disabled:bg-slate-100"
                     style={{ color: "#00466D" }}
                     placeholder="name@example.com"
                   />
                 </div>
 
-                {/* Password */}
                 <div className="flex flex-col gap-2">
                   <label
                     className="text-sm font-bold"
@@ -313,28 +649,41 @@ export default function AuthPage() {
 
                   <div className="relative flex items-center">
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
                       required
+                      disabled={isSubmitting}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setServerError("");
+                      }}
                       placeholder={
                         isLoginMode
                           ? "Enter your password"
                           : "e.g. Pass#2026!"
                       }
-                      className="w-full p-4 pr-20 rounded-xl border border-slate-300 text-base box-border outline-none bg-white font-medium focus:border-[#00466D]"
+                      className="w-full p-4 pr-20 rounded-xl border border-slate-300 text-base box-border outline-none bg-white font-medium focus:border-[#00466D] disabled:bg-slate-100"
                       style={{ color: "#00466D" }}
                     />
 
                     <button
                       type="button"
+                      disabled={isSubmitting}
                       onClick={() =>
-                        setShowPassword(!showPassword)
+                        setShowPassword(
+                          !showPassword,
+                        )
                       }
-                      className="absolute right-4 bg-none border-none font-bold text-sm cursor-pointer"
+                      className="absolute right-4 bg-none border-none font-bold text-sm cursor-pointer disabled:opacity-50"
                       style={{ color: "#00466D" }}
                     >
-                      {showPassword ? "Hide" : "Show"}
+                      {showPassword
+                        ? "Hide"
+                        : "Show"}
                     </button>
                   </div>
 
@@ -342,14 +691,14 @@ export default function AuthPage() {
                     password.length > 0 &&
                     !isPasswordValid && (
                       <p className="text-xs text-red-500 font-medium mt-1">
-                        Password must be at least 8 characters long
-                        and include uppercase, lowercase, a number,
+                        Password must be at least 8
+                        characters long and include
+                        uppercase, lowercase, a number,
                         and a special character.
                       </p>
                     )}
                 </div>
 
-                {/* Confirm password */}
                 {!isLoginMode && (
                   <div className="flex flex-col gap-2">
                     <label
@@ -362,15 +711,21 @@ export default function AuthPage() {
                     <div className="relative flex items-center">
                       <input
                         type={
-                          showPassword ? "text" : "password"
+                          showPassword
+                            ? "text"
+                            : "password"
                         }
                         required
+                        disabled={isSubmitting}
                         value={confirmPassword}
-                        onChange={(e) =>
-                          setConfirmPassword(e.target.value)
-                        }
+                        onChange={(e) => {
+                          setConfirmPassword(
+                            e.target.value,
+                          );
+                          setServerError("");
+                        }}
                         placeholder="Re-enter password"
-                        className="w-full p-4 rounded-xl border border-slate-300 text-base box-border outline-none bg-white font-medium focus:border-[#00466D]"
+                        className="w-full p-4 rounded-xl border border-slate-300 text-base box-border outline-none bg-white font-medium focus:border-[#00466D] disabled:bg-slate-100"
                         style={{ color: "#00466D" }}
                       />
                     </div>
@@ -384,11 +739,10 @@ export default function AuthPage() {
                   </div>
                 )}
 
-                {/* Agreement */}
                 {!isLoginMode && (
                   <p className="text-xs text-left leading-relaxed my-1 font-medium text-slate-500">
-                    By clicking Agree & Join or Continue, you
-                    agree to the TruCity{" "}
+                    By clicking Agree & Join or Continue,
+                    you agree to the TruCity{" "}
                     <a
                       href="#"
                       className="font-semibold no-underline"
@@ -416,12 +770,15 @@ export default function AuthPage() {
                   </p>
                 )}
 
-                {/* Submit */}
                 <button
                   type="submit"
-                  disabled={!isFormValid}
+                  disabled={
+                    !isFormValid ||
+                    isSubmitting
+                  }
                   className={`w-full text-white p-4 rounded-xl border-none text-base font-extrabold transition-colors shadow-md ${
-                    isFormValid
+                    isFormValid &&
+                    !isSubmitting
                       ? "cursor-pointer"
                       : "opacity-60 cursor-not-allowed"
                   }`}
@@ -431,11 +788,16 @@ export default function AuthPage() {
                       "0 4px 12px rgba(0, 70, 109, 0.3)",
                   }}
                 >
-                  {isLoginMode ? "Sign In" : "Agree & Join"}
+                  {isSubmitting
+                    ? isLoginMode
+                      ? "Signing In..."
+                      : "Creating Account..."
+                    : isLoginMode
+                      ? "Sign In"
+                      : "Agree & Join"}
                 </button>
               </form>
 
-              {/* Divider */}
               <div className="flex items-center my-6">
                 <div className="flex-1 h-px bg-slate-200" />
 
@@ -446,11 +808,11 @@ export default function AuthPage() {
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
 
-              {/* Google */}
               <button
                 type="button"
                 onClick={handleGoogleAuth}
-                className="w-full bg-white p-4 rounded-xl border border-slate-300 text-base font-bold flex items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shadow-sm"
+                disabled={isSubmitting}
+                className="w-full bg-white p-4 rounded-xl border border-slate-300 text-base font-bold flex items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ color: "#00466D" }}
               >
                 <svg
@@ -464,7 +826,7 @@ export default function AuthPage() {
 
                   <path
                     fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53l-3.66 2.84c1.81 3.59 5.52 6.06 9.82 6.06z"
                   />
 
                   <path
@@ -481,7 +843,6 @@ export default function AuthPage() {
                 Continue with Google
               </button>
 
-              {/* Switch auth mode */}
               <div className="mt-6 text-center text-sm font-medium text-slate-500">
                 {isLoginMode ? (
                   <>
@@ -489,7 +850,9 @@ export default function AuthPage() {
                     <Link
                       to="/"
                       className="font-bold no-underline ml-1"
-                      style={{ color: "#00466D" }}
+                      style={{
+                        color: "#00466D",
+                      }}
                     >
                       Sign up
                     </Link>
@@ -499,9 +862,13 @@ export default function AuthPage() {
                     Already on TruCity?{" "}
                     <button
                       type="button"
-                      onClick={() => navigate("/login")}
+                      onClick={() =>
+                        navigate("/login")
+                      }
                       className="bg-transparent border-none font-bold text-sm cursor-pointer ml-1 p-0"
-                      style={{ color: "#00466D" }}
+                      style={{
+                        color: "#00466D",
+                      }}
                     >
                       Sign in
                     </button>
@@ -513,9 +880,7 @@ export default function AuthPage() {
         </div>
       </main>
 
-      {/* =========================================================
-          ABOUT MODAL
-      ========================================================== */}
+      {/* ABOUT MODAL */}
       {activeModal === "about" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl relative border border-slate-100">
@@ -527,17 +892,22 @@ export default function AuthPage() {
             </h3>
 
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              TruCity is a premier verified workspace platform
-              designed to streamline recruitment, connect verified
-              professional talent with top employers, and
-              accelerate hiring workflows securely.
+              TruCity is a premier verified workspace
+              platform designed to streamline recruitment,
+              connect verified professional talent with top
+              employers, and accelerate hiring workflows
+              securely.
             </p>
 
             <button
               type="button"
-              onClick={() => setActiveModal("none")}
+              onClick={() =>
+                setActiveModal("none")
+              }
               className="w-full py-3 rounded-xl text-white font-bold text-sm cursor-pointer border-none shadow-md"
-              style={{ backgroundColor: "#00466D" }}
+              style={{
+                backgroundColor: "#00466D",
+              }}
             >
               Close
             </button>
@@ -545,9 +915,7 @@ export default function AuthPage() {
         </div>
       )}
 
-      {/* =========================================================
-          CONTACT MODAL
-      ========================================================== */}
+      {/* CONTACT MODAL */}
       {activeModal === "contact" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl relative border border-slate-100">
@@ -559,8 +927,9 @@ export default function AuthPage() {
             </h3>
 
             <p className="text-slate-600 text-sm leading-relaxed mb-4">
-              Need assistance with your workspace or active
-              listings? Reach out directly to our support team.
+              Need assistance with your workspace or
+              active listings? Reach out directly to our
+              support team.
             </p>
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 text-sm font-semibold text-[#00466D]">
@@ -569,9 +938,13 @@ export default function AuthPage() {
 
             <button
               type="button"
-              onClick={() => setActiveModal("none")}
+              onClick={() =>
+                setActiveModal("none")
+              }
               className="w-full py-3 rounded-xl text-white font-bold text-sm cursor-pointer border-none shadow-md"
-              style={{ backgroundColor: "#00466D" }}
+              style={{
+                backgroundColor: "#00466D",
+              }}
             >
               Close
             </button>
@@ -579,9 +952,7 @@ export default function AuthPage() {
         </div>
       )}
 
-      {/* =========================================================
-          FOOTER
-      ========================================================== */}
+      {/* FOOTER */}
       <footer className="relative z-10 bg-white/90 backdrop-blur px-6 lg:px-12 py-5 text-center text-xs font-medium border-t border-slate-200 text-slate-500">
         <span>TruCity © 2026</span> •{" "}
         <a

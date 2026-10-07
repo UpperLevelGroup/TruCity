@@ -1,16 +1,16 @@
 package com.trucity.auth;
 
 import com.trucity.audit.AuditService;
+import com.trucity.candidate.CandidateProfile;
+import com.trucity.candidate.CandidateProfileRepository;
 import com.trucity.security.JwtService;
 import com.trucity.user.Role;
 import com.trucity.user.RoleRepository;
 import com.trucity.user.User;
 import com.trucity.user.UserRepository;
-import com.trucity.candidate.CandidateProfile;
-
-import com.trucity.candidate.CandidateProfileRepository;
 
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,129 +32,196 @@ public class AuthService {
     private final CandidateProfileRepository candidateProfileRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
 
-
     /*
-     * =========================================================
+     * ============================================================
      * REGISTER
-     * =========================================================
+     * ============================================================
+     *
+     * Public registration may create only:
+     *
+     * CANDIDATE
+     * EMPLOYER
+     *
+     * ADMIN and VERIFIER accounts must be created through a
+     * protected administrative process.
      */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
 
-    if (userRepository.existsByEmail(request.getEmail())) {
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Registration request is required"
+            );
+        }
 
-        throw new RuntimeException(
-                "Email already registered"
-        );
-    }
+        String email = clean(request.getEmail());
 
-    Role candidateRole =
-            roleRepository
-                    .findByName("CANDIDATE")
-                    .orElseThrow(
-                            () -> new RuntimeException(
-                                    "CANDIDATE role does not exist"
-                            )
-                    );
+        if (email == null) {
+            throw new IllegalArgumentException(
+                    "Email is required"
+            );
+        }
 
-    User user = User.builder()
+        if (request.getPassword() == null ||
+                request.getPassword().isBlank()) {
 
-            .firstName(
-                    request.getFirstName()
-            )
+            throw new IllegalArgumentException(
+                    "Password is required"
+            );
+        }
 
-            .lastName(
-                    request.getLastName()
-            )
+        if (userRepository.existsByEmail(email)) {
+            throw new RuntimeException(
+                    "Email already registered"
+            );
+        }
 
-            .email(
-                    request.getEmail()
-            )
+        /*
+         * --------------------------------------------------------
+         * Resolve public registration role safely.
+         * --------------------------------------------------------
+         *
+         * Only CANDIDATE and EMPLOYER are allowed through the
+         * public registration endpoint.
+         *
+         * ADMIN and VERIFIER cannot be created through this
+         * endpoint.
+         */
+        String requestedRole =
+                request.getRole() == null
+                        ? ""
+                        : request.getRole().trim().toUpperCase();
 
-            .passwordHash(
-                    passwordEncoder.encode(
-                            request.getPassword()
-                    )
-            )
+        if (!requestedRole.equals("CANDIDATE") &&
+                !requestedRole.equals("EMPLOYER")) {
 
-            .roles(
-                    new HashSet<>()
-            )
+            throw new IllegalArgumentException(
+                    "Public registration is only available for candidates and employers."
+            );
+        }
 
-            .enabled(true)
+        Role registrationRole =
+                roleRepository
+                        .findByName(requestedRole)
+                        .orElseThrow(
+                                () -> new RuntimeException(
+                                        requestedRole +
+                                                " role does not exist"
+                                )
+                        );
 
-            .build();
+        /*
+         * --------------------------------------------------------
+         * Create user.
+         * --------------------------------------------------------
+         */
+        User user =
+                User.builder()
+                        .firstName(
+                                clean(request.getFirstName())
+                        )
+                        .lastName(
+                                clean(request.getLastName())
+                        )
+                        .email(email)
+                        .passwordHash(
+                                passwordEncoder.encode(
+                                        request.getPassword()
+                                )
+                        )
+                        .roles(new HashSet<>())
+                        .enabled(true)
+                        .build();
 
-    user.getRoles()
-            .add(candidateRole);
+        user.getRoles().add(registrationRole);
 
-    User savedUser =
-            userRepository.save(user);
+        User savedUser =
+                userRepository.save(user);
 
+        /*
+         * --------------------------------------------------------
+         * Candidate-specific setup.
+         * --------------------------------------------------------
+         *
+         * Employers must NOT receive a CandidateProfile.
+         */
+        if ("CANDIDATE".equals(requestedRole)) {
 
-    /*
-     * =========================================================
-     * CREATES INITIAL CANDIDATE PROFILE
-     * =========================================================
-     */
+            CandidateProfile candidateProfile =
+                    CandidateProfile.builder()
+                            .userId(savedUser.getId())
+                            .yearsExperience(0)
+                            .profileCompletion(0)
+                            .build();
 
-    CandidateProfile candidateProfile =
-            CandidateProfile.builder()
-
-                    .userId(
-                            savedUser.getId()
-                    )
-
-                    .yearsExperience(0)
-
-                    .profileCompletion(0)
-
-                    .build();
-
-    candidateProfileRepository.save(
-            candidateProfile
-    );
-
-
-    auditService.log(
-            savedUser.getId(),
-            "CANDIDATE_REGISTERED",
-            "Candidate account registered: "
-                    + savedUser.getEmail()
-    );
-
-    String token =
-            jwtService.generateToken(
-                    savedUser.getEmail()
+            candidateProfileRepository.save(
+                    candidateProfile
             );
 
-    return AuthResponse.builder()
+            auditService.log(
+                    savedUser.getId(),
+                    "CANDIDATE_REGISTERED",
+                    "Candidate account registered: " +
+                            savedUser.getEmail()
+            );
 
-            .accessToken(token)
+        } else if ("EMPLOYER".equals(requestedRole)) {
 
-            .refreshToken(null)
+            auditService.log(
+                    savedUser.getId(),
+                    "EMPLOYER_REGISTERED",
+                    "Employer account registered: " +
+                            savedUser.getEmail()
+            );
+        }
 
-            .role(
-                    candidateRole.getName()
-            )
+        /*
+         * --------------------------------------------------------
+         * Issue JWT immediately.
+         * --------------------------------------------------------
+         *
+         * The frontend can immediately use this token to access
+         * employer/candidate protected endpoints.
+         */
+        String token =
+                jwtService.generateToken(
+                        savedUser.getEmail()
+                );
 
-            .build();
-}
-
-
+        return AuthResponse.builder()
+                .accessToken(token)
+                .refreshToken(null)
+                .role(registrationRole.getName())
+                .build();
+    }
 
     /*
-     * =========================================================
+     * ============================================================
      * LOGIN
-     * =========================================================
+     * ============================================================
      */
-
     @Transactional
     public AuthResponse login(LoginRequest request) {
 
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Login request is required"
+            );
+        }
+
+        String email = clean(request.getEmail());
+
+        if (email == null ||
+                request.getPassword() == null) {
+
+            throw new RuntimeException(
+                    "Invalid credentials"
+            );
+        }
+
         User user =
                 userRepository
-                        .findByEmail(request.getEmail())
+                        .findByEmail(email)
                         .orElseThrow(
                                 () -> new RuntimeException(
                                         "Invalid credentials"
@@ -165,7 +232,6 @@ public class AuthService {
                 request.getPassword(),
                 user.getPasswordHash()
         )) {
-
             throw new RuntimeException(
                     "Invalid credentials"
             );
@@ -190,137 +256,103 @@ public class AuthService {
                         .orElse("USER");
 
         return AuthResponse.builder()
-
                 .accessToken(token)
-
                 .refreshToken(null)
-
                 .role(userRole)
-
                 .build();
     }
 
-
     /*
-     * =========================================================
+     * ============================================================
      * FORGOT PASSWORD
-     * =========================================================
+     * ============================================================
+     *
+     * Uses the existing PasswordResetToken model:
+     *
+     * user     -> User relationship
+     * usedAt   -> null until the token is consumed
      */
-
     @Transactional
     public PasswordResetResponse forgotPassword(
             ForgotPasswordRequest request
     ) {
 
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Forgot password request is required"
+            );
+        }
+
         String email =
                 request.getEmail() == null
-                        ? ""
+                        ? null
                         : request.getEmail().trim();
 
-        /*
-         * Always return the same response whether the
-         * account exists or not.
-         *
-         * This prevents someone from discovering which
-         * email addresses have TruCity accounts.
-         */
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Email is required"
+            );
+        }
 
         User user =
                 userRepository
                         .findByEmail(email)
-                        .orElse(null);
-
-        if (user == null) {
-
-            return PasswordResetResponse.builder()
-                    .message(
-                            "If an account exists for that email, password reset instructions have been sent."
-                    )
-                    .build();
-        }
+                        .orElseThrow(
+                                () -> new RuntimeException(
+                                        "No account found for this email"
+                                )
+                        );
 
         /*
-         * Remove any previous unused reset tokens.
+         * Remove any existing active reset tokens for this user.
+         *
+         * PasswordResetToken uses:
+         *
+         *     user
+         *     usedAt
+         *
+         * rather than userId/used.
          */
-
         passwordResetTokenRepository
                 .deleteActiveTokensForUser(user);
 
-
-        /*
-         * Generate a secure random token.
-         */
-
-        SecureRandom secureRandom =
-                new SecureRandom();
-
         byte[] randomBytes =
-                new byte[48];
+                new byte[32];
 
-        secureRandom.nextBytes(randomBytes);
+        new SecureRandom()
+                .nextBytes(randomBytes);
 
-        String resetToken =
+        String token =
                 Base64.getUrlEncoder()
                         .withoutPadding()
                         .encodeToString(randomBytes);
 
-
-        /*
-         * Token is valid for 30 minutes.
-         */
-
-        PasswordResetToken passwordResetToken =
+        PasswordResetToken resetToken =
                 PasswordResetToken.builder()
-
                         .user(user)
-
-                        .token(resetToken)
-
+                        .token(token)
                         .expiresAt(
                                 LocalDateTime.now()
                                         .plusMinutes(30)
                         )
-
                         .build();
 
-        passwordResetTokenRepository
-                .save(passwordResetToken);
-
+        passwordResetTokenRepository.save(
+                resetToken
+        );
 
         /*
-         * TEMPORARY DEVELOPMENT OUTPUT
+         * Temporary development behavior.
          *
-         * Until SMTP/email delivery is configured,
-         * the reset token is printed to the backend log.
-         *
-         * Do NOT use this as the production email solution.
+         * Replace with email delivery when mail infrastructure
+         * is connected.
          */
-
         System.out.println(
-                "================================================="
+                "PASSWORD RESET TOKEN for " +
+                        email +
+                        ": " +
+                        token
         );
-
-        System.out.println(
-                "TRUCITY PASSWORD RESET TOKEN"
-        );
-
-        System.out.println(
-                "User: " + user.getEmail()
-        );
-
-        System.out.println(
-                "Token: " + resetToken
-        );
-
-        System.out.println(
-                "Expires: "
-                        + passwordResetToken.getExpiresAt()
-        );
-
-        System.out.println(
-                "================================================="
-        );
-
 
         auditService.log(
                 user.getId(),
@@ -328,76 +360,82 @@ public class AuthService {
                 "Password reset requested"
         );
 
-
-        return PasswordResetResponse.builder()
-
-                .message(
-                        "If an account exists for that email, password reset instructions have been sent."
-                )
-
-                .build();
+        return new PasswordResetResponse(
+                "Password reset instructions have been generated."
+        );
     }
 
-
     /*
-     * =========================================================
+     * ============================================================
      * RESET PASSWORD
-     * =========================================================
+     * ============================================================
+     *
+     * Uses the existing PasswordResetToken model and marks the
+     * token as used by setting usedAt.
      */
-
     @Transactional
     public PasswordResetResponse resetPassword(
             ResetPasswordRequest request
     ) {
 
-        if (request.getToken() == null ||
-                request.getToken().trim().isEmpty()) {
+        if (request == null ||
+                request.getToken() == null ||
+                request.getToken().isBlank()) {
 
-            throw new RuntimeException(
-                    "Invalid password reset token"
+            throw new IllegalArgumentException(
+                    "Reset token is required"
             );
         }
 
         if (request.getNewPassword() == null ||
-                request.getNewPassword().trim().isEmpty()) {
+                request.getNewPassword().isBlank()) {
 
-            throw new RuntimeException(
+            throw new IllegalArgumentException(
                     "New password is required"
             );
         }
 
-
         PasswordResetToken resetToken =
                 passwordResetTokenRepository
-                        .findByToken(
-                                request.getToken().trim()
-                        )
+                        .findByToken(request.getToken())
                         .orElseThrow(
                                 () -> new RuntimeException(
                                         "Invalid password reset token"
                                 )
                         );
 
-
+        /*
+         * Token has already been consumed.
+         */
         if (resetToken.isUsed()) {
-
             throw new RuntimeException(
                     "Password reset token has already been used"
             );
         }
 
-
-        if (resetToken.isExpired()) {
+        /*
+         * Token has expired.
+         */
+        if (resetToken.getExpiresAt() == null ||
+                resetToken.getExpiresAt()
+                        .isBefore(LocalDateTime.now())) {
 
             throw new RuntimeException(
                     "Password reset token has expired"
             );
         }
 
-
+        /*
+         * PasswordResetToken contains the User entity directly.
+         */
         User user =
                 resetToken.getUser();
 
+        if (user == null) {
+            throw new RuntimeException(
+                    "User account could not be found"
+            );
+        }
 
         user.setPasswordHash(
                 passwordEncoder.encode(
@@ -405,32 +443,46 @@ public class AuthService {
                 )
         );
 
-
         userRepository.save(user);
 
-
+        /*
+         * Mark token as consumed.
+         *
+         * PasswordResetToken uses usedAt rather than a boolean
+         * used field.
+         */
         resetToken.setUsedAt(
                 LocalDateTime.now()
         );
 
-
-        passwordResetTokenRepository
-                .save(resetToken);
-
+        passwordResetTokenRepository.save(
+                resetToken
+        );
 
         auditService.log(
                 user.getId(),
                 "PASSWORD_RESET_COMPLETED",
-                "User password was successfully reset"
+                "Password was successfully reset"
         );
 
+        return new PasswordResetResponse(
+                "Password has been reset successfully."
+        );
+    }
 
-        return PasswordResetResponse.builder()
+    /*
+     * ============================================================
+     * HELPERS
+     * ============================================================
+     */
+    private String clean(String value) {
 
-                .message(
-                        "Your password has been reset successfully."
-                )
+        if (value == null ||
+                value.isBlank()) {
 
-                .build();
+            return null;
+        }
+
+        return value.trim();
     }
 }

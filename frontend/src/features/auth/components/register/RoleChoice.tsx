@@ -64,7 +64,7 @@ export default function RoleChoice() {
   };
 
   const handleEmployer = () => {
-    navigate('/register/employer');
+    navigate('/register/company');
   };
 
   return (

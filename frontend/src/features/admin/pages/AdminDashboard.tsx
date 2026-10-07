@@ -235,6 +235,7 @@ export default function AdminDashboard() {
 
             <div className="admin-system-health">
               <span className="admin-system-health-dot" />
+
               <span>
                 Operational
               </span>
@@ -271,10 +272,13 @@ export default function AdminDashboard() {
               </div>
 
               <div className="admin-status-indicator">
+
                 <span className="admin-status-dot" />
+
                 <span>
                   Operational
                 </span>
+
               </div>
 
             </div>
@@ -305,10 +309,13 @@ export default function AdminDashboard() {
               </div>
 
               <div className="admin-status-indicator">
+
                 <span className="admin-status-dot" />
+
                 <span>
                   Operational
                 </span>
+
               </div>
 
             </div>
@@ -339,10 +346,13 @@ export default function AdminDashboard() {
               </div>
 
               <div className="admin-status-indicator">
+
                 <span className="admin-status-dot" />
+
                 <span>
                   Operational
                 </span>
+
               </div>
 
             </div>
@@ -373,10 +383,13 @@ export default function AdminDashboard() {
               </div>
 
               <div className="admin-status-indicator">
+
                 <span className="admin-status-dot" />
+
                 <span>
                   Operational
                 </span>
+
               </div>
 
             </div>
@@ -425,7 +438,9 @@ export default function AdminDashboard() {
         <div className="admin-action-grid">
 
 
-          {/* MANAGE USERS */}
+          {/* =================================================
+              MANAGE USERS
+          ================================================= */}
 
           <button
             type="button"
@@ -454,7 +469,9 @@ export default function AdminDashboard() {
           </button>
 
 
-          {/* REVIEW VERIFICATIONS */}
+          {/* =================================================
+              REVIEW VERIFICATIONS
+          ================================================= */}
 
           <button
             type="button"
@@ -483,7 +500,9 @@ export default function AdminDashboard() {
           </button>
 
 
-          {/* MANAGE JOBS */}
+          {/* =================================================
+              MANAGE JOBS
+          ================================================= */}
 
           <button
             type="button"
@@ -512,7 +531,40 @@ export default function AdminDashboard() {
           </button>
 
 
-          {/* ANALYTICS */}
+          {/* =================================================
+              MANAGE GUIDANCE
+          ================================================= */}
+
+          <button
+            type="button"
+            className="admin-action-card"
+            onClick={() =>
+              navigate("/admin/guidance")
+            }
+          >
+
+            <span className="admin-action-icon">
+              ▤
+            </span>
+
+            <strong>
+              Manage Guidance
+            </strong>
+
+            <small>
+              Create and manage candidate guidance content
+            </small>
+
+            <span className="admin-action-arrow">
+              →
+            </span>
+
+          </button>
+
+
+          {/* =================================================
+              ANALYTICS
+          ================================================= */}
 
           <button
             type="button"

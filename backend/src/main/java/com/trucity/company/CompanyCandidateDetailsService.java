@@ -1,5 +1,8 @@
 package com.trucity.company;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,6 +18,7 @@ import java.util.UUID;
 public class CompanyCandidateDetailsService {
 
     private final EntityManager entityManager;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public CompanyCandidateDetailsResponse getCandidateDetails(
@@ -72,7 +76,8 @@ public class CompanyCandidateDetailsService {
                 verified,
                 getSkills(candidateId),
                 getQualifications(candidateId),
-                getExperience(candidateId)
+                getExperience(candidateId),
+                getProfileMedia(candidateId)
         );
     }
 
@@ -237,6 +242,114 @@ public class CompanyCandidateDetailsService {
         }
 
         return result;
+    }
+
+
+    private CompanyCandidateDetailsResponse.ProfileMediaResponse getProfileMedia(
+            UUID candidateId
+    ) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = entityManager.createNativeQuery("""
+                SELECT
+                    face_photo,
+                    full_body_photo,
+                    gallery_images,
+                    documents,
+                    projects,
+                    reel_meta,
+                    intro_reel,
+                    preferences
+                FROM candidate_profile_details
+                WHERE candidate_id = :candidateId
+                LIMIT 1
+                """)
+                .setParameter("candidateId", candidateId)
+                .getResultList();
+
+        if (rows.isEmpty()) {
+            return emptyProfileMedia();
+        }
+
+        Object[] row = rows.get(0);
+
+        List<CompanyCandidateDetailsResponse.GalleryImageResponse> galleryImages =
+                readJsonList(
+                        toStringValue(row[2]),
+                        new TypeReference<List<CompanyCandidateDetailsResponse.GalleryImageResponse>>() {}
+                );
+
+        List<CompanyCandidateDetailsResponse.DocumentResponse> documents =
+                readJsonList(
+                        toStringValue(row[3]),
+                        new TypeReference<List<CompanyCandidateDetailsResponse.DocumentResponse>>() {}
+                );
+
+        List<CompanyCandidateDetailsResponse.ProjectResponse> projects =
+                readJsonList(
+                        toStringValue(row[4]),
+                        new TypeReference<List<CompanyCandidateDetailsResponse.ProjectResponse>>() {}
+                );
+
+        CompanyCandidateDetailsResponse.IntroReelResponse reelMeta =
+                readJson(
+                        firstNonBlank(
+                                toStringValue(row[5]),
+                                toStringValue(row[6])
+                        ),
+                        new TypeReference<CompanyCandidateDetailsResponse.IntroReelResponse>() {}
+                );
+
+        CompanyCandidateDetailsResponse.PreferencesResponse preferences =
+                readJson(
+                        toStringValue(row[7]),
+                        new TypeReference<CompanyCandidateDetailsResponse.PreferencesResponse>() {}
+                );
+
+        return new CompanyCandidateDetailsResponse.ProfileMediaResponse(
+                toStringValue(row[0]),
+                toStringValue(row[1]),
+                galleryImages,
+                documents,
+                projects,
+                reelMeta,
+                preferences
+        );
+    }
+
+    private CompanyCandidateDetailsResponse.ProfileMediaResponse emptyProfileMedia() {
+        return new CompanyCandidateDetailsResponse.ProfileMediaResponse(
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                null
+        );
+    }
+
+    private <T> T readJson(String value, TypeReference<T> type) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(value, type);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
+    private <T> List<T> readJsonList(String value, TypeReference<List<T>> type) {
+        List<T> result = readJson(value, type);
+        return result == null ? List.of() : result;
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second;
     }
 
     private UUID toUuid(Object value) {

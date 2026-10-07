@@ -7,7 +7,6 @@ import {
   Bookmark,
   BriefcaseBusiness,
   CalendarDays,
-  Check,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
@@ -22,7 +21,6 @@ import {
   TrendingUp,
   UserRound,
   Users,
-  X,
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
@@ -55,23 +53,6 @@ interface EventItem {
   type: string;
 }
 
-interface OpportunityMatch {
-  id: number;
-  company: string;
-  title: string;
-  location: string;
-  employmentType: string;
-  matchPercentage: number;
-  summary: string;
-  requiredSkills: string[];
-  matchedSkills: string[];
-  missingSkills: string[];
-  experienceRequired: string;
-  candidateExperience: string;
-  qualification: string;
-  category: string;
-}
-
 export default function CandidateDashboard() {
   const navigate = useNavigate();
 
@@ -86,9 +67,6 @@ export default function CandidateDashboard() {
 
   const [searchTerm, setSearchTerm] =
     useState("");
-
-  const [selectedMatch, setSelectedMatch] =
-    useState<OpportunityMatch | null>(null);
 
   /*
    * =========================================================
@@ -137,154 +115,6 @@ export default function CandidateDashboard() {
     ],
     [navigate]
   );
-
-  /*
-   * =========================================================
-   * SMART OPPORTUNITY MATCHING - MOCK DATA
-   * =========================================================
-   *
-   * This is intentionally mock data.
-   *
-   * Future version:
-   * Candidate profile + CV + skills + experience
-   *        ↓
-   * Matching engine
-   *        ↓
-   * Open jobs
-   *        ↓
-   * Match percentage + reasons
-   */
-
-  const opportunityMatches: OpportunityMatch[] = [
-    {
-      id: 101,
-      company: "TechNova",
-      title: "Backend Software Engineer",
-      location: "Johannesburg",
-      employmentType: "Full-time",
-      matchPercentage: 94,
-      summary:
-        "Your backend development experience strongly aligns with the technical requirements for this role.",
-      requiredSkills: [
-        "Java",
-        "Spring Boot",
-        "PostgreSQL",
-        "REST APIs",
-        "Git",
-      ],
-      matchedSkills: [
-        "Java",
-        "Spring Boot",
-        "PostgreSQL",
-        "REST APIs",
-        "Git",
-      ],
-      missingSkills: [
-        "AWS",
-      ],
-      experienceRequired: "3–5 years",
-      candidateExperience: "4 years",
-      qualification:
-        "Computer Science / Software Engineering",
-      category: "Software Engineering",
-    },
-    {
-      id: 102,
-      company: "DataCore",
-      title: "Full Stack Developer",
-      location: "Pretoria",
-      employmentType: "Full-time",
-      matchPercentage: 88,
-      summary:
-        "Your Java and React experience matches most of the core development requirements for this opportunity.",
-      requiredSkills: [
-        "Java",
-        "React",
-        "REST APIs",
-        "PostgreSQL",
-        "Docker",
-      ],
-      matchedSkills: [
-        "Java",
-        "React",
-        "REST APIs",
-        "PostgreSQL",
-      ],
-      missingSkills: [
-        "Docker",
-      ],
-      experienceRequired: "2–4 years",
-      candidateExperience: "4 years",
-      qualification:
-        "Computer Science or related qualification",
-      category: "Full Stack Development",
-    },
-    {
-      id: 103,
-      company: "CloudWorks",
-      title: "Cloud Application Developer",
-      location: "Cape Town / Remote",
-      employmentType: "Hybrid",
-      matchPercentage: 82,
-      summary:
-        "Your software engineering background is a strong foundation, with cloud skills representing the main development opportunity.",
-      requiredSkills: [
-        "Java",
-        "Spring Boot",
-        "AWS",
-        "Docker",
-        "CI/CD",
-      ],
-      matchedSkills: [
-        "Java",
-        "Spring Boot",
-      ],
-      missingSkills: [
-        "AWS",
-        "Docker",
-        "CI/CD",
-      ],
-      experienceRequired: "3+ years",
-      candidateExperience: "4 years",
-      qualification:
-        "Information Technology / Computer Science",
-      category: "Cloud & DevOps",
-    },
-    {
-      id: 104,
-      company: "BuildRight",
-      title: "Technology Project Analyst",
-      location: "Pretoria",
-      employmentType: "Full-time",
-      matchPercentage: 76,
-      summary:
-        "Your technical background aligns with several requirements, while project management experience could strengthen the match.",
-      requiredSkills: [
-        "Technology",
-        "Data Analysis",
-        "Project Management",
-        "Communication",
-        "Reporting",
-      ],
-      matchedSkills: [
-        "Technology",
-        "Data Analysis",
-        "Communication",
-      ],
-      missingSkills: [
-        "Project Management",
-        "Advanced Reporting",
-      ],
-      experienceRequired: "2–5 years",
-      candidateExperience: "4 years",
-      qualification:
-        "Technology / Business qualification",
-      category: "Technology & Projects",
-    },
-  ];
-
-  const topOpportunityMatches =
-    opportunityMatches.slice(0, 3);
 
   /*
    * =========================================================
@@ -474,24 +304,6 @@ export default function CandidateDashboard() {
       type: "Career Event",
     },
   ];
-
-  const getMatchLabel = (
-    percentage: number
-  ) => {
-    if (percentage >= 90) {
-      return "Excellent Match";
-    }
-
-    if (percentage >= 80) {
-      return "Strong Match";
-    }
-
-    return "Potential Match";
-  };
-
-  const getMatchWidth = (
-    percentage: number
-  ) => `${percentage}%`;
 
   return (
     <div
@@ -724,7 +536,7 @@ export default function CandidateDashboard() {
         </section>
 
         {/* ===================================================
-            SMART OPPORTUNITY MATCHING
+            OPPORTUNITY OVERVIEW
         ==================================================== */}
 
         <section
@@ -733,8 +545,6 @@ export default function CandidateDashboard() {
             borderColor: "#BFD9E8",
           }}
         >
-          {/* Decorative glow */}
-
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full opacity-20 blur-2xl"
@@ -752,9 +562,7 @@ export default function CandidateDashboard() {
           />
 
           <div className="relative z-10">
-            {/* Section heading */}
-
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-3xl">
                 <div
                   className="flex items-center gap-2 text-xs font-bold tracking-[0.14em]"
@@ -762,8 +570,8 @@ export default function CandidateDashboard() {
                     color: "#1E92D2",
                   }}
                 >
-                  <Sparkles className="h-4 w-4" />
-                  SMART OPPORTUNITY MATCHING
+                  <BriefcaseBusiness className="h-4 w-4" />
+                  OPPORTUNITY CENTRE
                 </div>
 
                 <h2
@@ -772,8 +580,8 @@ export default function CandidateDashboard() {
                     color: "#00273D",
                   }}
                 >
-                  Opportunities matched to your
-                  profile
+                  Explore opportunities that
+                  interest you
                 </h2>
 
                 <p
@@ -782,345 +590,160 @@ export default function CandidateDashboard() {
                     color: "#64748B",
                   }}
                 >
-                  TruCity can compare your skills,
-                  experience and qualifications with
-                  employer requirements to surface
-                  opportunities that closely match your
-                  profile.
+                  Browse verified employer opportunities,
+                  review the full job requirements and
+                  decide which roles are right for you.
+                  You can review how your profile aligns
+                  with an individual job when viewing its
+                  details.
                 </p>
               </div>
 
-              <div className="flex shrink-0 items-center gap-3">
-                <div
-                  className="flex h-14 w-14 items-center justify-center rounded-2xl"
+              <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/candidate/feed")
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                   style={{
-                    background: "#EAF5FB",
-                    color: "#00466D",
+                    background:
+                      "linear-gradient(135deg, #00466D 0%, #1E92D2 100%)",
                   }}
                 >
-                  <Sparkles className="h-6 w-6" />
-                </div>
-
-                <div>
-                  <p
-                    className="text-[10px] font-bold tracking-wide"
-                    style={{
-                      color: "#64748B",
-                    }}
-                  >
-                    PROFILE MATCHING
-                  </p>
-
-                  <p
-                    className="mt-0.5 text-sm font-bold"
-                    style={{
-                      color: "#00466D",
-                    }}
-                  >
-                    Active
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Profile readiness banner */}
-
-            <div
-              className="mt-6 rounded-2xl border p-4"
-              style={{
-                borderColor: "#D4D2E6",
-                background:
-                  "linear-gradient(135deg, #F8FCFF 0%, #FFFFFF 100%)",
-              }}
-            >
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-start gap-3">
-                  <div
-                    className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                    style={{
-                      background: "#EAF5FB",
-                      color: "#1E92D2",
-                    }}
-                  >
-                    <UserRound className="h-5 w-5" />
-                  </div>
-
-                  <div>
-                    <p
-                      className="text-sm font-bold"
-                      style={{
-                        color: "#334155",
-                      }}
-                    >
-                      Your matching profile
-                    </p>
-
-                    <p
-                      className="mt-1 text-xs leading-5"
-                      style={{
-                        color: "#64748B",
-                      }}
-                    >
-                      Matching currently uses your
-                      profile skills, experience and
-                      qualifications.
-                    </p>
-                  </div>
-                </div>
+                  <Search className="h-4 w-4" />
+                  Browse Jobs
+                </button>
 
                 <button
                   type="button"
                   onClick={() =>
                     navigate("/candidate/profile")
                   }
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition hover:bg-white"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-bold transition hover:bg-[#F8FCFF]"
                   style={{
                     borderColor: "#00466D",
                     color: "#00466D",
                   }}
                 >
-                  Update Profile
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <UserRound className="h-4 w-4" />
+                  Review Profile
                 </button>
               </div>
             </div>
 
-            {/* Match cards */}
-
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-              {topOpportunityMatches.map(
-                (match) => (
-                  <button
-                    key={match.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedMatch(match)
-                    }
-                    className="group relative overflow-hidden rounded-2xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-md"
-                    style={{
-                      borderColor: "#D4D2E6",
-                      background: "#FFFFFF",
-                    }}
-                  >
-                    {/* Match percentage */}
-
-                    <div className="flex items-start justify-between gap-3">
-                      <div
-                        className="flex h-11 w-11 items-center justify-center rounded-xl"
-                        style={{
-                          background: "#F8FCFF",
-                          color: "#00466D",
-                          border:
-                            "1px solid #D4D2E6",
-                        }}
-                      >
-                        <BriefcaseBusiness className="h-5 w-5" />
-                      </div>
-
-                      <div className="text-right">
-                        <div
-                          className="text-2xl font-bold"
-                          style={{
-                            color:
-                              match.matchPercentage >=
-                              90
-                                ? "#16803C"
-                                : "#00466D",
-                          }}
-                        >
-                          {match.matchPercentage}%
-                        </div>
-
-                        <div
-                          className="text-[9px] font-bold uppercase tracking-wide"
-                          style={{
-                            color: "#64748B",
-                          }}
-                        >
-                          Match
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <span
-                        className="text-[10px] font-bold uppercase tracking-wide"
-                        style={{
-                          color: "#1E92D2",
-                        }}
-                      >
-                        {match.category}
-                      </span>
-
-                      <h3
-                        className="mt-1 text-base font-bold leading-5"
-                        style={{
-                          color: "#00273D",
-                        }}
-                      >
-                        {match.title}
-                      </h3>
-
-                      <p
-                        className="mt-1 text-xs font-semibold"
-                        style={{
-                          color: "#475569",
-                        }}
-                      >
-                        {match.company}
-                      </p>
-
-                      <p
-                        className="mt-2 text-xs"
-                        style={{
-                          color: "#64748B",
-                        }}
-                      >
-                        {match.location} •{" "}
-                        {match.employmentType}
-                      </p>
-                    </div>
-
-                    {/* Match bar */}
-
-                    <div className="mt-4">
-                      <div className="mb-1 flex items-center justify-between">
-                        <span
-                          className="text-[10px] font-semibold"
-                          style={{
-                            color: "#64748B",
-                          }}
-                        >
-                          Profile alignment
-                        </span>
-
-                        <span
-                          className="text-[10px] font-bold"
-                          style={{
-                            color: "#00466D",
-                          }}
-                        >
-                          {getMatchLabel(
-                            match.matchPercentage
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="h-2 overflow-hidden rounded-full bg-[#EAF5FB]">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: getMatchWidth(
-                              match.matchPercentage
-                            ),
-                            background:
-                              "linear-gradient(90deg, #00466D 0%, #1E92D2 100%)",
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Matched skills */}
-
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {match.matchedSkills
-                        .slice(0, 3)
-                        .map((skill) => (
-                          <span
-                            key={skill}
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold"
-                            style={{
-                              background: "#EAF5FB",
-                              color: "#00466D",
-                            }}
-                          >
-                            <Check className="h-2.5 w-2.5" />
-                            {skill}
-                          </span>
-                        ))}
-
-                      {match.matchedSkills.length >
-                        3 && (
-                        <span
-                          className="rounded-full px-2 py-1 text-[9px] font-bold"
-                          style={{
-                            background: "#F8FCFF",
-                            color: "#64748B",
-                          }}
-                        >
-                          +
-                          {match.matchedSkills
-                            .length - 3}{" "}
-                          more
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Click hint */}
-
-                    <div
-                      className="mt-5 flex items-center justify-between border-t pt-4"
-                      style={{
-                        borderColor: "#EEF2F6",
-                      }}
-                    >
-                      <span
-                        className="text-[10px] font-bold"
-                        style={{
-                          color: "#00466D",
-                        }}
-                      >
-                        View match details
-                      </span>
-
-                      <ChevronRight
-                        className="h-4 w-4 transition group-hover:translate-x-1"
-                        style={{
-                          color: "#1E92D2",
-                        }}
-                      />
-                    </div>
-                  </button>
-                )
-              )}
-            </div>
-
-            {/* Bottom action */}
-
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck
-                  className="h-4 w-4"
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <div
+                className="rounded-2xl border p-4"
+                style={{
+                  borderColor: "#D4D2E6",
+                  background: "#F8FCFF",
+                }}
+              >
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full"
                   style={{
-                    color: "#1E92D2",
+                    background: "#EAF5FB",
+                    color: "#00466D",
                   }}
-                />
+                >
+                  <BriefcaseBusiness className="h-5 w-5" />
+                </div>
+
+                <h3
+                  className="mt-3 text-sm font-bold"
+                  style={{
+                    color: "#334155",
+                  }}
+                >
+                  Browse Jobs
+                </h3>
 
                 <p
-                  className="text-[11px]"
+                  className="mt-1 text-xs leading-5"
                   style={{
                     color: "#64748B",
                   }}
                 >
-                  Matches are based on the information
-                  currently available in your profile.
+                  Discover open opportunities from
+                  verified employers.
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  navigate("/candidate/feed")
-                }
-                className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-xs font-bold text-white transition hover:-translate-y-0.5 hover:shadow-md"
+              <div
+                className="rounded-2xl border p-4"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #00466D 0%, #1E92D2 100%)",
+                  borderColor: "#D4D2E6",
+                  background: "#FFFFFF",
                 }}
               >
-                View All Opportunities
-                <ArrowRight className="h-4 w-4" />
-              </button>
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full"
+                  style={{
+                    background: "#FFF8E7",
+                    color: "#FFAD01",
+                  }}
+                >
+                  <FileText className="h-5 w-5" />
+                </div>
+
+                <h3
+                  className="mt-3 text-sm font-bold"
+                  style={{
+                    color: "#334155",
+                  }}
+                >
+                  Review Requirements
+                </h3>
+
+                <p
+                  className="mt-1 text-xs leading-5"
+                  style={{
+                    color: "#64748B",
+                  }}
+                >
+                  Understand the responsibilities,
+                  requirements and closing date before
+                  applying.
+                </p>
+              </div>
+
+              <div
+                className="rounded-2xl border p-4"
+                style={{
+                  borderColor: "#D4D2E6",
+                  background: "#FFFFFF",
+                }}
+              >
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full"
+                  style={{
+                    background: "#EAF5FB",
+                    color: "#1E92D2",
+                  }}
+                >
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+
+                <h3
+                  className="mt-3 text-sm font-bold"
+                  style={{
+                    color: "#334155",
+                  }}
+                >
+                  Check Your Fit
+                </h3>
+
+                <p
+                  className="mt-1 text-xs leading-5"
+                  style={{
+                    color: "#64748B",
+                  }}
+                >
+                  View your profile alignment against a
+                  specific job when reviewing its details.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -2121,7 +1744,8 @@ export default function CandidateDashboard() {
                         color: "#64748B",
                       }}
                     >
-                      Find roles that match your skills
+                      Find roles and review their
+                      requirements
                     </span>
                   </span>
                 </span>
@@ -2299,7 +1923,7 @@ export default function CandidateDashboard() {
         </section>
 
         {/* ===================================================
-            MOCK DATA NOTICE
+            DEVELOPMENT NOTICE
         ==================================================== */}
 
         <div className="flex items-center justify-center gap-2 pb-4 text-[10px] font-semibold">
@@ -2315,483 +1939,12 @@ export default function CandidateDashboard() {
               color: "#94A3B8",
             }}
           >
-            Dashboard business, market, event and
-            matching information is currently mock
-            data for development.
+            Dashboard business, market and event
+            information is currently mock data for
+            development.
           </span>
         </div>
       </div>
-
-      {/* =====================================================
-          SMART MATCH DETAIL MODAL
-      ====================================================== */}
-
-      {selectedMatch && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00273D]/55 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="smart-match-title"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setSelectedMatch(null);
-            }
-          }}
-        >
-          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-white shadow-2xl">
-            {/* Modal header */}
-
-            <div
-              className="relative overflow-hidden px-6 pb-6 pt-6 sm:px-7"
-              style={{
-                background:
-                  "linear-gradient(135deg, #F8FCFF 0%, #FFFFFF 100%)",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedMatch(null)
-                }
-                aria-label="Close match details"
-                className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full border bg-white transition hover:bg-[#F8FCFF]"
-                style={{
-                  borderColor: "#D4D2E6",
-                  color: "#64748B",
-                }}
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="pr-12">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[10px] font-bold"
-                    style={{
-                      background: "#EAF5FB",
-                      color: "#00466D",
-                    }}
-                  >
-                    SMART MATCH
-                  </span>
-
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[10px] font-bold"
-                    style={{
-                      background: "#FFF8E7",
-                      color: "#B77900",
-                    }}
-                  >
-                    MOCK
-                  </span>
-                </div>
-
-                <h2
-                  id="smart-match-title"
-                  className="mt-3 text-2xl font-bold"
-                  style={{
-                    color: "#00273D",
-                  }}
-                >
-                  {selectedMatch.title}
-                </h2>
-
-                <p
-                  className="mt-1 text-sm font-semibold"
-                  style={{
-                    color: "#475569",
-                  }}
-                >
-                  {selectedMatch.company}
-                </p>
-
-                <p
-                  className="mt-1 text-xs"
-                  style={{
-                    color: "#64748B",
-                  }}
-                >
-                  {selectedMatch.location} •{" "}
-                  {selectedMatch.employmentType}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-6 px-6 pb-7 sm:px-7">
-              {/* Match score */}
-
-              <div
-                className="rounded-2xl border p-5"
-                style={{
-                  borderColor: "#BFD9E8",
-                  background: "#F8FCFF",
-                }}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p
-                      className="text-xs font-bold tracking-wide"
-                      style={{
-                        color: "#64748B",
-                      }}
-                    >
-                      PROFILE MATCH
-                    </p>
-
-                    <p
-                      className="mt-1 text-sm font-bold"
-                      style={{
-                        color: "#334155",
-                      }}
-                    >
-                      {getMatchLabel(
-                        selectedMatch.matchPercentage
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <span
-                      className="text-3xl font-bold"
-                      style={{
-                        color:
-                          selectedMatch.matchPercentage >=
-                          90
-                            ? "#16803C"
-                            : "#00466D",
-                      }}
-                    >
-                      {selectedMatch.matchPercentage}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#DDEFF8]">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${selectedMatch.matchPercentage}%`,
-                      background:
-                        "linear-gradient(90deg, #00466D 0%, #1E92D2 100%)",
-                    }}
-                  />
-                </div>
-
-                <p
-                  className="mt-3 text-xs leading-5"
-                  style={{
-                    color: "#64748B",
-                  }}
-                >
-                  {selectedMatch.summary}
-                </p>
-              </div>
-
-              {/* Why this matches */}
-
-              <div>
-                <h3
-                  className="text-sm font-bold"
-                  style={{
-                    color: "#00273D",
-                  }}
-                >
-                  Why this opportunity matches
-                </h3>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div
-                    className="rounded-2xl border p-4"
-                    style={{
-                      borderColor: "#D4D2E6",
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="flex h-8 w-8 items-center justify-center rounded-full"
-                        style={{
-                          background: "#EAF7EE",
-                          color: "#16803C",
-                        }}
-                      >
-                        <Check className="h-4 w-4" />
-                      </div>
-
-                      <span
-                        className="text-xs font-bold"
-                        style={{
-                          color: "#334155",
-                        }}
-                      >
-                        Matched Skills
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedMatch.matchedSkills.map(
-                        (skill) => (
-                          <span
-                            key={skill}
-                            className="rounded-full px-2.5 py-1.5 text-[10px] font-bold"
-                            style={{
-                              background: "#EAF7EE",
-                              color: "#16803C",
-                            }}
-                          >
-                            {skill}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    className="rounded-2xl border p-4"
-                    style={{
-                      borderColor: "#D4D2E6",
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="flex h-8 w-8 items-center justify-center rounded-full"
-                        style={{
-                          background: "#FFF8E7",
-                          color: "#B77900",
-                        }}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                      </div>
-
-                      <span
-                        className="text-xs font-bold"
-                        style={{
-                          color: "#334155",
-                        }}
-                      >
-                        Skills to Develop
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedMatch.missingSkills.length >
-                      0 ? (
-                        selectedMatch.missingSkills.map(
-                          (skill) => (
-                            <span
-                              key={skill}
-                              className="rounded-full px-2.5 py-1.5 text-[10px] font-bold"
-                              style={{
-                                background: "#FFF8E7",
-                                color: "#B77900",
-                              }}
-                            >
-                              {skill}
-                            </span>
-                          )
-                        )
-                      ) : (
-                        <span
-                          className="text-xs"
-                          style={{
-                            color: "#64748B",
-                          }}
-                        >
-                          No major gaps identified.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Experience / qualification */}
-
-              <div>
-                <h3
-                  className="text-sm font-bold"
-                  style={{
-                    color: "#00273D",
-                  }}
-                >
-                  Profile alignment
-                </h3>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <div
-                    className="rounded-2xl border p-4"
-                    style={{
-                      borderColor: "#D4D2E6",
-                    }}
-                  >
-                    <p
-                      className="text-[10px] font-semibold"
-                      style={{
-                        color: "#94A3B8",
-                      }}
-                    >
-                      Experience required
-                    </p>
-
-                    <p
-                      className="mt-1 text-sm font-bold"
-                      style={{
-                        color: "#334155",
-                      }}
-                    >
-                      {selectedMatch.experienceRequired}
-                    </p>
-                  </div>
-
-                  <div
-                    className="rounded-2xl border p-4"
-                    style={{
-                      borderColor: "#D4D2E6",
-                    }}
-                  >
-                    <p
-                      className="text-[10px] font-semibold"
-                      style={{
-                        color: "#94A3B8",
-                      }}
-                    >
-                      Your experience
-                    </p>
-
-                    <p
-                      className="mt-1 text-sm font-bold"
-                      style={{
-                        color: "#16803C",
-                      }}
-                    >
-                      {selectedMatch.candidateExperience}
-                    </p>
-                  </div>
-
-                  <div
-                    className="rounded-2xl border p-4"
-                    style={{
-                      borderColor: "#D4D2E6",
-                    }}
-                  >
-                    <p
-                      className="text-[10px] font-semibold"
-                      style={{
-                        color: "#94A3B8",
-                      }}
-                    >
-                      Qualification
-                    </p>
-
-                    <p
-                      className="mt-1 text-xs font-bold leading-5"
-                      style={{
-                        color: "#334155",
-                      }}
-                    >
-                      {selectedMatch.qualification}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Required skills */}
-
-              <div>
-                <h3
-                  className="text-sm font-bold"
-                  style={{
-                    color: "#00273D",
-                  }}
-                >
-                  Role requirements
-                </h3>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedMatch.requiredSkills.map(
-                    (skill) => {
-                      const isMatched =
-                        selectedMatch.matchedSkills.includes(
-                          skill
-                        );
-
-                      return (
-                        <span
-                          key={skill}
-                          className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold"
-                          style={{
-                            background: isMatched
-                              ? "#EAF5FB"
-                              : "#F8FCFF",
-                            color: isMatched
-                              ? "#00466D"
-                              : "#64748B",
-                            border:
-                              "1px solid #D4D2E6",
-                          }}
-                        >
-                          {isMatched && (
-                            <Check className="h-3 w-3" />
-                          )}
-
-                          {skill}
-                        </span>
-                      );
-                    }
-                  )}
-                </div>
-              </div>
-
-              {/* Modal actions */}
-
-              <div
-                className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end"
-                style={{
-                  borderColor: "#EEF2F6",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate("/candidate/profile")
-                  }
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-xs font-bold transition hover:bg-[#F8FCFF]"
-                  style={{
-                    borderColor: "#00466D",
-                    color: "#00466D",
-                  }}
-                >
-                  <UserRound className="h-4 w-4" />
-                  Improve My Profile
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate("/candidate/feed")
-                  }
-                  className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #00466D 0%, #1E92D2 100%)",
-                  }}
-                >
-                  View Opportunity
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
-
-              <p
-                className="text-center text-[10px]"
-                style={{
-                  color: "#94A3B8",
-                }}
-              >
-                ds net for show my lannie
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

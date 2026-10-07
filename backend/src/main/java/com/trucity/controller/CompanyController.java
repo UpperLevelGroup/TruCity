@@ -8,15 +8,49 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/admin/companies")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class CompanyController {
 
     private final CompanyService companyService;
 
-    @GetMapping
+    /*
+     * ============================================================
+     * ADMIN — LIST COMPANIES
+     * ============================================================
+     */
+
+    @GetMapping("/admin/companies")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<CompanyService.CompanyResponse> companies() {
+
         return companyService.getCompanies();
+    }
+
+    /*
+     * ============================================================
+     * EMPLOYER — GET COMPANY PROFILE
+     * ============================================================
+     */
+
+    @GetMapping("/api/company/profile")
+    @PreAuthorize("hasRole('EMPLOYER')")
+    public CompanyService.CompanyProfileResponse getProfile() {
+
+        return companyService.getCurrentCompany();
+    }
+
+    /*
+     * ============================================================
+     * EMPLOYER — CREATE / UPDATE COMPANY PROFILE
+     * ============================================================
+     */
+
+    @PutMapping("/api/company/profile")
+    @PreAuthorize("hasRole('EMPLOYER')")
+    public CompanyService.CompanyProfileResponse saveProfile(
+            @RequestBody CompanyService.CompanyProfileRequest request
+    ) {
+
+        return companyService.saveCurrentCompany(request);
     }
 }

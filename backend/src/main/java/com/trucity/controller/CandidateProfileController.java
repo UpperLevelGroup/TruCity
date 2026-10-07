@@ -15,12 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Candidate's own profile.
- *
- * The authenticated candidate is resolved from the JWT email.
- * No candidate id is accepted from the browser for ownership.
- */
+
 @RestController
 @RequestMapping("/api/candidate/profile")
 @RequiredArgsConstructor

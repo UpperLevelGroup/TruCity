@@ -19,7 +19,8 @@ public record CompanyCandidateDetailsResponse(
         boolean verified,
         List<SkillResponse> skills,
         List<QualificationResponse> qualifications,
-        List<ExperienceResponse> experienceHistory
+        List<ExperienceResponse> experienceHistory,
+        ProfileMediaResponse media
 ) {
 
     public record SkillResponse(
@@ -47,6 +48,58 @@ public record CompanyCandidateDetailsResponse(
             String description,
             String startDate,
             String endDate
+    ) {
+    }
+
+    public record ProfileMediaResponse(
+            String facePhoto,
+            String fullBodyPhoto,
+            List<GalleryImageResponse> galleryImages,
+            List<DocumentResponse> documents,
+            List<ProjectResponse> projects,
+            IntroReelResponse reelMeta,
+            PreferencesResponse preferences
+    ) {
+    }
+
+    public record GalleryImageResponse(
+            String id,
+            String name,
+            String category,
+            String image,
+            String uploadedAt
+    ) {
+    }
+
+    public record DocumentResponse(
+            int id,
+            String name,
+            String status,
+            String fileName,
+            String fileSize,
+            String dataUrl
+    ) {
+    }
+
+    public record ProjectResponse(
+            int id,
+            String name,
+            String tech,
+            String status,
+            String desc
+    ) {
+    }
+
+    public record IntroReelResponse(
+            String fileName,
+            String fileSize,
+            String uploadedAt,
+            String dataUrl
+    ) {
+    }
+
+    public record PreferencesResponse(
+            String availability
     ) {
     }
 }

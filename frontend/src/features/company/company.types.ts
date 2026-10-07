@@ -1,3 +1,9 @@
+/*
+|--------------------------------------------------------------------------
+| JOBS
+|--------------------------------------------------------------------------
+*/
+
 export type CompanyJobStatus =
   | "Active"
   | "Paused"
@@ -15,12 +21,24 @@ export type WorkplaceType =
   | "Hybrid"
   | "Remote";
 
+/*
+|--------------------------------------------------------------------------
+| PIPELINE
+|--------------------------------------------------------------------------
+*/
+
 export type PipelineStage =
   | "sourced"
   | "shortlisted"
   | "interviewing"
   | "offered"
   | "rejected";
+
+/*
+|--------------------------------------------------------------------------
+| CANDIDATES
+|--------------------------------------------------------------------------
+*/
 
 export type CandidateCategory =
   | "Software Engineering"
@@ -36,146 +54,246 @@ export type CandidateStatus =
   | "Unavailable"
   | "In Review";
 
+/*
+|--------------------------------------------------------------------------
+| VERIFICATION
+|--------------------------------------------------------------------------
+*/
+
 export type VerificationStatus =
+  | "NOT_VERIFIED"
   | "pending"
   | "verifying"
   | "approved"
   | "rejected";
+/*
+|--------------------------------------------------------------------------
+| PAYMENT
+|--------------------------------------------------------------------------
+*/
 
 export type PaymentMethod =
   | "card"
   | "invoice"
   | "paypal";
 
-
 /*
 |--------------------------------------------------------------------------
-| Company Jobs
+| COMPANY JOB
 |--------------------------------------------------------------------------
+|
+| Represents a job returned by the company jobs API.
+|
 */
 
 export interface CompanyJob {
   id: string;
+
   companyId?: string;
+
   companyName?: string;
+
   title: string;
+
   department: string;
+
   location: string;
+
   workplaceType: WorkplaceType;
+
   type: EmploymentType;
+
   status: CompanyJobStatus;
+
   applicants: number;
+
   postedDate: string;
+
   description?: string;
+
   salaryMin?: number;
+
   salaryMax?: number;
+
   salaryCurrency?: string;
+
   salaryNegotiable?: boolean;
+
   qualifications?: string;
+
   experienceRequired?: string;
+
   skills: string[];
+
   responsibilities?: string;
+
   benefits?: string;
+
   openings?: number;
+
   applicationDeadline?: string;
 }
 
-
-
 /*
 |--------------------------------------------------------------------------
-| Job Request
+| COMPANY JOB REQUEST
 |--------------------------------------------------------------------------
+|
+| Shared payload used when creating or updating a company job.
+|
 */
 
 export interface CompanyJobRequest {
   title: string;
+
   department: string;
+
   description?: string;
+
   location: string;
+
   workplaceType: WorkplaceType;
+
   type: EmploymentType;
+
   salaryMin?: number;
+
   salaryMax?: number;
+
   salaryCurrency?: string;
+
   salaryNegotiable?: boolean;
+
   qualifications?: string;
+
   experienceRequired?: string;
+
   skills: string[];
+
   responsibilities?: string;
+
   benefits?: string;
+
   openings?: number;
+
   applicationDeadline?: string;
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| Candidates
+| CANDIDATE
 |--------------------------------------------------------------------------
+|
+| Lightweight candidate representation.
+|
+| This is intentionally NOT the full candidate profile.
+|
+| Talent Feed uses this model for the searchable/paginated candidate list.
+| The full profile is retrieved through candidateDetails.service.ts.
+|
 */
 
 export interface CompanyCandidate {
   id: string;
-  userId?: string;
-  firstName?: string;
-  lastName?: string;
-  name: string;
-  role: string;
-  category: CandidateCategory;
-  status: CandidateStatus;
-  verified: boolean;
-  skills: string[];
-  experience: number;
-  email?: string;
-  phone?: string;
-  location?: string;
-  bio?: string;
-}
 
+  userId?: string;
+
+  firstName?: string;
+
+  lastName?: string;
+
+  name: string;
+
+  role: string;
+
+  category: CandidateCategory;
+
+  status: CandidateStatus;
+
+  verified: boolean;
+
+  skills: string[];
+
+  experience: number;
+
+  email?: string;
+
+  phone?: string;
+
+  location?: string;
+
+  bio?: string;
+
+  /*
+  |----------------------------------------------------------------------
+  | Optional profile completion
+  |----------------------------------------------------------------------
+  |
+  | The lightweight endpoint may not currently return this value.
+  | Keeping it optional allows the UI to use it when available without
+  | making the existing candidate API contract stricter.
+  |
+  */
+
+  profileCompletion?: number;
+}
 
 /*
 |--------------------------------------------------------------------------
-| Pipeline
+| PIPELINE CANDIDATE
 |--------------------------------------------------------------------------
+|
+| Extends the lightweight candidate model with application-specific
+| pipeline information.
+|
 */
 
 export interface CompanyPipelineCandidate
   extends CompanyCandidate {
   applicationId: string;
+
   jobId: string;
+
   jobTitle: string;
+
   applicationStatus: string;
+
   stage: PipelineStage;
+
   appliedAt?: string;
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| Messaging
+| MESSAGING
 |--------------------------------------------------------------------------
 */
 
 export interface CompanyMessage {
   id: string;
+
   sender: "me" | "them";
+
   text: string;
+
   timestamp: string;
 }
 
 export interface CompanyChatThread {
   id: string;
+
   name: string;
+
   role: string;
+
   messages: CompanyMessage[];
+
   unread?: number;
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| Company Profile
+| COMPANY PROFILE
 |--------------------------------------------------------------------------
 */
 
@@ -208,17 +326,25 @@ export interface CompanyProfile {
 
   representativePhone?: string;
 
+  representativeRole?: string;
+
   verificationStatus: VerificationStatus;
 
   createdAt: string;
 
   updatedAt: string;
+
+  billingContactName?: string;
+
+  billingContactEmail?: string;
+
+  invoicingAddress?: string;
+
+  agreeToTerms?: boolean;
 }
-
-
 /*
 |--------------------------------------------------------------------------
-| Company Onboarding
+| COMPANY ONBOARDING
 |--------------------------------------------------------------------------
 */
 
@@ -262,10 +388,9 @@ export interface CompanyOnboardingData {
   agreeToTerms: boolean;
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| Subscription / Plans
+| COMPANY PLANS
 |--------------------------------------------------------------------------
 */
 
@@ -276,7 +401,9 @@ export interface CompanyPlan {
 
   price: number;
 
-  billingPeriod: "monthly" | "yearly";
+  billingPeriod:
+    | "monthly"
+    | "yearly";
 
   description: string;
 
@@ -284,6 +411,12 @@ export interface CompanyPlan {
 
   recommended?: boolean;
 }
+
+/*
+|--------------------------------------------------------------------------
+| COMPANY SUBSCRIPTION
+|--------------------------------------------------------------------------
+*/
 
 export interface CompanySubscription {
   planId: string;
@@ -300,10 +433,9 @@ export interface CompanySubscription {
   paymentMethod?: PaymentMethod;
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| Dashboard
+| DASHBOARD
 |--------------------------------------------------------------------------
 */
 
@@ -335,11 +467,14 @@ export interface CompanyDashboardSummary {
   recentActivity: CompanyActivity[];
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| Requests
+| JOB REQUEST ALIASES
 |--------------------------------------------------------------------------
+|
+| Kept as aliases so existing company pages can continue using the more
+| explicit Create/Update names.
+|
 */
 
 export type CreateCompanyJobRequest =
@@ -348,11 +483,23 @@ export type CreateCompanyJobRequest =
 export type UpdateCompanyJobRequest =
   CompanyJobRequest;
 
+/*
+|--------------------------------------------------------------------------
+| MESSAGING REQUEST
+|--------------------------------------------------------------------------
+*/
+
 export interface SendCompanyMessageRequest {
   threadId: string;
 
   text: string;
 }
+
+/*
+|--------------------------------------------------------------------------
+| PIPELINE REQUEST
+|--------------------------------------------------------------------------
+*/
 
 export interface UpdatePipelineStageRequest {
   applicationId: string;

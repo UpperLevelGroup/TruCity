@@ -15,7 +15,7 @@ import type {
   CompanyActivity,
 } from "../company.types";
 
-import logo from "../../../assets/trucity-logo.png";
+import logo from "../../../assets/trucity-nav-logo.png";
 
 interface GuideItem {
   id: string;
@@ -956,16 +956,7 @@ const styles: {
     boxSizing: "border-box",
   },
 
-  bgLogoWatermark: {
-    position: "fixed",
-    inset: 0,
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    backgroundSize: "min(72vw, 720px)",
-    opacity: 0.025,
-    pointerEvents: "none",
-    zIndex: 0,
-  },
+  
 
   circleTopLeft: {
     position: "absolute",

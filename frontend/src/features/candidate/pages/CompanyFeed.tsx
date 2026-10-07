@@ -119,6 +119,18 @@ interface ItemDetails {
 
   companyName?: string;
   jobId?: string;
+  location?: string;
+  salary?: string;
+  posted?: string;
+  department?: string;
+  employmentType?: string;
+  workplaceType?: string;
+  qualifications?: string;
+  experienceRequired?: string;
+  skills?: readonly string[];
+  responsibilities?: string;
+  benefits?: string;
+  applicationDeadline?: string;
 }
 
 /* =========================================================
@@ -245,6 +257,26 @@ function formatPostedDate(
   }
 
   return date.toLocaleDateString();
+}
+
+function formatClosingDate(
+  deadline?: string | null,
+): string {
+  if (!deadline) {
+    return 'Closing date not specified';
+  }
+
+  const date = new Date(deadline);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Closing date not specified';
+  }
+
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 function mapBackendJob(
@@ -944,7 +976,7 @@ export default function CompanyFeed({
     );
   };
 
-  const handleExpressInterest =
+  const handleApply =
     async (
       job: Job,
     ) => {
@@ -1036,28 +1068,25 @@ export default function CompanyFeed({
   ) => {
     const requirements =
       [
-        job.experienceRequired,
-        job.qualifications,
-        ...job.skills,
-        job.workplaceType,
-        job.employmentType,
-        job.benefits,
+        job.experienceRequired
+          ? `Experience: ${job.experienceRequired}`
+          : undefined,
+        job.qualifications
+          ? `Qualifications: ${job.qualifications}`
+          : undefined,
+        job.skills.length > 0
+          ? `Skills: ${job.skills.join(', ')}`
+          : undefined,
       ].filter(
-        (
-          value,
-        ): value is string =>
-          Boolean(
-            value &&
-              value.trim(),
-          ),
+        (value): value is string =>
+          Boolean(value),
       );
 
     setSelectedItemDetails({
       title: job.title,
       subtitle:
         `${job.company} · ${job.location}`,
-      description:
-        job.description,
+      description: job.description,
       metaList:
         requirements.length > 0
           ? requirements
@@ -1065,9 +1094,22 @@ export default function CompanyFeed({
               'Review the complete job description before applying.',
             ],
       type: 'job',
-      companyName:
-        job.company,
+      companyName: job.company,
       jobId: job.id,
+      location: job.location,
+      salary: job.salary,
+      posted: job.posted,
+      department: job.department,
+      employmentType: job.employmentType,
+      workplaceType: job.workplaceType,
+      qualifications: job.qualifications,
+      experienceRequired: job.experienceRequired,
+      skills: job.skills,
+      responsibilities: job.responsibilities,
+      benefits: job.benefits,
+      applicationDeadline: formatClosingDate(
+        job.applicationDeadline,
+      ),
     });
   };
 
@@ -1586,8 +1628,8 @@ export default function CompanyFeed({
                               job,
                             )
                           }
-                          onExpressInterest={() =>
-                            handleExpressInterest(
+                          onApply={() =>
+                            handleApply(
                               job,
                             )
                           }
@@ -1787,8 +1829,8 @@ export default function CompanyFeed({
                                     job,
                                   )
                                 }
-                                onExpressInterest={() =>
-                                  handleExpressInterest(
+                                onApply={() =>
+                                  handleApply(
                                     job,
                                   )
                                 }
@@ -1835,7 +1877,7 @@ export default function CompanyFeed({
               null,
             )
           }
-          onExpressInterest={(
+          onApply={(
             jobId,
           ) => {
             const job =
@@ -1846,7 +1888,7 @@ export default function CompanyFeed({
               );
 
             if (job) {
-              void handleExpressInterest(
+              void handleApply(
                 job,
               );
             }
@@ -2559,7 +2601,7 @@ interface JobCardProps {
   hasApplied: boolean;
   onToggleSave: () => void;
   onOpenInfo: () => void;
-  onExpressInterest: () => void;
+  onApply: () => void;
   isApplying?: boolean;
 }
 
@@ -2570,7 +2612,7 @@ function JobCard({
   hasApplied,
   onToggleSave,
   onOpenInfo,
-  onExpressInterest,
+  onApply,
   isApplying = false,
 }: JobCardProps) {
   return (
@@ -2749,7 +2791,7 @@ function JobCard({
         <button
           type="button"
           onClick={
-            onExpressInterest
+            onApply
           }
           disabled={
             hasApplied ||
@@ -2819,7 +2861,7 @@ function JobCard({
             <>
               <Send className="h-3.5 w-3.5" />
 
-              Express Interest
+              Apply
             </>
           )}
         </button>
@@ -2891,7 +2933,7 @@ interface DetailModalProps {
     company: string,
   ) => void;
 
-  onExpressInterest: (
+  onApply: (
     jobId: string,
   ) => void;
 }
@@ -2901,7 +2943,7 @@ function DetailModal({
   isApplied,
   onClose,
   isApplying,
-  onExpressInterest,
+  onApply,
 }: DetailModalProps) {
   return (
     <div
@@ -3002,7 +3044,7 @@ function DetailModal({
 
         <div
           className="
-            max-h-[60vh]
+            max-h-[65vh]
             space-y-6
             overflow-y-auto
             p-5
@@ -3010,80 +3052,258 @@ function DetailModal({
             sm:p-6
           "
         >
-          <div>
-            <h4
-              className="
-                mb-2
-                text-[10px]
-                font-bold
-                uppercase
-                tracking-[0.17em]
-                text-brand-primary
-              "
-            >
-              Overview
-            </h4>
+          {details.type === 'job' ? (
+            <>
+              <div
+                className="
+                  grid
+                  grid-cols-1
+                  gap-3
+                  sm:grid-cols-2
+                "
+              >
+                {[
+                  ['Company', details.companyName],
+                  ['Location', details.location],
+                  ['Salary', details.salary],
+                  ['Department', details.department],
+                  ['Employment', details.employmentType],
+                  ['Workplace', details.workplaceType],
+                  ['Posted', details.posted],
+                  ['Closing date', details.applicationDeadline],
+                ]
+                  .filter(
+                    ([, value]) =>
+                      Boolean(value),
+                  )
+                  .map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="
+                        rounded-[14px]
+                        border
+                        border-brand-border
+                        bg-brand-surface
+                        p-3
+                      "
+                    >
+                      <p
+                        className="
+                          mb-1
+                          text-[10px]
+                          font-bold
+                          uppercase
+                          tracking-[0.14em]
+                          text-brand-textMuted
+                        "
+                      >
+                        {label}
+                      </p>
+                      <p
+                        className="
+                          text-[13px]
+                          font-bold
+                          leading-5
+                          text-brand-primary
+                        "
+                      >
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+              </div>
 
-            <p
-              className="
-                text-[14px]
-                leading-6
-                text-brand-textMuted
-              "
-            >
-              {details.description}
-            </p>
-          </div>
+              <div>
+                <h4
+                  className="
+                    mb-2
+                    text-[10px]
+                    font-bold
+                    uppercase
+                    tracking-[0.17em]
+                    text-brand-primary
+                  "
+                >
+                  Job Description
+                </h4>
+                <p
+                  className="
+                    text-[14px]
+                    leading-6
+                    text-brand-textMuted
+                  "
+                >
+                  {details.description}
+                </p>
+              </div>
 
-          <div>
-            <h4
-              className="
-                mb-3
-                text-[10px]
-                font-bold
-                uppercase
-                tracking-[0.17em]
-                text-brand-primary
-              "
-            >
-              Key Requirements
-            </h4>
-
-            <ul className="space-y-3">
-              {details.metaList.map(
-                (
-                  requirement,
-                  index,
-                ) => (
-                  <li
-                    key={`${requirement}-${index}`}
+              {details.responsibilities && (
+                <div>
+                  <h4
                     className="
-                      flex
-                      items-start
-                      gap-2.5
+                      mb-2
+                      text-[10px]
+                      font-bold
+                      uppercase
+                      tracking-[0.17em]
+                      text-brand-primary
+                    "
+                  >
+                    Responsibilities
+                  </h4>
+                  <p
+                    className="
+                      whitespace-pre-line
                       text-[14px]
                       leading-6
                       text-brand-textMuted
                     "
                   >
-                    <CheckCircle2
-                      className="
-                        mt-1
-                        h-4
-                        w-4
-                        shrink-0
-                        text-brand-accent
-                      "
-                    />
-
-                    <span>
-                      {requirement}
-                    </span>
-                  </li>
-                ),
+                    {details.responsibilities}
+                  </p>
+                </div>
               )}
-            </ul>
-          </div>
+
+              <div>
+                <h4
+                  className="
+                    mb-3
+                    text-[10px]
+                    font-bold
+                    uppercase
+                    tracking-[0.17em]
+                    text-brand-primary
+                  "
+                >
+                  Requirements & Skills
+                </h4>
+                <ul className="space-y-3">
+                  {details.metaList.map(
+                    (requirement, index) => (
+                      <li
+                        key={`${requirement}-${index}`}
+                        className="
+                          flex
+                          items-start
+                          gap-2.5
+                          text-[14px]
+                          leading-6
+                          text-brand-textMuted
+                        "
+                      >
+                        <CheckCircle2
+                          className="
+                            mt-1
+                            h-4
+                            w-4
+                            shrink-0
+                            text-brand-accent
+                          "
+                        />
+                        <span>{requirement}</span>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+
+              {details.benefits && (
+                <div>
+                  <h4
+                    className="
+                      mb-2
+                      text-[10px]
+                      font-bold
+                      uppercase
+                      tracking-[0.17em]
+                      text-brand-primary
+                    "
+                  >
+                    Benefits
+                  </h4>
+                  <p
+                    className="
+                      whitespace-pre-line
+                      text-[14px]
+                      leading-6
+                      text-brand-textMuted
+                    "
+                  >
+                    {details.benefits}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <h4
+                  className="
+                    mb-2
+                    text-[10px]
+                    font-bold
+                    uppercase
+                    tracking-[0.17em]
+                    text-brand-primary
+                  "
+                >
+                  About the Company
+                </h4>
+                <p
+                  className="
+                    text-[14px]
+                    leading-6
+                    text-brand-textMuted
+                  "
+                >
+                  {details.description}
+                </p>
+              </div>
+
+              <div>
+                <h4
+                  className="
+                    mb-3
+                    text-[10px]
+                    font-bold
+                    uppercase
+                    tracking-[0.17em]
+                    text-brand-primary
+                  "
+                >
+                  Company Information
+                </h4>
+                <ul className="space-y-3">
+                  {details.metaList.map(
+                    (requirement, index) => (
+                      <li
+                        key={`${requirement}-${index}`}
+                        className="
+                          flex
+                          items-start
+                          gap-2.5
+                          text-[14px]
+                          leading-6
+                          text-brand-textMuted
+                        "
+                      >
+                        <CheckCircle2
+                          className="
+                            mt-1
+                            h-4
+                            w-4
+                            shrink-0
+                            text-brand-accent
+                          "
+                        />
+                        <span>{requirement}</span>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            </>
+          )}
         </div>
 
         <div
@@ -3105,7 +3325,7 @@ function DetailModal({
               <button
                 type="button"
                 onClick={() =>
-                  onExpressInterest(
+                  onApply(
                     details.jobId!,
                   )
                 }
@@ -3175,7 +3395,7 @@ function DetailModal({
                   <>
                     <Send className="h-3.5 w-3.5" />
 
-                    Express Interest
+                    Apply
                   </>
                 )}
               </button>

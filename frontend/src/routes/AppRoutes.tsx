@@ -25,10 +25,11 @@ import AdminReports from "../features/admin/pages/AdminReports";
 import AdminAnalytics from "../features/admin/pages/AdminAnalytics";
 import AdminSettings from "../features/admin/pages/AdminSettings";
 import AdminMessages from "../features/admin/pages/Messages";
+import AdminGuidance from "../features/admin/pages/AdminGuidance";
 
 import CompanyLayout from "../layouts/CompanyLayout";
 import CompanyDashboard from "../features/company/pages/CompanyDashboard";
-
+import CompanyOnboarding from "../features/company/pages/CompanyOnboarding";
 /* =========================================================
    CANDIDATE
 ========================================================= */
@@ -182,11 +183,16 @@ export default function AppRoutes() {
       ====================================================== */}
 
       <Route element={<CompanyLayout />}>
-        <Route
-          path="/company"
-          element={<CompanyDashboard />}
-        />
-      </Route>
+  <Route
+    path="/company/onboarding"
+    element={<CompanyOnboarding />}
+  />
+
+  <Route
+    path="/company"
+    element={<CompanyDashboard />}
+  />
+</Route>
 
       {/* =====================================================
           ADMIN
@@ -233,6 +239,12 @@ export default function AppRoutes() {
         <Route
           path="/admin/messages"
           element={<AdminMessages />}
+        />
+
+        {/* Guidance */}
+        <Route
+          path="/admin/guidance"
+          element={<AdminGuidance />}
         />
 
         {/* Verifications */}

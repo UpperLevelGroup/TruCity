@@ -1,11 +1,16 @@
 import api from "../api/axios";
 import { ENDPOINTS } from "../api/endpoint";
 
+export type PublicRegistrationRole =
+  | "CANDIDATE"
+  | "EMPLOYER";
+
 export interface RegisterRequest {
   firstName: string;
   lastName: string;
   email: string;
   password: string;
+  role: PublicRegistrationRole;
 }
 
 export interface LoginRequest {
@@ -35,10 +40,12 @@ export interface PasswordResetResponse {
 export async function registerUser(
   data: RegisterRequest
 ): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>(
-    ENDPOINTS.AUTH.REGISTER,
-    data
-  );
+
+  const response =
+    await api.post<AuthResponse>(
+      ENDPOINTS.AUTH.REGISTER,
+      data
+    );
 
   return response.data;
 }
@@ -46,10 +53,12 @@ export async function registerUser(
 export async function loginUser(
   data: LoginRequest
 ): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>(
-    ENDPOINTS.AUTH.LOGIN,
-    data
-  );
+
+  const response =
+    await api.post<AuthResponse>(
+      ENDPOINTS.AUTH.LOGIN,
+      data
+    );
 
   return response.data;
 }
@@ -57,6 +66,7 @@ export async function loginUser(
 export async function forgotPassword(
   data: ForgotPasswordRequest
 ): Promise<PasswordResetResponse> {
+
   const response =
     await api.post<PasswordResetResponse>(
       ENDPOINTS.AUTH.FORGOT_PASSWORD,
@@ -69,6 +79,7 @@ export async function forgotPassword(
 export async function resetPassword(
   data: ResetPasswordRequest
 ): Promise<PasswordResetResponse> {
+
   const response =
     await api.post<PasswordResetResponse>(
       ENDPOINTS.AUTH.RESET_PASSWORD,
