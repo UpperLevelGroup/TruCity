@@ -41,6 +41,7 @@ export async function registerCandidate({
       lastName: cleanLastName,
       email: cleanEmail,
       password,
+      role: 'CANDIDATE',
     });
   } catch (error: any) {
     console.error('Candidate registration error:', error);

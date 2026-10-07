@@ -98,7 +98,8 @@ export function useRegisterCandidate() {
         lastName: cleanLastName,
         email: cleanEmail,
         password,
-      });
+        role: 'CANDIDATE',
+});
 
       /*
        * =====================================================
