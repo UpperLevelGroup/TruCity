@@ -27,6 +27,7 @@ import {
   NavLink,
   useNavigate,
 } from 'react-router-dom';
+import trucityLogo from '../../assets/trucity-logo.png';
 
 /* =========================================================
    TYPES
@@ -328,27 +329,27 @@ export default function PublicGuidanceHub() {
             "
           >
             <img
-              src="/trucity-nav-logo.png"
-              alt="TruCity"
-              draggable={false}
-              className="
-                absolute
-                left-[-22px]
-                top-1/2
-                block
-                h-auto
-                w-[145px]
-                max-w-none
-                -translate-y-1/2
-                select-none
-                object-contain
+            src={trucityLogo}
+            alt="TruCity"
+            draggable={false}
+            className="
+              absolute
+              left-[-22px]
+              top-1/2
+              block
+              h-auto
+              w-[130px]
+              max-w-none
+              -translate-y-1/2
+              select-none
+              object-contain
 
-                sm:left-[-26px]
-                sm:w-[165px]
+              sm:left-[-26px]
+              sm:w-[155px]
 
-                lg:left-[-30px]
-                lg:w-[190px]
-              "
+              lg:left-[-30px]
+              lg:w-[190px]
+            "
             />
           </Link>
 

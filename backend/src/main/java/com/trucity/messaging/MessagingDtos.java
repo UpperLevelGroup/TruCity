@@ -7,17 +7,7 @@ import java.util.UUID;
 public final class MessagingDtos {
 
     private MessagingDtos() {
-    }
-
-    public record CreateConversationRequest(
-            String targetType,
-            UUID targetId
-    ) {
-    }
-
-    public record SendMessageRequest(
-            String text
-    ) {
+        // Utility class; DTOs are defined as nested records.
     }
 
     public record ConversationResponse(
@@ -47,6 +37,17 @@ public final class MessagingDtos {
     public record ConversationMessagesResponse(
             ConversationResponse conversation,
             List<MessageResponse> messages
+    ) {
+    }
+
+    public record CreateConversationRequest(
+            String targetType,
+            UUID targetId
+    ) {
+    }
+
+    public record SendMessageRequest(
+            String text
     ) {
     }
 }

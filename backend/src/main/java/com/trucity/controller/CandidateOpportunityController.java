@@ -1,4 +1,4 @@
-package com.trucity.candidate;
+package com.trucity.controller;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;

@@ -15,14 +15,30 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashSet;
+import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final int RESET_TOKEN_BYTES = 32;
+    private static final int RESET_TOKEN_EXPIRY_MINUTES = 30;
+
+    /*
+     * Generic response avoids revealing whether an email address
+     * is registered. Email delivery must be connected before
+     * users can actually receive reset links.
+     */
+    private static final String FORGOT_PASSWORD_MESSAGE =
+            "If an account exists for that email, password reset instructions will be sent.";
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
@@ -32,18 +48,12 @@ public class AuthService {
     private final CandidateProfileRepository candidateProfileRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
 
+    private final SecureRandom secureRandom = new SecureRandom();
+
     /*
      * ============================================================
      * REGISTER
      * ============================================================
-     *
-     * Public registration may create only:
-     *
-     * CANDIDATE
-     * EMPLOYER
-     *
-     * ADMIN and VERIFIER accounts must be created through a
-     * protected administrative process.
      */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -54,7 +64,7 @@ public class AuthService {
             );
         }
 
-        String email = clean(request.getEmail());
+        String email = cleanEmail(request.getEmail());
 
         if (email == null) {
             throw new IllegalArgumentException(
@@ -62,89 +72,51 @@ public class AuthService {
             );
         }
 
-        if (request.getPassword() == null ||
-                request.getPassword().isBlank()) {
-
+        if (request.getPassword() == null
+                || request.getPassword().isBlank()) {
             throw new IllegalArgumentException(
                     "Password is required"
             );
         }
 
         if (userRepository.existsByEmail(email)) {
-            throw new RuntimeException(
-                    "Email already registered"
+            throw new IllegalArgumentException(
+                    "Unable to register with the supplied details."
             );
         }
 
-        /*
-         * --------------------------------------------------------
-         * Resolve public registration role safely.
-         * --------------------------------------------------------
-         *
-         * Only CANDIDATE and EMPLOYER are allowed through the
-         * public registration endpoint.
-         *
-         * ADMIN and VERIFIER cannot be created through this
-         * endpoint.
-         */
-        String requestedRole =
-                request.getRole() == null
-                        ? ""
-                        : request.getRole().trim().toUpperCase();
+        String requestedRole = request.getRole() == null
+                ? ""
+                : request.getRole().trim().toUpperCase(Locale.ROOT);
 
-        if (!requestedRole.equals("CANDIDATE") &&
-                !requestedRole.equals("EMPLOYER")) {
-
+        if (!requestedRole.equals("CANDIDATE")
+                && !requestedRole.equals("EMPLOYER")) {
             throw new IllegalArgumentException(
                     "Public registration is only available for candidates and employers."
             );
         }
 
-        Role registrationRole =
-                roleRepository
-                        .findByName(requestedRole)
-                        .orElseThrow(
-                                () -> new RuntimeException(
-                                        requestedRole +
-                                                " role does not exist"
-                                )
-                        );
+        Role registrationRole = roleRepository
+                .findByName(requestedRole)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Registration is temporarily unavailable."
+                ));
 
-        /*
-         * --------------------------------------------------------
-         * Create user.
-         * --------------------------------------------------------
-         */
-        User user =
-                User.builder()
-                        .firstName(
-                                clean(request.getFirstName())
-                        )
-                        .lastName(
-                                clean(request.getLastName())
-                        )
-                        .email(email)
-                        .passwordHash(
-                                passwordEncoder.encode(
-                                        request.getPassword()
-                                )
-                        )
-                        .roles(new HashSet<>())
-                        .enabled(true)
-                        .build();
+        User user = User.builder()
+                .firstName(clean(request.getFirstName()))
+                .lastName(clean(request.getLastName()))
+                .email(email)
+                .passwordHash(
+                        passwordEncoder.encode(request.getPassword())
+                )
+                .roles(new HashSet<>())
+                .enabled(true)
+                .build();
 
         user.getRoles().add(registrationRole);
 
-        User savedUser =
-                userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
-        /*
-         * --------------------------------------------------------
-         * Candidate-specific setup.
-         * --------------------------------------------------------
-         *
-         * Employers must NOT receive a CandidateProfile.
-         */
         if ("CANDIDATE".equals(requestedRole)) {
 
             CandidateProfile candidateProfile =
@@ -154,39 +126,24 @@ public class AuthService {
                             .profileCompletion(0)
                             .build();
 
-            candidateProfileRepository.save(
-                    candidateProfile
-            );
+            candidateProfileRepository.save(candidateProfile);
 
             auditService.log(
                     savedUser.getId(),
                     "CANDIDATE_REGISTERED",
-                    "Candidate account registered: " +
-                            savedUser.getEmail()
+                    "Candidate account registered"
             );
 
-        } else if ("EMPLOYER".equals(requestedRole)) {
+        } else {
 
             auditService.log(
                     savedUser.getId(),
                     "EMPLOYER_REGISTERED",
-                    "Employer account registered: " +
-                            savedUser.getEmail()
+                    "Employer account registered"
             );
         }
 
-        /*
-         * --------------------------------------------------------
-         * Issue JWT immediately.
-         * --------------------------------------------------------
-         *
-         * The frontend can immediately use this token to access
-         * employer/candidate protected endpoints.
-         */
-        String token =
-                jwtService.generateToken(
-                        savedUser.getEmail()
-                );
+        String token = jwtService.generateToken(savedUser.getEmail());
 
         return AuthResponse.builder()
                 .accessToken(token)
@@ -205,35 +162,30 @@ public class AuthService {
 
         if (request == null) {
             throw new IllegalArgumentException(
-                    "Login request is required"
+                    "Invalid email or password."
             );
         }
 
-        String email = clean(request.getEmail());
+        String email = cleanEmail(request.getEmail());
 
-        if (email == null ||
-                request.getPassword() == null) {
-
-            throw new RuntimeException(
-                    "Invalid credentials"
+        if (email == null || request.getPassword() == null) {
+            throw new IllegalArgumentException(
+                    "Invalid email or password."
             );
         }
 
-        User user =
-                userRepository
-                        .findByEmail(email)
-                        .orElseThrow(
-                                () -> new RuntimeException(
-                                        "Invalid credentials"
-                                )
-                        );
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Invalid email or password."
+                ));
 
-        if (!passwordEncoder.matches(
-                request.getPassword(),
-                user.getPasswordHash()
-        )) {
-            throw new RuntimeException(
-                    "Invalid credentials"
+        if (!user.isEnabled()
+                || !passwordEncoder.matches(
+                        request.getPassword(),
+                        user.getPasswordHash()
+                )) {
+            throw new IllegalArgumentException(
+                    "Invalid email or password."
             );
         }
 
@@ -243,17 +195,13 @@ public class AuthService {
                 "User signed in successfully"
         );
 
-        String token =
-                jwtService.generateToken(
-                        user.getEmail()
-                );
+        String token = jwtService.generateToken(user.getEmail());
 
-        String userRole =
-                user.getRoles()
-                        .stream()
-                        .findFirst()
-                        .map(Role::getName)
-                        .orElse("USER");
+        String userRole = user.getRoles()
+                .stream()
+                .findFirst()
+                .map(Role::getName)
+                .orElse("USER");
 
         return AuthResponse.builder()
                 .accessToken(token)
@@ -267,92 +215,69 @@ public class AuthService {
      * FORGOT PASSWORD
      * ============================================================
      *
-     * Uses the existing PasswordResetToken model:
+     * The raw token is never logged or stored.
      *
-     * user     -> User relationship
-     * usedAt   -> null until the token is consumed
+     * IMPORTANT:
+     * Connect an email service to deliver the raw token as a
+     * one-time reset link. This implementation intentionally does
+     * not return the token in the API response.
      */
     @Transactional
     public PasswordResetResponse forgotPassword(
             ForgotPasswordRequest request
     ) {
 
-        if (request == null) {
-            throw new IllegalArgumentException(
-                    "Forgot password request is required"
+        if (request == null
+                || cleanEmail(request.getEmail()) == null) {
+            return new PasswordResetResponse(
+                    FORGOT_PASSWORD_MESSAGE
             );
         }
 
-        String email =
-                request.getEmail() == null
-                        ? null
-                        : request.getEmail().trim();
+        String email = cleanEmail(request.getEmail());
 
-        if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Email is required"
+        Optional<User> optionalUser = userRepository.findByEmail(email);
+
+        if (optionalUser.isEmpty()) {
+            return new PasswordResetResponse(
+                    FORGOT_PASSWORD_MESSAGE
             );
         }
 
-        User user =
-                userRepository
-                        .findByEmail(email)
-                        .orElseThrow(
-                                () -> new RuntimeException(
-                                        "No account found for this email"
-                                )
-                        );
+        User user = optionalUser.get();
 
         /*
-         * Remove any existing active reset tokens for this user.
-         *
-         * PasswordResetToken uses:
-         *
-         *     user
-         *     usedAt
-         *
-         * rather than userId/used.
+         * Delete previous tokens before creating a new one.
          */
-        passwordResetTokenRepository
-                .deleteActiveTokensForUser(user);
+        passwordResetTokenRepository.deleteActiveTokensForUser(user);
 
-        byte[] randomBytes =
-                new byte[32];
+        byte[] randomBytes = new byte[RESET_TOKEN_BYTES];
+        secureRandom.nextBytes(randomBytes);
 
-        new SecureRandom()
-                .nextBytes(randomBytes);
+        String rawToken = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(randomBytes);
 
-        String token =
-                Base64.getUrlEncoder()
-                        .withoutPadding()
-                        .encodeToString(randomBytes);
+        String tokenHash = hashToken(rawToken);
 
-        PasswordResetToken resetToken =
-                PasswordResetToken.builder()
-                        .user(user)
-                        .token(token)
-                        .expiresAt(
-                                LocalDateTime.now()
-                                        .plusMinutes(30)
-                        )
-                        .build();
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .user(user)
+                .token(tokenHash)
+                .expiresAt(
+                        LocalDateTime.now()
+                                .plusMinutes(RESET_TOKEN_EXPIRY_MINUTES)
+                )
+                .build();
 
-        passwordResetTokenRepository.save(
-                resetToken
-        );
+        passwordResetTokenRepository.save(resetToken);
 
         /*
-         * Temporary development behavior.
+         * TODO: Deliver a reset link through a configured email
+         * service. The link should contain rawToken and should
+         * use the trusted frontend base URL.
          *
-         * Replace with email delivery when mail infrastructure
-         * is connected.
+         * Never log rawToken, tokenHash, or a complete reset URL.
          */
-        System.out.println(
-                "PASSWORD RESET TOKEN for " +
-                        email +
-                        ": " +
-                        token
-        );
 
         auditService.log(
                 user.getId(),
@@ -361,7 +286,7 @@ public class AuthService {
         );
 
         return new PasswordResetResponse(
-                "Password reset instructions have been generated."
+                FORGOT_PASSWORD_MESSAGE
         );
     }
 
@@ -370,94 +295,64 @@ public class AuthService {
      * RESET PASSWORD
      * ============================================================
      *
-     * Uses the existing PasswordResetToken model and marks the
-     * token as used by setting usedAt.
+     * The frontend submits the raw token received by email.
+     * The database lookup uses its SHA-256 hash.
      */
     @Transactional
     public PasswordResetResponse resetPassword(
             ResetPasswordRequest request
     ) {
 
-        if (request == null ||
-                request.getToken() == null ||
-                request.getToken().isBlank()) {
-
+        if (request == null
+                || request.getToken() == null
+                || request.getToken().isBlank()) {
             throw new IllegalArgumentException(
-                    "Reset token is required"
+                    "Invalid or expired password reset link."
             );
         }
 
-        if (request.getNewPassword() == null ||
-                request.getNewPassword().isBlank()) {
-
+        if (request.getNewPassword() == null
+                || request.getNewPassword().isBlank()) {
             throw new IllegalArgumentException(
-                    "New password is required"
+                    "A new password is required."
             );
         }
+
+        String tokenHash = hashToken(request.getToken().trim());
 
         PasswordResetToken resetToken =
-                passwordResetTokenRepository
-                        .findByToken(request.getToken())
-                        .orElseThrow(
-                                () -> new RuntimeException(
-                                        "Invalid password reset token"
-                                )
-                        );
+                passwordResetTokenRepository.findByToken(tokenHash)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Invalid or expired password reset link."
+                        ));
 
-        /*
-         * Token has already been consumed.
-         */
-        if (resetToken.isUsed()) {
-            throw new RuntimeException(
-                    "Password reset token has already been used"
+        if (resetToken.isUsed() || resetToken.isExpired()) {
+            throw new IllegalArgumentException(
+                    "Invalid or expired password reset link."
             );
         }
 
-        /*
-         * Token has expired.
-         */
-        if (resetToken.getExpiresAt() == null ||
-                resetToken.getExpiresAt()
-                        .isBefore(LocalDateTime.now())) {
-
-            throw new RuntimeException(
-                    "Password reset token has expired"
-            );
-        }
-
-        /*
-         * PasswordResetToken contains the User entity directly.
-         */
-        User user =
-                resetToken.getUser();
+        User user = resetToken.getUser();
 
         if (user == null) {
-            throw new RuntimeException(
-                    "User account could not be found"
+            throw new IllegalArgumentException(
+                    "Invalid or expired password reset link."
             );
         }
 
         user.setPasswordHash(
-                passwordEncoder.encode(
-                        request.getNewPassword()
-                )
+                passwordEncoder.encode(request.getNewPassword())
         );
 
         userRepository.save(user);
 
-        /*
-         * Mark token as consumed.
-         *
-         * PasswordResetToken uses usedAt rather than a boolean
-         * used field.
-         */
-        resetToken.setUsedAt(
-                LocalDateTime.now()
-        );
+        resetToken.setUsedAt(LocalDateTime.now());
+        passwordResetTokenRepository.save(resetToken);
 
-        passwordResetTokenRepository.save(
-                resetToken
-        );
+        /*
+         * Invalidate other outstanding reset tokens for this user.
+         */
+        passwordResetTokenRepository.deleteActiveTokensForUser(user);
 
         auditService.log(
                 user.getId(),
@@ -465,8 +360,12 @@ public class AuthService {
                 "Password was successfully reset"
         );
 
+        /*
+         * Existing JWTs remain valid until expiry unless JWT
+         * revocation/version checking is implemented separately.
+         */
         return new PasswordResetResponse(
-                "Password has been reset successfully."
+                "Password has been reset successfully. Please sign in again."
         );
     }
 
@@ -477,12 +376,44 @@ public class AuthService {
      */
     private String clean(String value) {
 
-        if (value == null ||
-                value.isBlank()) {
-
+        if (value == null || value.isBlank()) {
             return null;
         }
 
         return value.trim();
+    }
+
+    private String cleanEmail(String value) {
+
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String hashToken(String token) {
+
+        try {
+            MessageDigest digest =
+                    MessageDigest.getInstance("SHA-256");
+
+            byte[] hash = digest.digest(
+                    token.getBytes(StandardCharsets.UTF_8)
+            );
+
+            return Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(hash);
+
+        } catch (NoSuchAlgorithmException exception) {
+            /*
+             * SHA-256 is required by Java. Fail safely if the
+             * runtime unexpectedly does not provide it.
+             */
+            throw new IllegalStateException(
+                    "Password reset is temporarily unavailable."
+            );
+        }
     }
 }

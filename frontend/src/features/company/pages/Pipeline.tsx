@@ -1,6 +1,8 @@
 import React, {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -22,26 +24,74 @@ type JobGroup = {
   candidates: CompanyPipelineCandidate[];
 };
 
-function formatDate(value?: string | null): string {
-  if (!value) {
-    return "Not provided";
+type CandidateDocument =
+  CompanyCandidateDetails["media"]["documents"][number];
+
+type PipelineView =
+  | "applicants"
+  | "shortlisted"
+  | "interviewing"
+  | "offered"
+  | "rejected";
+
+  
+
+type ApplicationResponseItem = {
+  id?: string | number;
+  questionId?: string | number;
+  questionText?: string | null;
+  question?: string | null;
+  questionType?: string | null;
+  answerText?: string | null;
+  answerJson?: unknown;
+  answer?: string | null;
+  response?: string | null;
+  submittedAt?: string | null;
+};
+
+
+type ApplicationResume = {
+  applicationId: string;
+  candidateId: string;
+  resumeId: string | null;
+  resume: Record<string, unknown> | null;
+};
+
+
+
+function normalizeApplicationResponses(
+  value: unknown
+): ApplicationResponseItem[] {
+  if (Array.isArray(value)) {
+    return value as ApplicationResponseItem[];
   }
+
+  if (value && typeof value === "object") {
+    const result = value as Record<string, unknown>;
+
+    for (const key of ["responses", "answers", "data"]) {
+      if (Array.isArray(result[key])) {
+        return result[key] as ApplicationResponseItem[];
+      }
+    }
+  }
+
+  return [];
+}
+
+
+function formatDate(value?: string | null): string {
+  if (!value) return "Not provided";
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
+  if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString();
 }
 
-function formatVerificationStatus(
-  value?: string | null
-): string {
-  if (!value) {
-    return "Not verified";
-  }
+function formatVerificationStatus(value?: string | null): string {
+  if (!value) return "Not verified";
 
   return value
     .toLowerCase()
@@ -49,76 +99,261 @@ function formatVerificationStatus(
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export default function Pipeline() {
-  const [pipeline, setPipeline] =
-    useState<CompanyPipelineCandidate[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
+function ResumeValue({
+  value,
+}: {
+  value: unknown;
+}): React.ReactElement {
+  if (value == null || value === "") {
+    return <span>Not provided</span>;
+  }
+
+  if (typeof value === "boolean" || typeof value === "number") {
+    return <span>{String(value)}</span>;
+  }
+
+  if (typeof value === "string") {
+    return <span style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{value}</span>;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <span>Not provided</span>;
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {value.map((item, index) => (
+          <div
+            key={index}
+            style={{
+              padding: 10,
+              border: "1px solid #E9E8F3",
+              borderRadius: 8,
+              background: "#FFFFFF",
+            }}
+          >
+            <ResumeValue value={item} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item != null && item !== "");
+
+    if (entries.length === 0) {
+      return <span>Not provided</span>;
+    }
+
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        {entries.map(([key, item]) => (
+          <div
+            key={key}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(110px, 0.35fr) minmax(0, 1fr)",
+              gap: 10,
+              padding: "8px 0",
+              borderBottom: "1px solid #E9E8F3",
+            }}
+          >
+            <strong
+              style={{
+                color: "#00466D",
+                fontSize: 10,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {key
+                .replace(/([a-z])([A-Z])/g, "$1 $2")
+                .replace(/[_-]/g, " ")
+                .replace(/\b\w/g, (letter) => letter.toUpperCase())}
+            </strong>
+
+            <div style={{ minWidth: 0, color: "#475569", fontSize: 10 }}>
+              <ResumeValue value={item} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return <span>{String(value)}</span>;
+}
+
+
+function getJobGroupKey(
+  candidate: CompanyPipelineCandidate
+): string {
+  const title = candidate.jobTitle?.trim();
+
+  return title
+    ? title.toLowerCase()
+    : `application-${candidate.jobId || candidate.applicationId}`;
+}
+
+function groupByJob(
+  candidates: CompanyPipelineCandidate[]
+): JobGroup[] {
+  const groups = new Map<string, JobGroup>();
+
+  candidates.forEach((candidate) => {
+    const key = getJobGroupKey(candidate);
+    const label = candidate.jobTitle?.trim() || "Job application";
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.candidates.push(candidate);
+    } else {
+      groups.set(key, {
+        key,
+        label,
+        description: `Candidates who applied for ${label}`,
+        candidates: [candidate],
+      });
+    }
+  });
+
+  return Array.from(groups.values()).sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, {
+      sensitivity: "base",
+    })
+  );
+}
+
+
+
+function createCandidateFallback(
+  candidate: CompanyPipelineCandidate
+): CompanyCandidateDetails {
+  return {
+    id: candidate.id || "",
+    userId: candidate.userId || "",
+    firstName: candidate.firstName || "",
+    lastName: candidate.lastName || "",
+    name: candidate.name || "Candidate",
+    email: candidate.email || null,
+    phone: null,
+    headline: candidate.role || null,
+    bio: candidate.bio || null,
+    location: candidate.location || null,
+    yearsExperience: candidate.experience || 0,
+    profileCompletion: null,
+    verified: Boolean(candidate.verified),
+    skills: (candidate.skills || []).map((skill) => ({
+      name: skill,
+      proficiency: null,
+      yearsUsed: null,
+    })),
+    qualifications: [],
+    experienceHistory: [],
+    media: {
+      facePhoto: null,
+      fullBodyPhoto: null,
+      galleryImages: [],
+      documents: [],
+      projects: [],
+      reelMeta: null,
+      preferences: null,
+    },
+  };
+}
+
+
+export default function Pipeline() {
+  
+  const [pipeline, setPipeline] = useState<
+    CompanyPipelineCandidate[]
+  >([]);
+
+  const [loading, setLoading] = useState(true);
+
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const [applicationResume, setApplicationResume] = useState<ApplicationResume | null>(null);
+
+  const [loadingApplicationResume, setLoadingApplicationResume] = useState(false);
+
+  const [applicationResumeError, setApplicationResumeError] = useState<string | null>(null);
+
+  const [resumeRetryKey, setResumeRetryKey] = useState(0);
+
+
+  const [applicationResponses, setApplicationResponses] = useState<
+    ApplicationResponseItem[]
+  >([]);
+
+  const [loadingApplicationResponses, setLoadingApplicationResponses] =
+    useState(false);
+
+  const [applicationResponsesError, setApplicationResponsesError] =
+     useState<string | null>(null);
+
+  const [responsesRetryKey, setResponsesRetryKey] = useState(0);
 
   const [updatingApplication, setUpdatingApplication] =
     useState<string | null>(null);
 
-  const [viewingCandidateId, setViewingCandidateId] =
-    useState<string | null>(null);
+  const [selectedPipelineCandidate, setSelectedPipelineCandidate] =
+    useState<CompanyPipelineCandidate | null>(null);
 
   const [selectedCandidate, setSelectedCandidate] =
     useState<CompanyCandidateDetails | null>(null);
 
-  const [selectedPipelineCandidate, setSelectedPipelineCandidate] =
-    useState<CompanyPipelineCandidate | null>(null);
+  const [isProfileExpanded, setIsProfileExpanded] = useState(false);
 
-  const [selectedDocument, setSelectedDocument] = useState<
-    CompanyCandidateDetails["media"]["documents"][number] | null
-  >(null);
+  useEffect(() => {
+    if (!isProfileExpanded) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsProfileExpanded(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isProfileExpanded]);
+
+  const [selectedDocument, setSelectedDocument] =
+    useState<CandidateDocument | null>(null);
 
   const [expandedGroups, setExpandedGroups] =
     useState<string[]>([]);
 
-  const [activeView, setActiveView] = useState<
-    | "applicants"
-    | "shortlisted"
-    | "interviewing"
-    | "offered"
-    | "rejected"
-  >("applicants");
+  const [activeView, setActiveView] =
+    useState<PipelineView>("applicants");
+
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadPipeline = async () => {
+    async function loadPipeline() {
       try {
         setLoading(true);
 
-        const pipelineData =
-          await companyService.getPipeline();
+        const result = await companyService.getPipeline();
 
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
 
-        setPipeline(
-          Array.isArray(pipelineData)
-            ? pipelineData
-            : []
-        );
+        setPipeline(Array.isArray(result) ? result : []);
       } catch (error) {
-        console.error(
-          "Failed to load recruitment pipeline:",
-          error
-        );
+        console.error("Failed to load recruitment pipeline:", error);
 
-        if (mounted) {
-          setPipeline([]);
-        }
+        if (mounted) setPipeline([]);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
-    };
+    }
 
-    loadPipeline();
+    void loadPipeline();
 
     return () => {
       mounted = false;
@@ -126,42 +361,29 @@ export default function Pipeline() {
   }, []);
 
   const applicantCandidates = useMemo(
-    () =>
-      pipeline.filter(
-        (candidate) => candidate.stage === "sourced"
-      ),
+    () => pipeline.filter((candidate) => candidate.stage === "sourced"),
     [pipeline]
   );
 
   const shortlistedCandidates = useMemo(
     () =>
-      pipeline.filter(
-        (candidate) => candidate.stage === "shortlisted"
-      ),
+      pipeline.filter((candidate) => candidate.stage === "shortlisted"),
     [pipeline]
   );
 
   const interviewingCandidates = useMemo(
     () =>
-      pipeline.filter(
-        (candidate) => candidate.stage === "interviewing"
-      ),
+      pipeline.filter((candidate) => candidate.stage === "interviewing"),
     [pipeline]
   );
 
   const offeredCandidates = useMemo(
-    () =>
-      pipeline.filter(
-        (candidate) => candidate.stage === "offered"
-      ),
+    () => pipeline.filter((candidate) => candidate.stage === "offered"),
     [pipeline]
   );
 
   const rejectedCandidates = useMemo(
-    () =>
-      pipeline.filter(
-        (candidate) => candidate.stage === "rejected"
-      ),
+    () => pipeline.filter((candidate) => candidate.stage === "rejected"),
     [pipeline]
   );
 
@@ -170,95 +392,55 @@ export default function Pipeline() {
     interviewingCandidates.length +
     offeredCandidates.length;
 
-  const getJobGroupKey = (
-    candidate: CompanyPipelineCandidate
-  ): string => {
-    const jobTitle = candidate.jobTitle?.trim();
-
-    if (jobTitle) {
-      return jobTitle.toLowerCase();
-    }
-
-    return `application-${candidate.jobId || candidate.applicationId}`;
-  };
-
-  const getJobGroupLabel = (
-    candidate: CompanyPipelineCandidate
-  ): string =>
-    candidate.jobTitle?.trim() || "Job application";
-
-  const groupByJob = (
-    candidates: CompanyPipelineCandidate[]
-  ): JobGroup[] => {
-    const groups = new Map<string, JobGroup>();
-
-    candidates.forEach((candidate) => {
-      const key = getJobGroupKey(candidate);
-      const label = getJobGroupLabel(candidate);
-      const existing = groups.get(key);
-
-      if (existing) {
-        existing.candidates.push(candidate);
-        return;
-      }
-
-      groups.set(key, {
-        key,
-        label,
-        description: `Candidates who applied for ${label}`,
-        candidates: [candidate],
-      });
-    });
-
-    return Array.from(groups.values()).sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, {
-        sensitivity: "base",
-      })
-    );
-  };
-
-  const applicantGroups = useMemo(
-    () => groupByJob(applicantCandidates),
-    [applicantCandidates]
+  const groupsByView = useMemo<Record<PipelineView, JobGroup[]>>(
+    () => ({
+      applicants: groupByJob(applicantCandidates),
+      shortlisted: groupByJob(shortlistedCandidates),
+      interviewing: groupByJob(interviewingCandidates),
+      offered: groupByJob(offeredCandidates),
+      rejected: groupByJob(rejectedCandidates),
+    }),
+    [
+      applicantCandidates,
+      shortlistedCandidates,
+      interviewingCandidates,
+      offeredCandidates,
+      rejectedCandidates,
+    ]
   );
 
-  const shortlistedGroups = useMemo(
-    () => groupByJob(shortlistedCandidates),
-    [shortlistedCandidates]
+  const candidatesByView = useMemo<
+    Record<PipelineView, CompanyPipelineCandidate[]>
+  >(
+    () => ({
+      applicants: applicantCandidates,
+      shortlisted: shortlistedCandidates,
+      interviewing: interviewingCandidates,
+      offered: offeredCandidates,
+      rejected: rejectedCandidates,
+    }),
+    [
+      applicantCandidates,
+      shortlistedCandidates,
+      interviewingCandidates,
+      offeredCandidates,
+      rejectedCandidates,
+    ]
   );
 
-  const interviewingGroups = useMemo(
-    () => groupByJob(interviewingCandidates),
-    [interviewingCandidates]
-  );
-
-  const offeredGroups = useMemo(
-    () => groupByJob(offeredCandidates),
-    [offeredCandidates]
-  );
-
-  const rejectedGroups = useMemo(
-    () => groupByJob(rejectedCandidates),
-    [rejectedCandidates]
-  );
+  const visibleCandidates = candidatesByView[activeView];
+  const visibleGroups = groupsByView[activeView];
 
   useEffect(() => {
-    const keys = applicantGroups.map(
-      (group) => group.key
-    );
+    const groupKeys = groupsByView.applicants.map((group) => group.key);
 
     setExpandedGroups((current) => {
-      const validCurrent = current.filter((key) =>
-        keys.includes(key)
-      );
+      const retained = current.filter((key) => groupKeys.includes(key));
+      const added = groupKeys.filter((key) => !current.includes(key));
 
-      const newlyAdded = keys.filter(
-        (key) => !current.includes(key)
-      );
-
-      return [...validCurrent, ...newlyAdded];
+      return [...retained, ...added];
     });
-  }, [applicantGroups]);
+  }, [groupsByView.applicants]);
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups((current) =>
@@ -268,6 +450,260 @@ export default function Pipeline() {
     );
   };
 
+  
+const handleViewCandidate = useCallback(
+  async (candidate: CompanyPipelineCandidate) => {
+    const requestId = ++requestSequence.current;
+
+    setSelectedPipelineCandidate(candidate);
+    setSelectedCandidate(createCandidateFallback(candidate));
+    setIsProfileExpanded(true);
+    setSelectedDocument(null);
+    setLoadingDetails(false);
+
+    const candidateId =
+      typeof candidate.id === "string" ? candidate.id.trim() : "";
+
+    if (!candidateId) {
+      console.warn(
+        "Cannot load candidate details: candidate ID is missing.",
+        candidate
+      );
+      return;
+    }
+
+    setLoadingDetails(true);
+
+    try {
+      const details = await getCandidateDetails(candidateId);
+
+      if (requestId !== requestSequence.current) return;
+
+      setSelectedCandidate(details);
+    } catch (error) {
+      if (requestId !== requestSequence.current) return;
+
+      console.error("Failed to load candidate details:", error);
+      // Keep the lightweight fallback profile visible.
+    } finally {
+      if (requestId === requestSequence.current) {
+        setLoadingDetails(false);
+      }
+    }
+  },
+  []
+);
+
+const [messagingCandidateId, setMessagingCandidateId] =
+  useState<string | null>(null);
+
+const handleMessageCandidate = useCallback(
+  async (candidate: CompanyPipelineCandidate) => {
+    const participantId = String(candidate.userId || "").trim();
+
+    if (!participantId) {
+      window.alert(
+        "This candidate does not have a user ID available for messaging."
+      );
+      return;
+    }
+
+    const openingMessage = window.prompt(
+      `Write your opening message to ${candidate.name}:`
+    );
+
+    if (openingMessage === null) return;
+
+    const messageText = openingMessage.trim();
+
+    if (!messageText) {
+      window.alert("Please enter a message before continuing.");
+      return;
+    }
+
+    setMessagingCandidateId(candidate.applicationId);
+
+    try {
+      // Use the existing conversation-creation method.
+      const conversation =
+        await companyService.startConversation(
+          participantId,
+          "CANDIDATE"
+        );
+
+      if (!conversation?.id) {
+        throw new Error(
+          "The messaging service did not return a conversation ID."
+        );
+      }
+
+      // sendMessage accepts one SendCompanyMessageRequest object.
+      await companyService.sendMessage({
+        threadId: String(conversation.id),
+        text: messageText,
+      });
+
+      window.alert(
+        `Your message to ${candidate.name} has been sent. Open Messages to continue the conversation.`
+      );
+    } catch (error) {
+      console.error(
+        "Failed to initiate conversation with candidate:",
+        error
+      );
+
+      window.alert(
+        "The message could not be sent. Please check the browser console and messaging API response."
+      );
+    } finally {
+      setMessagingCandidateId(null);
+    }
+  },
+  []
+);
+
+useEffect(() => {
+  let active = true;
+
+  const applicationId =
+    selectedPipelineCandidate?.applicationId?.trim() || "";
+
+  // Clear the previous application's answers immediately.
+  setApplicationResponses([]);
+  setApplicationResponsesError(null);
+
+  if (!applicationId) {
+    setLoadingApplicationResponses(false);
+    return () => {
+      active = false;
+    };
+  }
+
+  async function loadApplicationResponses() {
+    setLoadingApplicationResponses(true);
+
+    try {
+      const result: unknown =
+        await companyService.getApplicationResponses(applicationId);
+
+      if (!active) return;
+
+      setApplicationResponses(normalizeApplicationResponses(result));
+    } catch (error) {
+      if (!active) return;
+
+      console.error(
+        "Failed to load application-question responses:",
+        error
+      );
+
+      setApplicationResponsesError(
+        "Application answers could not be loaded."
+      );
+    } finally {
+      if (active) {
+        setLoadingApplicationResponses(false);
+      }
+    }
+  }
+
+  void loadApplicationResponses();
+
+  return () => {
+    active = false;
+  };
+}, [
+  selectedPipelineCandidate?.applicationId,
+  responsesRetryKey,
+]);
+
+
+  
+useEffect(() => {
+  let active = true;
+
+  const applicationId =
+    selectedPipelineCandidate?.applicationId?.trim() || "";
+
+  setApplicationResume(null);
+  setApplicationResumeError(null);
+
+  if (!applicationId) {
+    setLoadingApplicationResume(false);
+
+    return () => {
+      active = false;
+    };
+  }
+
+  async function loadResume() {
+    setLoadingApplicationResume(true);
+
+    try {
+      const result =
+        await companyService.getApplicationResume(applicationId);
+
+      if (!active) return;
+
+      setApplicationResume(result);
+    } catch (error) {
+      if (!active) return;
+
+      console.error(
+        "Failed to load the application CV:",
+        error
+      );
+
+      setApplicationResumeError(
+        "The CV submitted with this application could not be loaded."
+      );
+    } finally {
+      if (active) {
+        setLoadingApplicationResume(false);
+      }
+    }
+  }
+
+  void loadResume();
+
+  return () => {
+    active = false;
+  };
+}, [
+  selectedPipelineCandidate?.applicationId,
+  resumeRetryKey,
+]);
+
+  useEffect(() => {
+    if (visibleCandidates.length === 0) {
+      if (
+        selectedPipelineCandidate &&
+        selectedPipelineCandidate.stage !== activeView
+      ) {
+        setSelectedPipelineCandidate(null);
+        setSelectedCandidate(null);
+        setSelectedDocument(null);
+      }
+      return;
+    }
+
+    const selectedStillVisible = visibleCandidates.some(
+      (candidate) =>
+        candidate.applicationId ===
+        selectedPipelineCandidate?.applicationId
+    );
+
+    if (!selectedStillVisible) {
+      void handleViewCandidate(visibleCandidates[0]);
+    }
+  }, [
+    visibleCandidates,
+    selectedPipelineCandidate?.applicationId,
+    selectedPipelineCandidate?.stage,
+    activeView,
+    handleViewCandidate,
+  ]);
+
   const moveCandidate = async (
     applicationId: string,
     stage: PipelineStage
@@ -275,21 +711,25 @@ export default function Pipeline() {
     try {
       setUpdatingApplication(applicationId);
 
-      const updated =
-        await companyService.updatePipelineStage(
-          applicationId,
-          stage
-        );
+      const updated = await companyService.updatePipelineStage(
+        applicationId,
+        stage
+      );
 
-      const refreshedPipeline = Array.isArray(updated)
-        ? updated
-        : [];
+      setPipeline(Array.isArray(updated) ? updated : []);
 
-      setPipeline(refreshedPipeline);
+      // Clear the old selection. The selection effect will pick the
+      // first available candidate in the active stage if necessary.
+      const selectedApplication =
+        selectedPipelineCandidate?.applicationId;
 
-      setSelectedCandidate(null);
-      setSelectedPipelineCandidate(null);
-      setSelectedDocument(null);
+      if (selectedApplication === applicationId) {
+        setSelectedPipelineCandidate(null);
+        setSelectedCandidate(null);
+        setSelectedDocument(null);
+        requestSequence.current += 1;
+        setLoadingDetails(false);
+      }
     } catch (error) {
       console.error(
         `Failed to update application ${applicationId} to ${stage}:`,
@@ -310,23 +750,15 @@ export default function Pipeline() {
     candidate: CompanyPipelineCandidate
   ) => {
     const nextStage: PipelineStage =
-      candidate.stage === "shortlisted"
-        ? "sourced"
-        : "shortlisted";
+      candidate.stage === "shortlisted" ? "sourced" : "shortlisted";
 
-    await moveCandidate(
-      candidate.applicationId,
-      nextStage
-    );
+    await moveCandidate(candidate.applicationId, nextStage);
   };
 
   const handleInterview = async (
     candidate: CompanyPipelineCandidate
   ) => {
-    await moveCandidate(
-      candidate.applicationId,
-      "interviewing"
-    );
+    await moveCandidate(candidate.applicationId, "interviewing");
   };
 
   const handleReject = async (
@@ -336,14 +768,9 @@ export default function Pipeline() {
       `Reject ${candidate.name} for "${candidate.jobTitle || "this role"}"?`
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
-    await moveCandidate(
-      candidate.applicationId,
-      "rejected"
-    );
+    await moveCandidate(candidate.applicationId, "rejected");
   };
 
   const handleOffer = async (
@@ -353,132 +780,44 @@ export default function Pipeline() {
       `Make an offer to ${candidate.name} for "${candidate.jobTitle || "this role"}"?`
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
-    await moveCandidate(
-      candidate.applicationId,
-      "offered"
-    );
-  };
-
-  const handleViewCandidate = async (
-    candidate: CompanyPipelineCandidate
-  ) => {
-    setSelectedPipelineCandidate(candidate);
-    setViewingCandidateId(candidate.id);
-    setSelectedDocument(null);
-
-    /*
-     * Lightweight fallback shown immediately while the full
-     * candidate profile is being retrieved.
-     *
-     * IMPORTANT:
-     * This object now fully matches CandidateProfileMedia.
-     * Explicit empty arrays prevent TypeScript from inferring
-     * never[] and the optional media fields are initialized.
-     */
-    setSelectedCandidate({
-      id: candidate.id,
-      userId: candidate.userId || "",
-      firstName: candidate.firstName || "",
-      lastName: candidate.lastName || "",
-      name: candidate.name,
-      email: candidate.email || null,
-      phone: null,
-      headline: candidate.role,
-      bio: candidate.bio || null,
-      location: candidate.location || null,
-      yearsExperience: candidate.experience || 0,
-      profileCompletion: null,
-      verified: Boolean(candidate.verified),
-      skills: (candidate.skills || []).map((skill) => ({
-        name: skill,
-        proficiency: null,
-        yearsUsed: null,
-      })),
-      qualifications: [],
-      experienceHistory: [],
-      media: {
-        facePhoto: null,
-        fullBodyPhoto: null,
-        galleryImages: [],
-        documents: [],
-        projects: [],
-        reelMeta: null,
-        preferences: null,
-      },
-    });
-
-    try {
-      const details = await getCandidateDetails(
-        candidate.id
-      );
-
-      setSelectedCandidate(details);
-    } catch (error) {
-      console.error(
-        "Failed to load candidate details:",
-        error
-      );
-
-      window.alert(
-        "The candidate's full profile could not be loaded."
-      );
-    } finally {
-      setViewingCandidateId(null);
-    }
-  };
-
-  const closeCandidateView = () => {
-    if (viewingCandidateId || updatingApplication) {
-      return;
-    }
-
-    setSelectedCandidate(null);
-    setSelectedPipelineCandidate(null);
-    setSelectedDocument(null);
+    await moveCandidate(candidate.applicationId, "offered");
   };
 
   const renderStageActions = (
     candidate: CompanyPipelineCandidate,
-    insideView = false
+    compact = false
   ) => {
     const isUpdating =
       updatingApplication === candidate.applicationId;
 
-    const buttonStyle = insideView
-      ? styles.modalActionButton
-      : undefined;
+    const commonStyle: React.CSSProperties = compact
+      ? styles.compactAction
+      : {};
+
+    const buttonProps = {
+      type: "button" as const,
+      disabled: isUpdating,
+    };
 
     if (candidate.stage === "sourced") {
       return (
         <>
           <button
-            type="button"
-            disabled={isUpdating}
-            style={{
-              ...styles.shortlistButton,
-              ...(buttonStyle || {}),
-              ...(isUpdating ? styles.disabledButton : {}),
-            }}
-            onClick={() => toggleShortlist(candidate)}
+            {...buttonProps}
+            style={{ ...styles.shortlistButton, ...commonStyle }}
+            onClick={() => void toggleShortlist(candidate)}
           >
             {isUpdating ? "Updating..." : "Shortlist"}
           </button>
 
           <button
-            type="button"
-            disabled={isUpdating}
-            style={{
-              ...styles.rejectButton,
-              ...(buttonStyle || {}),
-              ...(isUpdating ? styles.disabledButton : {}),
-            }}
-            onClick={() => handleReject(candidate)}
+            {...buttonProps}
+            style={{ ...styles.rejectButton, ...commonStyle }}
+            onClick={() => void handleReject(candidate)}
           >
-            {isUpdating ? "Updating..." : "Reject"}
+            Reject
           </button>
         </>
       );
@@ -488,43 +827,27 @@ export default function Pipeline() {
       return (
         <>
           <button
-            type="button"
-            disabled={isUpdating}
-            style={{
-              ...styles.shortlistButton,
-              ...styles.removeShortlistButton,
-              ...(buttonStyle || {}),
-              ...(isUpdating ? styles.disabledButton : {}),
-            }}
-            onClick={() => toggleShortlist(candidate)}
+            {...buttonProps}
+            style={{ ...styles.removeButton, ...commonStyle }}
+            onClick={() => void toggleShortlist(candidate)}
           >
-            {isUpdating ? "Updating..." : "Remove"}
+            {isUpdating ? "Updating..." : "Remove shortlist"}
           </button>
 
           <button
-            type="button"
-            disabled={isUpdating}
-            style={{
-              ...styles.interviewButton,
-              ...(buttonStyle || {}),
-              ...(isUpdating ? styles.disabledButton : {}),
-            }}
-            onClick={() => handleInterview(candidate)}
+            {...buttonProps}
+            style={{ ...styles.interviewButton, ...commonStyle }}
+            onClick={() => void handleInterview(candidate)}
           >
-            {isUpdating ? "Moving..." : "Start Interview →"}
+            {isUpdating ? "Moving..." : "Start Interview"}
           </button>
 
           <button
-            type="button"
-            disabled={isUpdating}
-            style={{
-              ...styles.rejectButton,
-              ...(buttonStyle || {}),
-              ...(isUpdating ? styles.disabledButton : {}),
-            }}
-            onClick={() => handleReject(candidate)}
+            {...buttonProps}
+            style={{ ...styles.rejectButton, ...commonStyle }}
+            onClick={() => void handleReject(candidate)}
           >
-            {isUpdating ? "Updating..." : "Reject"}
+            Reject
           </button>
         </>
       );
@@ -534,29 +857,19 @@ export default function Pipeline() {
       return (
         <>
           <button
-            type="button"
-            disabled={isUpdating}
-            style={{
-              ...styles.offerButton,
-              ...(buttonStyle || {}),
-              ...(isUpdating ? styles.disabledButton : {}),
-            }}
-            onClick={() => handleOffer(candidate)}
+            {...buttonProps}
+            style={{ ...styles.offerButton, ...commonStyle }}
+            onClick={() => void handleOffer(candidate)}
           >
-            {isUpdating ? "Making Offer..." : "Make Offer"}
+            {isUpdating ? "Making offer..." : "Make Offer"}
           </button>
 
           <button
-            type="button"
-            disabled={isUpdating}
-            style={{
-              ...styles.rejectButton,
-              ...(buttonStyle || {}),
-              ...(isUpdating ? styles.disabledButton : {}),
-            }}
-            onClick={() => handleReject(candidate)}
+            {...buttonProps}
+            style={{ ...styles.rejectButton, ...commonStyle }}
+            onClick={() => void handleReject(candidate)}
           >
-            {isUpdating ? "Updating..." : "Reject"}
+            Reject
           </button>
         </>
       );
@@ -565,16 +878,11 @@ export default function Pipeline() {
     if (candidate.stage === "offered") {
       return (
         <button
-          type="button"
-          disabled={isUpdating}
-          style={{
-            ...styles.rejectButton,
-            ...(buttonStyle || {}),
-            ...(isUpdating ? styles.disabledButton : {}),
-          }}
-          onClick={() => handleReject(candidate)}
+          {...buttonProps}
+          style={{ ...styles.rejectButton, ...commonStyle }}
+          onClick={() => void handleReject(candidate)}
         >
-          {isUpdating ? "Updating..." : "Reject"}
+          Reject
         </button>
       );
     }
@@ -583,223 +891,122 @@ export default function Pipeline() {
   };
 
   const renderCandidateCard = (
-    candidate: CompanyPipelineCandidate,
-    showActions = true
+    candidate: CompanyPipelineCandidate
   ) => {
-    const shortlistedCandidate =
-      candidate.stage === "shortlisted";
+    const selected =
+      selectedPipelineCandidate?.applicationId === candidate.applicationId;
 
     const isUpdating =
-      updatingApplication ===
-      candidate.applicationId;
-
-    const isViewing =
-      viewingCandidateId === candidate.id;
+      updatingApplication === candidate.applicationId;
 
     return (
-      <div
+      <button
         key={candidate.applicationId}
-        style={styles.candidateCard}
+        type="button"
+        style={{
+          ...styles.candidateCard,
+          ...(selected ? styles.candidateCardSelected : {}),
+        }}
+        onClick={() => void handleViewCandidate(candidate)}
+        aria-pressed={selected}
       >
-        <div style={styles.cardTop}>
+        <div style={styles.candidateCardTop}>
           <div style={styles.avatar}>
-            {candidate.name
-              .charAt(0)
-              .toUpperCase()}
+            {candidate.name?.charAt(0).toUpperCase() || "?"}
           </div>
 
-          <div style={styles.identity}>
+          <div style={styles.candidateIdentity}>
             <div style={styles.nameRow}>
-              <h3 style={styles.name}>
+              <strong style={styles.candidateName}>
                 {candidate.name}
-              </h3>
+              </strong>
 
               {candidate.verified && (
-                <span
-                  style={styles.verified}
-                  title="Verified candidate"
-                >
+                <span style={styles.verifiedBadge} title="Verified candidate">
                   ✓
                 </span>
               )}
             </div>
 
-            <p style={styles.role}>
-              {candidate.role}
-            </p>
-
-            {candidate.jobTitle && (
-              <p style={styles.appliedJob}>
-                Applied for:{" "}
-                <strong>
-                  {candidate.jobTitle}
-                </strong>
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div style={styles.details}>
-          <span style={styles.category}>
-            {candidate.category}
-          </span>
-
-          <span style={styles.experience}>
-            {candidate.experience}{" "}
-            {candidate.experience === 1
-              ? "year"
-              : "years"}{" "}
-            experience
-          </span>
-        </div>
-
-        <div style={styles.skills}>
-          {candidate.skills
-            .slice(0, 4)
-            .map((skill) => (
-              <span
-                key={skill}
-                style={styles.skill}
-              >
-                {skill}
-              </span>
-            ))}
-        </div>
-
-        <div style={styles.cardFooter}>
-          <div>
-            {candidate.stage ===
-            "rejected" ? (
-              <span style={styles.rejectedBadge}>
-                ✕ Rejected
-              </span>
-            ) : candidate.stage ===
-              "offered" ? (
-              <span
-                style={
-                  styles.shortlistedBadge
-                }
-              >
-                ✓ Offer Stage
-              </span>
-            ) : candidate.stage ===
-              "interviewing" ? (
-              <span
-                style={
-                  styles.shortlistedBadge
-                }
-              >
-                ✓ Interviewing
-              </span>
-            ) : shortlistedCandidate ? (
-              <span
-                style={
-                  styles.shortlistedBadge
-                }
-              >
-                ✓ Shortlisted
-              </span>
-            ) : (
-              <span style={styles.reviewBadge}>
-                Needs review
-              </span>
-            )}
-          </div>
-
-          {showActions && (
-            <div style={styles.cardActions}>
-              <button
-                type="button"
-                disabled={Boolean(
-                  isUpdating ||
-                  viewingCandidateId
-                )}
-                style={{
-                  ...styles.viewButton,
-                  ...(isViewing
-                    ? styles.disabledButton
-                    : {}),
-                }}
-                onClick={() =>
-                  handleViewCandidate(candidate)
-                }
-              >
-                {isViewing
-                  ? "Loading..."
-                  : "View"}
-              </button>
-
-              {renderStageActions(candidate)}
-            </div>
-          )}
-        </div>
-
-        {candidate.stage === "sourced" && (
-          <div style={styles.cardHint}>
-            Review the candidate against the
-            requirements of this role, then
-            view, shortlist or reject the
-            application.
-          </div>
-        )}
-
-        {candidate.stage === "shortlisted" && (
-          <div style={styles.cardHint}>
-            This candidate is ready for the
-            interview stage. Open View to inspect
-            the full candidate profile.
-          </div>
-        )}
-
-        {candidate.stage === "interviewing" && (
-          <div style={styles.cardHint}>
-            This candidate is currently being
-            assessed. Open View to review their
-            qualifications and work history.
-          </div>
-        )}
-
-        {candidate.stage === "rejected" && (
-          <div style={styles.cardHint}>
-            This application was rejected and is
-            retained here for review.
-          </div>
-        )}
-
-        <div style={styles.applicationMeta}>
-          <span>
-            Application:{" "}
-            {candidate.applicationId.slice(0, 8)}
-            ...
-          </span>
-
-          {candidate.appliedAt && (
-            <span>
-              {formatDate(candidate.appliedAt)}
+            <span style={styles.candidateRole}>
+              {candidate.role || "Professional"}
             </span>
-          )}
+          </div>
+
+          <span style={selected ? styles.selectedDot : styles.unselectedDot}>
+            {selected ? "✓" : ""}
+          </span>
         </div>
-      </div>
+
+        <div style={styles.candidateMeta}>
+          <span style={styles.categoryBadge}>
+            {candidate.category || "Uncategorised"}
+          </span>
+
+          <span style={styles.experienceText}>
+            {candidate.experience ?? 0}{" "}
+            {(candidate.experience ?? 0) === 1 ? "year" : "years"}
+          </span>
+        </div>
+
+        {candidate.jobTitle && (
+          <div style={styles.appliedFor}>
+            Applied for <strong>{candidate.jobTitle}</strong>
+          </div>
+        )}
+
+        <div style={styles.skillsRow}>
+          {(candidate.skills || []).slice(0, 3).map((skill) => (
+            <span key={skill} style={styles.skillChip}>
+              {skill}
+            </span>
+          ))}
+        </div>
+
+        <div style={styles.candidateCardFooter}>
+          <span
+            style={
+              candidate.stage === "rejected"
+                ? styles.rejectedBadge
+                : candidate.stage === "offered"
+                  ? styles.offerStageBadge
+                  : candidate.stage === "interviewing"
+                    ? styles.interviewStageBadge
+                    : candidate.stage === "shortlisted"
+                      ? styles.shortlistedBadge
+                      : styles.reviewBadge
+            }
+          >
+            {candidate.stage === "rejected"
+              ? "Rejected"
+              : candidate.stage === "offered"
+                ? "Offer stage"
+                : candidate.stage === "interviewing"
+                  ? "Interviewing"
+                  : candidate.stage === "shortlisted"
+                    ? "Shortlisted"
+                    : "Needs review"}
+          </span>
+
+          <span style={styles.applicationDate}>
+            {formatDate(candidate.appliedAt)}
+          </span>
+        </div>
+
+        {isUpdating && (
+          <span style={styles.updatingText}>Updating application…</span>
+        )}
+      </button>
     );
   };
 
-  const renderGroupList = (
-    groups: JobGroup[],
-    groupBadge: string,
-    collapsible: boolean,
-    showActions = true
-  ) => {
+  const renderGroupList = (groups: JobGroup[]) => {
     if (groups.length === 0) {
       return (
         <div style={styles.emptyState}>
           <div style={styles.emptyIcon}>✓</div>
-
-          <h3>No applications</h3>
-
-          <p>
-            There are no applications in this
-            stage yet.
-          </p>
+          <strong>No applications in this stage</strong>
+          <p>Applications will appear here as candidates progress.</p>
         </div>
       );
     }
@@ -807,1741 +1014,815 @@ export default function Pipeline() {
     return (
       <div style={styles.groups}>
         {groups.map((group) => {
-          const isExpanded =
-            expandedGroups.includes(group.key);
+          const expanded = expandedGroups.includes(group.key);
 
           return (
-            <div
-              key={group.key}
-              style={styles.group}
-            >
-              {collapsible ? (
-                <button
-                  type="button"
-                  style={styles.groupHeader}
-                  onClick={() =>
-                    toggleGroup(group.key)
-                  }
-                >
-                  <div
-                    style={
-                      styles.groupHeaderLeft
-                    }
-                  >
-                    <div style={styles.groupIcon}>
-                      {group.label
-                        .charAt(0)
-                        .toUpperCase()}
-                    </div>
+            <section key={group.key} style={styles.group}>
+              <button
+                type="button"
+                style={styles.groupHeader}
+                onClick={() => toggleGroup(group.key)}
+                aria-expanded={expanded}
+              >
+                <span style={styles.groupIcon}>
+                  {group.label.charAt(0).toUpperCase()}
+                </span>
 
-                    <div>
-                      <div
-                        style={
-                          styles.groupTitleRow
-                        }
-                      >
-                        <h3
-                          style={
-                            styles.groupTitle
-                          }
-                        >
-                          {group.label}
-                        </h3>
-
-                        <span
-                          style={
-                            styles.groupCount
-                          }
-                        >
-                          {group.candidates.length}
-                        </span>
-                      </div>
-
-                      <p
-                        style={
-                          styles.groupDescription
-                        }
-                      >
-                        {group.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div
-                    style={
-                      styles.groupHeaderRight
-                    }
-                  >
-                    <span
-                      style={
-                        groupBadge ===
-                        "rejected"
-                          ? styles.rejectedGroupBadge
-                          : styles.groupShortlistBadge
-                      }
-                    >
-                      {group.candidates.length}{" "}
-                      {groupBadge}
-                    </span>
-
-                    <span
-                      style={{
-                        ...styles.expandIcon,
-                        transform:
-                          isExpanded
-                            ? "rotate(180deg)"
-                            : "rotate(0deg)",
-                      }}
-                    >
-                      ↓
-                    </span>
-                  </div>
-                </button>
-              ) : (
-                <div
-                  style={
-                    styles.simpleGroupHeader
-                  }
-                >
-                  <div>
-                    <h3
-                      style={
-                        styles.groupTitle
-                      }
-                    >
-                      {group.label}
-                    </h3>
-
-                    <p
-                      style={
-                        styles.groupDescription
-                      }
-                    >
-                      {group.description}
-                    </p>
-                  </div>
-
-                  <span
-                    style={
-                      groupBadge === "rejected"
-                        ? styles.rejectedGroupBadge
-                        : styles.groupShortlistBadge
-                    }
-                  >
-                    {group.candidates.length}{" "}
-                    {groupBadge}
+                <span style={styles.groupHeaderText}>
+                  <strong style={styles.groupTitle}>{group.label}</strong>
+                  <span style={styles.groupDescription}>
+                    {group.description}
                   </span>
-                </div>
-              )}
+                </span>
 
-              {(!collapsible || isExpanded) && (
-                <div style={styles.groupBody}>
-                  {group.candidates.map(
-                    (candidate) =>
-                      renderCandidateCard(
-                        candidate,
-                        showActions
-                      )
-                  )}
+                <span style={styles.groupCount}>
+                  {group.candidates.length}
+                </span>
+
+                <span style={styles.expandIcon}>
+                  {expanded ? "−" : "+"}
+                </span>
+              </button>
+
+              {expanded && (
+                <div style={styles.groupCandidates}>
+                  {group.candidates.map(renderCandidateCard)}
                 </div>
               )}
-            </div>
+            </section>
           );
         })}
       </div>
     );
   };
 
+  const renderProfileSection = (
+    title: string,
+    content: React.ReactNode,
+    count?: number
+  ) => (
+    <section style={styles.profileSection}>
+      <div style={styles.profileSectionHeader}>
+        <h3 style={styles.profileSectionTitle}>{title}</h3>
+        {count !== undefined && (
+          <span style={styles.countBadge}>{count}</span>
+        )}
+      </div>
+      {content}
+    </section>
+  );
+
+  const candidate = selectedCandidate;
+  const application = selectedPipelineCandidate;
+
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
+      <header style={styles.pageHeader}>
         <div>
-          <div style={styles.eyebrow}>
-            RECRUITMENT MANAGEMENT
-          </div>
-
-          <h1 style={styles.title}>
-            Recruitment Pipeline
-          </h1>
-
-          <p style={styles.subtitle}>
-            Review applications by the actual
-            role they were submitted for,
-            inspect candidate profiles, shortlist
-            candidates, interview them, and
-            reject applications when needed.
+          <span style={styles.eyebrow}>RECRUITMENT MANAGEMENT</span>
+          <h1 style={styles.pageTitle}>Recruitment Pipeline</h1>
+          <p style={styles.pageSubtitle}>
+            Review applicants by job, select a candidate, and inspect their
+            complete profile alongside the application list.
           </p>
         </div>
 
         <div style={styles.summaryGrid}>
           <div style={styles.summaryCard}>
-            <span style={styles.summaryNumber}>
-              {applicantCandidates.length}
-            </span>
-
-            <span style={styles.summaryLabel}>
-              Applicants
-            </span>
+            <strong>{applicantCandidates.length}</strong>
+            <span>Applicants</span>
           </div>
-
-          <div
-            style={{
-              ...styles.summaryCard,
-              ...styles.summaryCardYellow,
-            }}
-          >
-            <span style={styles.summaryNumber}>
-              {shortlistedCandidates.length}
-            </span>
-
-            <span style={styles.summaryLabel}>
-              Shortlisted
-            </span>
-          </div>
-
           <div style={styles.summaryCard}>
-            <span style={styles.summaryNumber}>
-              {activePipelineCount}
-            </span>
-
-            <span style={styles.summaryLabel}>
-              In Pipeline
-            </span>
+            <strong>{shortlistedCandidates.length}</strong>
+            <span>Shortlisted</span>
+          </div>
+          <div style={styles.summaryCard}>
+            <strong>{activePipelineCount}</strong>
+            <span>In pipeline</span>
           </div>
         </div>
-      </div>
+      </header>
 
       <div style={styles.workflow}>
-        <div
-          style={{
-            ...styles.workflowStep,
-            ...styles.workflowActive,
-          }}
-        >
-          <span style={styles.workflowNumber}>1</span>
-
-          <div>
-            <strong>Review Applicants</strong>
-            <span>
-              Grouped by the role they applied for
-            </span>
-          </div>
-        </div>
-
-        <span style={styles.workflowArrow}>→</span>
-
-        <div style={styles.workflowStep}>
-          <span style={styles.workflowNumber}>2</span>
-
-          <div>
-            <strong>Shortlist</strong>
-            <span>
-              Select candidates to interview
-            </span>
-          </div>
-        </div>
-
-        <span style={styles.workflowArrow}>→</span>
-
-        <div style={styles.workflowStep}>
-          <span style={styles.workflowNumber}>3</span>
-
-          <div>
-            <strong>Interview</strong>
-            <span>
-              Assess shortlisted candidates
-            </span>
-          </div>
-        </div>
-
-        <span style={styles.workflowArrow}>→</span>
-
-        <div style={styles.workflowStep}>
-          <span style={styles.workflowNumber}>4</span>
-
-          <div>
-            <strong>Offer</strong>
-            <span>
-              Select successful candidates
-            </span>
-          </div>
-        </div>
+        {[
+          ["1", "Review Applicants"],
+          ["2", "Shortlist"],
+          ["3", "Interview"],
+          ["4", "Offer"],
+        ].map(([number, label], index) => (
+          <React.Fragment key={number}>
+            {index > 0 && <span style={styles.workflowArrow}>→</span>}
+            <div style={styles.workflowStep}>
+              <span style={styles.workflowNumber}>{number}</span>
+              <strong>{label}</strong>
+            </div>
+          </React.Fragment>
+        ))}
       </div>
 
-      <div style={styles.viewTabs}>
-        <button
-          type="button"
-          style={{
-            ...styles.viewTab,
-            ...(activeView === "applicants"
-              ? styles.activeViewTab
-              : {}),
-          }}
-          onClick={() =>
-            setActiveView("applicants")
-          }
-        >
-          Applicants
-
-          <span style={styles.tabCount}>
-            {applicantCandidates.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          style={{
-            ...styles.viewTab,
-            ...(activeView === "shortlisted"
-              ? styles.activeViewTab
-              : {}),
-          }}
-          onClick={() =>
-            setActiveView("shortlisted")
-          }
-        >
-          Shortlist
-
-          <span
+      <nav style={styles.viewTabs} aria-label="Application stages">
+        {(
+          [
+            ["applicants", "Applicants", applicantCandidates.length],
+            ["shortlisted", "Shortlist", shortlistedCandidates.length],
+            ["interviewing", "Interviews", interviewingCandidates.length],
+            ["offered", "Offers", offeredCandidates.length],
+            ["rejected", "Rejects", rejectedCandidates.length],
+          ] as [PipelineView, string, number][]
+        ).map(([view, label, count]) => (
+          <button
+            key={view}
+            type="button"
             style={{
-              ...styles.tabCount,
-              ...styles.yellowTabCount,
+              ...styles.viewTab,
+              ...(activeView === view ? styles.activeViewTab : {}),
             }}
+            onClick={() => setActiveView(view)}
           >
-            {shortlistedCandidates.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          style={{
-            ...styles.viewTab,
-            ...(activeView === "interviewing"
-              ? styles.activeViewTab
-              : {}),
-          }}
-          onClick={() =>
-            setActiveView("interviewing")
-          }
-        >
-          Interviews
-
-          <span style={styles.tabCount}>
-            {interviewingCandidates.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          style={{
-            ...styles.viewTab,
-            ...(activeView === "offered"
-              ? styles.activeViewTab
-              : {}),
-          }}
-          onClick={() =>
-            setActiveView("offered")
-          }
-        >
-          Offers
-
-          <span style={styles.tabCount}>
-            {offeredCandidates.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          style={{
-            ...styles.viewTab,
-            ...(activeView === "rejected"
-              ? styles.activeViewTab
-              : {}),
-          }}
-          onClick={() =>
-            setActiveView("rejected")
-          }
-        >
-          Rejects
-
-          <span
-            style={{
-              ...styles.tabCount,
-              ...styles.rejectedTabCount,
-            }}
-          >
-            {rejectedCandidates.length}
-          </span>
-        </button>
-      </div>
+            {label}
+            <span style={styles.tabCount}>{count}</span>
+          </button>
+        ))}
+      </nav>
 
       {loading ? (
-        <div style={styles.loadingCard}>
+        <div style={styles.loadingState}>
           <div style={styles.loadingCircle} />
-          <p>Loading applicants...</p>
+          <span>Loading recruitment pipeline…</span>
         </div>
       ) : (
-        <>
-          {activeView === "applicants" && (
-            <div>
-              <div style={styles.sectionHeader}>
-                <div>
-                  <h2 style={styles.sectionTitle}>
-                    Applicants by job
-                  </h2>
-
-                  <p
-                    style={
-                      styles.sectionDescription
-                    }
-                  >
-                    Each group is created from the
-                    actual job the candidate applied for.
-                  </p>
-                </div>
-
-                <div style={styles.sectionCount}>
-                  {applicantGroups.length} groups
-                </div>
-              </div>
-
-              {renderGroupList(
-                applicantGroups,
-                "applicants",
-                true,
-                true
-              )}
-            </div>
-          )}
-
-          {activeView === "shortlisted" && (
-            <div>
-              <div style={styles.sectionHeader}>
-                <div>
-                  <h2 style={styles.sectionTitle}>
-                    Shortlisted Candidates
-                  </h2>
-
-                  <p
-                    style={
-                      styles.sectionDescription
-                    }
-                  >
-                    Open View to inspect the selected
-                    candidate's full profile.
-                  </p>
-                </div>
-
-                <div
-                  style={
-                    styles.shortlistHeaderBadge
-                  }
-                >
-                  {shortlistedCandidates.length} ready
-                </div>
-              </div>
-
-              {renderGroupList(
-                shortlistedGroups,
-                "shortlisted",
-                false,
-                true
-              )}
-            </div>
-          )}
-
-          {activeView === "interviewing" && (
-            <div>
-              <div style={styles.sectionHeader}>
-                <div>
-                  <h2 style={styles.sectionTitle}>
-                    Candidates in Interview
-                  </h2>
-
-                  <p
-                    style={
-                      styles.sectionDescription
-                    }
-                  >
-                    Review candidate history while
-                    assessing interview-stage applications.
-                  </p>
-                </div>
-
-                <div style={styles.sectionCount}>
-                  {interviewingCandidates.length} interviewing
-                </div>
-              </div>
-
-              {renderGroupList(
-                interviewingGroups,
-                "interviewing",
-                false,
-                true
-              )}
-            </div>
-          )}
-
-          {activeView === "offered" && (
-            <div>
-              <div style={styles.sectionHeader}>
-                <div>
-                  <h2 style={styles.sectionTitle}>
-                    Offer Stage
-                  </h2>
-
-                  <p
-                    style={
-                      styles.sectionDescription
-                    }
-                  >
-                    Candidates who have progressed through
-                    interviews and are ready for an offer.
-                  </p>
-                </div>
-
-                <div style={styles.sectionCount}>
-                  {offeredCandidates.length} offers
-                </div>
-              </div>
-
-              {renderGroupList(
-                offeredGroups,
-                "offers",
-                false,
-                true
-              )}
-            </div>
-          )}
-
-          {activeView === "rejected" && (
-            <div>
-              <div style={styles.sectionHeader}>
-                <div>
-                  <h2 style={styles.sectionTitle}>
-                    Rejected Candidates
-                  </h2>
-
-                  <p
-                    style={
-                      styles.sectionDescription
-                    }
-                  >
-                    Rejected applications remain available
-                    here for review.
-                  </p>
-                </div>
-
-                <div
-                  style={
-                    styles.rejectedHeaderBadge
-                  }
-                >
-                  {rejectedCandidates.length} rejected
-                </div>
-              </div>
-
-              {renderGroupList(
-                rejectedGroups,
-                "rejected",
-                false,
-                false
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {selectedCandidate && (
-        <div
-          style={styles.modalOverlay}
-          onClick={closeCandidateView}
-        >
-          <div
-            style={styles.modal}
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <div style={styles.modalHeader}>
-              <div style={styles.modalIdentity}>
-                <div style={styles.modalAvatar}>
-                  {selectedCandidate.media.facePhoto ? (
-                    <img
-                      src={
-                        selectedCandidate.media.facePhoto
-                      }
-                      alt={`${selectedCandidate.name} profile`}
-                      style={
-                        styles.modalAvatarImage
-                      }
-                    />
-                  ) : (
-                    selectedCandidate.name
-                      .charAt(0)
-                      .toUpperCase()
-                  )}
-                </div>
-
-                <div>
-                  <div style={styles.modalEyebrow}>
-                    CANDIDATE PROFILE
-                  </div>
-
-                  <h2 style={styles.modalTitle}>
-                    {selectedCandidate.name}
-                  </h2>
-
-                  <p style={styles.modalRole}>
-                    {selectedCandidate.headline ||
-                      "Professional"}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                style={styles.modalCloseButton}
-                onClick={closeCandidateView}
-                disabled={Boolean(
-                  viewingCandidateId
-                )}
-              >
-                ×
-              </button>
-            </div>
-
-            <div style={styles.modalBody}>
-              {viewingCandidateId && (
-                <div style={styles.detailLoading}>
-                  Loading full candidate profile…
-                </div>
-              )}
-
-              {/* =========================================================
-                  CANDIDATE MEDIA
-                  Order:
-                  1. Intro Reel
-                  2. Profile Photo
-                  3. Full Body Photo
-                  ========================================================= */}
-              <section
-                style={{
-                  ...styles.detailSection,
-                  marginTop: 0,
-                }}
-              >
-                <div
-                  style={
-                    styles.detailSectionHeader
-                  }
-                >
-                  <h3
-                    style={
-                      styles.detailSectionTitle
-                    }
-                  >
-                    Candidate Media
-                  </h3>
-
-                  <span
-                    style={
-                      styles.detailCountBadge
-                    }
-                  >
-                    {selectedCandidate.media.reelMeta
-                      ?.dataUrl
-                      ? "Reel"
-                      : "No reel"}
-                  </span>
-                </div>
-
-                <div style={styles.mediaCardWide}>
-                  <div
-                    style={
-                      styles.mediaCardHeader
-                    }
-                  >
-                    <div>
-                      <span
-                        style={
-                          styles.mediaCardTitle
-                        }
-                      >
-                        Intro video / reel
-                      </span>
-
-                      <span style={styles.mediaMeta}>
-                        {selectedCandidate.media
-                          .reelMeta?.fileName ||
-                          "No intro reel uploaded"}
-                      </span>
-                    </div>
-
-                    <span
-                      style={
-                        selectedCandidate.media
-                          .reelMeta?.dataUrl
-                          ? styles.mediaPresent
-                          : styles.mediaMissing
-                      }
-                    >
-                      {selectedCandidate.media
-                        .reelMeta?.dataUrl
-                        ? "Uploaded"
-                        : "Not uploaded"}
-                    </span>
-                  </div>
-
-                  {selectedCandidate.media.reelMeta
-                    ?.dataUrl ? (
-                    <video
-                      src={
-                        selectedCandidate.media.reelMeta
-                          .dataUrl
-                      }
-                      controls
-                      playsInline
-                      style={styles.reelPreview}
-                    />
-                  ) : (
-                    <div
-                      style={
-                        styles.mediaPlaceholder
-                      }
-                    >
-                      The candidate has not uploaded an
-                      introduction video yet.
-                    </div>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    ...styles.mediaOverviewGrid,
-                    marginTop: "12px",
-                  }}
-                >
-                  <div style={styles.mediaCard}>
-                    <div
-                      style={
-                        styles.mediaCardHeader
-                      }
-                    >
-                      <span
-                        style={
-                          styles.mediaCardTitle
-                        }
-                      >
-                        Profile photo
-                      </span>
-
-                      <span
-                        style={
-                          selectedCandidate.media
-                            .facePhoto
-                            ? styles.mediaPresent
-                            : styles.mediaMissing
-                        }
-                      >
-                        {selectedCandidate.media
-                          .facePhoto
-                          ? "Uploaded"
-                          : "Not uploaded"}
-                      </span>
-                    </div>
-
-                    {selectedCandidate.media
-                      .facePhoto ? (
-                      <img
-                        src={
-                          selectedCandidate.media
-                            .facePhoto
-                        }
-                        alt={`${selectedCandidate.name} profile`}
-                        style={
-                          styles.profilePhotoPreview
-                        }
-                      />
-                    ) : (
-                      <div
-                        style={
-                          styles.mediaPlaceholder
-                        }
-                      >
-                        No profile photo uploaded.
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={styles.mediaCard}>
-                    <div
-                      style={
-                        styles.mediaCardHeader
-                      }
-                    >
-                      <span
-                        style={
-                          styles.mediaCardTitle
-                        }
-                      >
-                        Full body photo
-                      </span>
-
-                      <span
-                        style={
-                          selectedCandidate.media
-                            .fullBodyPhoto
-                            ? styles.mediaPresent
-                            : styles.mediaMissing
-                        }
-                      >
-                        {selectedCandidate.media
-                          .fullBodyPhoto
-                          ? "Uploaded"
-                          : "Not uploaded"}
-                      </span>
-                    </div>
-
-                    {selectedCandidate.media
-                      .fullBodyPhoto ? (
-                      <img
-                        src={
-                          selectedCandidate.media
-                            .fullBodyPhoto
-                        }
-                        alt={`${selectedCandidate.name} full body`}
-                        style={
-                          styles.fullBodyPreview
-                        }
-                      />
-                    ) : (
-                      <div
-                        style={
-                          styles.mediaPlaceholder
-                        }
-                      >
-                        No full body photo uploaded.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <div style={styles.detailGrid}>
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>
-                    Location
-                  </span>
-
-                  <strong style={styles.detailValue}>
-                    {selectedCandidate.location ||
-                      "Not provided"}
-                  </strong>
-                </div>
-
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>
-                    Email
-                  </span>
-
-                  <strong style={styles.detailValue}>
-                    {selectedCandidate.email ||
-                      "Not provided"}
-                  </strong>
-                </div>
-
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>
-                    Phone
-                  </span>
-
-                  <strong style={styles.detailValue}>
-                    {selectedCandidate.phone ||
-                      "Not provided"}
-                  </strong>
-                </div>
-
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>
-                    Experience
-                  </span>
-
-                  <strong style={styles.detailValue}>
-                    {selectedCandidate.yearsExperience}{" "}
-                    {selectedCandidate.yearsExperience ===
-                    1
-                      ? "year"
-                      : "years"}
-                  </strong>
-                </div>
-
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>
-                    Verification
-                  </span>
-
-                  <strong style={styles.detailValue}>
-                    {selectedCandidate.verified
-                      ? "Verified"
-                      : "Not verified"}
-                  </strong>
-                </div>
-
-                <div style={styles.detailCard}>
-                  <span style={styles.detailLabel}>
-                    Profile completion
-                  </span>
-
-                  <strong style={styles.detailValue}>
-                    {selectedCandidate.profileCompletion !=
-                    null
-                      ? `${selectedCandidate.profileCompletion}%`
-                      : "Not available"}
-                  </strong>
-                </div>
-              </div>
-
-              <section style={styles.detailSection}>
-                <h3 style={styles.detailSectionTitle}>
-                  Professional Summary
-                </h3>
-
-                <p style={styles.detailParagraph}>
-                  {selectedCandidate.bio ||
-                    "No professional summary has been provided."}
+        <div style={styles.workspace}>
+          <aside style={styles.leftPanel}>
+            <div style={styles.panelHeader}>
+              <div>
+                <h2 style={styles.panelTitle}>
+                  {activeView === "applicants"
+                    ? "Applicants by job"
+                    : activeView === "shortlisted"
+                      ? "Shortlisted candidates"
+                      : activeView === "interviewing"
+                        ? "Interview candidates"
+                        : activeView === "offered"
+                          ? "Offer stage"
+                          : "Rejected applications"}
+                </h2>
+                <p style={styles.panelSubtitle}>
+                  Select a candidate to view their profile.
                 </p>
-              </section>
+              </div>
+              <span style={styles.panelCount}>{visibleCandidates.length}</span>
+            </div>
 
-              <section style={styles.detailSection}>
-                <h3 style={styles.detailSectionTitle}>
-                  Skills
-                </h3>
+            <div style={styles.leftPanelContent}>
+              {renderGroupList(visibleGroups)}
+            </div>
+          </aside>
 
-                {selectedCandidate.skills.length >
-                0 ? (
-                  <div style={styles.detailSkills}>
-                    {selectedCandidate.skills.map(
-                      (skill) => (
-                        <span
-                          key={`${skill.name}-${skill.yearsUsed ?? "x"}`}
-                          style={
-                            styles.detailSkill
-                          }
-                        >
-                          <strong>
-                            {skill.name}
-                          </strong>
-
-                          {skill.proficiency && (
-                            <small>
-                              {skill.proficiency}
-                            </small>
-                          )}
-
-                          {skill.yearsUsed != null && (
-                            <small>
-                              {skill.yearsUsed}{" "}
-                              {skill.yearsUsed === 1
-                                ? "year"
-                                : "years"}
-                            </small>
-                          )}
-                        </span>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  <p style={styles.detailMuted}>
-                    No skills provided.
-                  </p>
-                )}
-              </section>
-
-              <section style={styles.detailSection}>
-                <div
-                  style={
-                    styles.detailSectionHeader
-                  }
-                >
-                  <h3
-                    style={
-                      styles.detailSectionTitle
-                    }
-                  >
-                    Qualifications
-                  </h3>
-
-                  <span
-                    style={
-                      styles.detailCountBadge
-                    }
-                  >
-                    {
-                      selectedCandidate
-                        .qualifications.length
-                    }
+          <main style={styles.rightPanel}>
+            {!candidate || !application ? (
+              <div style={styles.profileEmptyState}>
+                <div style={styles.emptyProfileIcon}>👤</div>
+                <h2 style={styles.profileEmptyTitle}>
+                  Select a candidate
+                </h2>
+                <p style={styles.profileEmptyText}>
+                  Choose an applicant from the left panel to view their
+                  introduction reel, photos, professional summary, skills,
+                  qualifications, work history, projects, and documents.
+                </p>
+                {visibleCandidates.length === 0 && (
+                  <span style={styles.emptyStageHint}>
+                    There are no candidates in this stage yet.
                   </span>
-                </div>
-
-                {selectedCandidate.qualifications
-                  .length > 0 ? (
-                  <div style={styles.timelineList}>
-                    {selectedCandidate.qualifications.map(
-                      (qualification) => (
-                        <div
-                          key={qualification.id}
-                          style={
-                            styles.timelineItem
-                          }
-                        >
-                          <div
-                            style={
-                              styles.timelineDot
-                            }
-                          />
-
-                          <div
-                            style={
-                              styles.timelineContent
-                            }
-                          >
-                            <strong
-                              style={
-                                styles.timelineTitle
-                              }
-                            >
-                              {qualification.qualificationName ||
-                                "Qualification"}
-                            </strong>
-
-                            <div
-                              style={
-                                styles.timelineMeta
-                              }
-                            >
-                              {qualification.institution ||
-                                "Institution not provided"}
-                            </div>
-
-                            {qualification.fieldOfStudy && (
-                              <div
-                                style={
-                                  styles.timelineMeta
-                                }
-                              >
-                                Field:{" "}
-                                {
-                                  qualification.fieldOfStudy
-                                }
-                              </div>
-                            )}
-
-                            {(qualification.startYear ||
-                              qualification.completionYear) && (
-                              <div
-                                style={
-                                  styles.timelineMeta
-                                }
-                              >
-                                {qualification.startYear ||
-                                  "—"}{" "}
-                                –{" "}
-                                {qualification.completionYear ||
-                                  "Present"}
-                              </div>
-                            )}
-
-                            {qualification.verificationStatus && (
-                              <span
-                                style={
-                                  styles.timelineStatus
-                                }
-                              >
-                                {formatVerificationStatus(
-                                  qualification.verificationStatus
-                                )}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  <p style={styles.detailMuted}>
-                    No qualifications have been recorded.
-                  </p>
                 )}
-              </section>
-
-              <section style={styles.detailSection}>
-                <div
-                  style={
-                    styles.detailSectionHeader
-                  }
-                >
-                  <h3
-                    style={
-                      styles.detailSectionTitle
-                    }
-                  >
-                    Work Experience
-                  </h3>
-
-                  <span
-                    style={
-                      styles.detailCountBadge
-                    }
-                  >
-                    {
-                      selectedCandidate
-                        .experienceHistory.length
-                    }
-                  </span>
-                </div>
-
-                {selectedCandidate.experienceHistory
-                  .length > 0 ? (
-                  <div style={styles.timelineList}>
-                    {selectedCandidate.experienceHistory.map(
-                      (experience) => (
-                        <div
-                          key={experience.id}
-                          style={
-                            styles.timelineItem
-                          }
-                        >
-                          <div
-                            style={
-                              styles.timelineDot
-                            }
-                          />
-
-                          <div
-                            style={
-                              styles.timelineContent
-                            }
-                          >
-                            <strong
-                              style={
-                                styles.timelineTitle
-                              }
-                            >
-                              {experience.jobTitle ||
-                                "Position"}
-                            </strong>
-
-                            <div
-                              style={
-                                styles.timelineMeta
-                              }
-                            >
-                              {experience.companyName ||
-                                "Company not provided"}
-                            </div>
-
-                            {(experience.startDate ||
-                              experience.endDate) && (
-                              <div
-                                style={
-                                  styles.timelineMeta
-                                }
-                              >
-                                {formatDate(
-                                  experience.startDate
-                                )}{" "}
-                                –{" "}
-                                {experience.endDate
-                                  ? formatDate(
-                                      experience.endDate
-                                    )
-                                  : "Present"}
-                              </div>
-                            )}
-
-                            {experience.description && (
-                              <p
-                                style={
-                                  styles.timelineDescription
-                                }
-                              >
-                                {
-                                  experience.description
-                                }
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  <p style={styles.detailMuted}>
-                    No work experience has been recorded.
-                  </p>
-                )}
-              </section>
-
-              <section style={styles.detailSection}>
-                <div
-                  style={
-                    styles.detailSectionHeader
-                  }
-                >
-                  <h3
-                    style={
-                      styles.detailSectionTitle
-                    }
-                  >
-                    Application
-                  </h3>
-
-                  <span
-                    style={
-                      styles.applicationStageBadge
-                    }
-                  >
-                    {selectedPipelineCandidate?.stage ||
-                      "sourced"}
-                  </span>
-                </div>
-
-                <div
-                  style={
-                    styles.applicationContext
-                  }
-                >
-                  <div>
-                    <span style={styles.detailLabel}>
-                      Applied role
-                    </span>
-
-                    <strong
-                      style={styles.detailValue}
-                    >
-                      {selectedPipelineCandidate?.jobTitle ||
-                        "Job application"}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span style={styles.detailLabel}>
-                      Applied
-                    </span>
-
-                    <strong
-                      style={styles.detailValue}
-                    >
-                      {formatDate(
-                        selectedPipelineCandidate?.appliedAt
+              </div>
+            ) : (
+              <div
+                style={{
+                  ...styles.profilePanel,
+                  ...(isProfileExpanded
+                    ? {
+                        position: "fixed",
+                        inset: 12,
+                        zIndex: 10000,
+                        width: "auto",
+                        height: "auto",
+                        maxHeight: "calc(100vh - 24px)",
+                        border: "1px solid #D4D2E6",
+                        borderRadius: 13,
+                        background: "#FFFFFF",
+                        boxShadow: "0 0 0 100vmax rgba(0, 20, 35, 0.72), 0 18px 60px rgba(0,0,0,0.25)",
+                      }
+                    : {}),
+                }}
+                role={isProfileExpanded ? "dialog" : undefined}
+                aria-modal={isProfileExpanded ? true : undefined}
+                aria-label={isProfileExpanded ? `${candidate.name} expanded profile` : undefined}
+              >
+                <header style={styles.profileHeader}>
+                  <div style={styles.profileHeading}>
+                    <div style={styles.profileAvatar}>
+                      {candidate.media.facePhoto ? (
+                        <img
+                          src={candidate.media.facePhoto}
+                          alt={`${candidate.name} profile`}
+                          style={styles.profileAvatarImage}
+                        />
+                      ) : (
+                        candidate.name.charAt(0).toUpperCase()
                       )}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span style={styles.detailLabel}>
-                      Application ID
-                    </span>
-
-                    <strong
-                      style={styles.detailValue}
-                    >
-                      {selectedPipelineCandidate?.applicationId ||
-                        "Not available"}
-                    </strong>
-                  </div>
-                </div>
-              </section>
-
-              <section style={styles.detailSection}>
-                <div
-                  style={
-                    styles.detailSectionHeader
-                  }
-                >
-                  <h3
-                    style={
-                      styles.detailSectionTitle
-                    }
-                  >
-                    Candidate Documents & Gallery
-                  </h3>
-
-                  <span
-                    style={
-                      styles.detailCountBadge
-                    }
-                  >
-                    {
-                      selectedCandidate.media
-                        .documents.length
-                    }{" "}
-                    docs
-                  </span>
-                </div>
-
-                <div style={styles.mediaCardWide}>
-                  <div
-                    style={
-                      styles.mediaCardHeader
-                    }
-                  >
-                    <div>
-                      <span
-                        style={
-                          styles.mediaCardTitle
-                        }
-                      >
-                        Uploaded documents
-                      </span>
-
-                      <span style={styles.mediaMeta}>
-                        CV, certificates, identification and other
-                        candidate documents will appear here as
-                        they are uploaded.
-                      </span>
                     </div>
 
-                    <span
-                      style={
-                        styles.detailCountBadge
-                      }
-                    >
-                      {
-                        selectedCandidate.media
-                          .documents.length
-                      }
-                    </span>
+                    <div style={styles.profileHeadingText}>
+                      <span style={styles.eyebrow}>CANDIDATE PROFILE</span>
+                      <h2 style={styles.profileName}>{candidate.name}</h2>
+                      <p style={styles.profileRole}>
+                        {candidate.headline || application.role || "Professional"}
+                      </p>
+                      <div style={styles.profileBadges}>
+                        <span
+                          style={
+                            candidate.verified
+                              ? styles.verifiedStatus
+                              : styles.unverifiedStatus
+                          }
+                        >
+                          {candidate.verified ? "✓ Verified" : "Not verified"}
+                        </span>
+                        <span style={styles.categoryBadge}>
+                          {application.category || "Uncategorised"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {selectedCandidate.media.documents
-                    .length > 0 ? (
-                    <div
-                      style={
-                        styles.documentList
-                      }
+                  <div style={styles.profileHeaderActions}>
+                    <button
+                      type="button"
+                      style={styles.expandProfileButton}
+                      onClick={() => setIsProfileExpanded((expanded) => !expanded)}
+                      aria-label={isProfileExpanded ? "Close expanded candidate profile" : "Expand candidate profile"}
+                      title={isProfileExpanded ? "Close expanded profile (Esc)" : "Expand profile"}
                     >
-                      {selectedCandidate.media.documents.map(
-                        (document) => (
-                          <div
-                            key={document.id}
-                            style={
-                              styles.documentCard
-                            }
-                          >
-                            <div
-                              style={
-                                styles.documentIcon
-                              }
-                            >
-                              DOC
-                            </div>
+                      {isProfileExpanded ? "✕ Close" : "⛶ Expand profile"}
+                    </button>
+                    
+                    <button
+                     type="button"
+                     style={styles.interviewButton}
+                     disabled={
+                    messagingCandidateId === application.applicationId
+                       }
+                     onClick={() => void handleMessageCandidate(application)}
+                    >
+                    {messagingCandidateId === application.applicationId
+                    ? "Sending message..."
+                    : "Message candidate"}
+                    </button>
+                    {renderStageActions(application, true)}
 
-                            <div
-                              style={
-                                styles.documentInfo
-                              }
-                            >
-                              <strong
-                                style={
-                                  styles.documentName
-                                }
-                              >
+                    
+                  </div>
+                </header>
+
+                {loadingDetails && (
+                  <div style={styles.loadingNotice}>
+                    Loading the complete candidate profile…
+                  </div>
+                )}
+
+                <div style={styles.profileContent}>
+                  <div style={styles.quickFacts}>
+                    {[
+                      ["Location", candidate.location || "Not provided"],
+                      ["Email", candidate.email || "Not provided"],
+                      ["Phone", candidate.phone || "Not provided"],
+                      [
+                        "Experience",
+                        `${candidate.yearsExperience ?? 0} ${
+                          candidate.yearsExperience === 1 ? "year" : "years"
+                        }`,
+                      ],
+                      [
+                        "Profile completion",
+                        candidate.profileCompletion != null
+                          ? `${candidate.profileCompletion}%`
+                          : "Not available",
+                      ],
+                      ["Applied role", application.jobTitle || "Job application"],
+                    ].map(([label, value]) => (
+                      <div key={label} style={styles.factCard}>
+                        <span style={styles.factLabel}>{label}</span>
+                        <strong style={styles.factValue}>{value}</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  {renderProfileSection(
+                    "Introduction Reel",
+                    candidate.media.reelMeta?.dataUrl ? (
+                      <div style={styles.mediaCard}>
+                        <video
+                          key={`${candidate.id}-${candidate.media.reelMeta.dataUrl}`}
+                          src={candidate.media.reelMeta.dataUrl}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          style={styles.reel}
+                        />
+                        <div style={styles.mediaMeta}>
+                          {candidate.media.reelMeta.fileName ||
+                            "Candidate introduction video"}
+                          {candidate.media.reelMeta.fileSize
+                            ? ` · ${candidate.media.reelMeta.fileSize}`
+                            : ""}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={styles.mediaPlaceholder}>
+                        No introduction reel has been uploaded.
+                      </div>
+                    )
+                  )}
+
+                  {renderProfileSection(
+                    "Profile Photos",
+                    <div style={styles.photoGrid}>
+                      <div style={styles.photoCard}>
+                        <h4 style={styles.photoTitle}>Profile photo</h4>
+                        {candidate.media.facePhoto ? (
+                          <img
+                            src={candidate.media.facePhoto}
+                            alt={`${candidate.name} profile`}
+                            style={styles.profilePhoto}
+                          />
+                        ) : (
+                          <div style={styles.mediaPlaceholder}>
+                            No profile photo uploaded.
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={styles.photoCard}>
+                        <h4 style={styles.photoTitle}>Full-body photo</h4>
+                        {candidate.media.fullBodyPhoto ? (
+                          <img
+                            src={candidate.media.fullBodyPhoto}
+                            alt={`${candidate.name} full body`}
+                            style={styles.fullBodyPhoto}
+                          />
+                        ) : (
+                          <div style={styles.mediaPlaceholder}>
+                            No full-body photo uploaded.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {renderProfileSection(
+                    "Professional Summary",
+                    <p style={styles.summaryText}>
+                      {candidate.bio ||
+                        "No professional summary has been provided."}
+                    </p>
+                  )}
+
+                  {renderProfileSection(
+                    "Skills",
+                    candidate.skills.length > 0 ? (
+                      <div style={styles.detailSkills}>
+                        {candidate.skills.map((skill, index) => (
+                          <div
+                            key={`${skill.name}-${index}`}
+                            style={styles.detailSkill}
+                          >
+                            <strong>{skill.name}</strong>
+                            {skill.proficiency && (
+                              <small>{skill.proficiency}</small>
+                            )}
+                            {skill.yearsUsed != null && (
+                              <small>
+                                {skill.yearsUsed}{" "}
+                                {skill.yearsUsed === 1 ? "year" : "years"}
+                              </small>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={styles.mutedText}>No skills provided.</p>
+                    ),
+                    candidate.skills.length
+                  )}
+
+                  {renderProfileSection(
+                    "Qualifications",
+                    candidate.qualifications.length > 0 ? (
+                      <div style={styles.timeline}>
+                        {candidate.qualifications.map((qualification) => (
+                          <article
+                            key={qualification.id}
+                            style={styles.timelineItem}
+                          >
+                            <span style={styles.timelineDot} />
+                            <div style={styles.timelineContent}>
+                              <strong style={styles.timelineTitle}>
+                                {qualification.qualificationName ||
+                                  "Qualification"}
+                              </strong>
+                              <p style={styles.timelineMeta}>
+                                {qualification.institution ||
+                                  "Institution not provided"}
+                              </p>
+                              {qualification.fieldOfStudy && (
+                                <p style={styles.timelineMeta}>
+                                  Field: {qualification.fieldOfStudy}
+                                </p>
+                              )}
+                              {(qualification.startYear ||
+                                qualification.completionYear) && (
+                                <p style={styles.timelineMeta}>
+                                  {qualification.startYear || "—"} –{" "}
+                                  {qualification.completionYear || "Present"}
+                                </p>
+                              )}
+                              {qualification.verificationStatus && (
+                                <span style={styles.statusTag}>
+                                  {formatVerificationStatus(
+                                    qualification.verificationStatus
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={styles.mutedText}>
+                        No qualifications have been recorded.
+                      </p>
+                    ),
+                    candidate.qualifications.length
+                  )}
+
+                  {renderProfileSection(
+                    "Work History",
+                    candidate.experienceHistory.length > 0 ? (
+                      <div style={styles.timeline}>
+                        {candidate.experienceHistory.map((experience) => (
+                          <article
+                            key={experience.id}
+                            style={styles.timelineItem}
+                          >
+                            <span style={styles.timelineDot} />
+                            <div style={styles.timelineContent}>
+                              <strong style={styles.timelineTitle}>
+                                {experience.jobTitle || "Position"}
+                              </strong>
+                              <p style={styles.timelineMeta}>
+                                {experience.companyName ||
+                                  "Company not provided"}
+                              </p>
+                              {(experience.startDate ||
+                                experience.endDate) && (
+                                <p style={styles.timelineMeta}>
+                                  {formatDate(experience.startDate)} –{" "}
+                                  {experience.endDate
+                                    ? formatDate(experience.endDate)
+                                    : "Present"}
+                                </p>
+                              )}
+                              {experience.description && (
+                                <p style={styles.descriptionText}>
+                                  {experience.description}
+                                </p>
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={styles.mutedText}>
+                        No work history has been recorded.
+                      </p>
+                    ),
+                    candidate.experienceHistory.length
+                  )}
+
+                  {renderProfileSection(
+                    "Portfolio Projects",
+                    candidate.media.projects.length > 0 ? (
+                      <div style={styles.projectGrid}>
+                        {candidate.media.projects.map((project) => (
+                          <article
+                            key={project.id}
+                            style={styles.projectCard}
+                          >
+                            <div style={styles.projectHeader}>
+                              <strong>
+                                {project.name || "Portfolio project"}
+                              </strong>
+                              {project.status && (
+                                <span style={styles.projectStatus}>
+                                  {project.status}
+                                </span>
+                              )}
+                            </div>
+                            <p>
+                              {project.desc ||
+                                "No project description provided."}
+                            </p>
+                            {project.tech && (
+                              <small>{project.tech}</small>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={styles.mutedText}>
+                        No portfolio projects have been recorded.
+                      </p>
+                    ),
+                    candidate.media.projects.length
+                  )}
+
+                  {renderProfileSection(
+                    "Documents",
+                    candidate.media.documents.length > 0 ? (
+                      <div style={styles.documentList}>
+                        {candidate.media.documents.map((document) => (
+                          <article
+                            key={document.id}
+                            style={styles.documentCard}
+                          >
+                            <div style={styles.documentIcon}>DOC</div>
+                            <div style={styles.documentInfo}>
+                              <strong>
                                 {document.name ||
                                   document.fileName ||
                                   "Candidate document"}
                               </strong>
-
-                              <span
-                                style={
-                                  styles.documentMeta
-                                }
-                              >
+                              <span style={styles.documentMeta}>
                                 {document.fileName ||
                                   "File name not provided"}
                                 {document.fileSize
                                   ? ` · ${document.fileSize}`
                                   : ""}
                               </span>
-
                               <span
                                 style={
-                                  document.status
-                                    ?.toLowerCase() ===
-                                  "verified"
+                                  document.status?.toLowerCase() === "verified"
                                     ? styles.documentVerified
                                     : styles.documentPending
                                 }
                               >
-                                {formatVerificationStatus(
-                                  document.status
-                                )}
+                                {formatVerificationStatus(document.status)}
                               </span>
                             </div>
 
                             {document.dataUrl ? (
-                              <button
-                                type="button"
-                                style={
-                                  styles.documentViewButton
-                                }
-                                onClick={() =>
-                                  setSelectedDocument(
-                                    document
-                                  )
-                                }
+                              <a
+                                href={document.dataUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={styles.documentLink}
                               >
-                                View document
-                              </button>
+                                Open document
+                              </a>
                             ) : (
-                              <span
-                                style={
-                                  styles.detailMuted
-                                }
-                              >
+                              <span style={styles.mutedText}>
                                 File unavailable
                               </span>
                             )}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      style={
-                        styles.mediaPlaceholder
-                      }
-                    >
-                      No candidate documents have been uploaded
-                      yet.
-                    </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={styles.mutedText}>
+                        No candidate documents have been uploaded.
+                      </p>
+                    ),
+                    candidate.media.documents.length
                   )}
-                </div>
 
-                <div style={styles.mediaCardWide}>
-                  <div
-                    style={
-                      styles.mediaCardHeader
-                    }
-                  >
-                    <div>
-                      <span
-                        style={
-                          styles.mediaCardTitle
-                        }
-                      >
-                        Profile gallery
-                      </span>
-
-                      <span style={styles.mediaMeta}>
-                        Professional, front, side, back,
-                        project and certificate images.
-                      </span>
-                    </div>
-
-                    <span
-                      style={
-                        styles.detailCountBadge
-                      }
-                    >
-                      {
-                        selectedCandidate.media
-                          .galleryImages.length
-                      }
-                    </span>
-                  </div>
-
-                  {selectedCandidate.media.galleryImages
-                    .length > 0 ? (
-                    <div
-                      style={
-                        styles.galleryGrid
-                      }
-                    >
-                      {selectedCandidate.media.galleryImages.map(
-                        (image) => (
-                          <div
-                            key={image.id}
-                            style={
-                              styles.galleryCard
-                            }
-                          >
-                            <img
-                              src={image.image || ""}
-                              alt={
-                                image.name ||
-                                "Candidate gallery image"
-                              }
-                              style={
-                                styles.galleryPreview
-                              }
-                            />
-
-                            <div
-                              style={
-                                styles.galleryCaption
-                              }
-                            >
-                              <strong>
-                                {image.name ||
-                                  "Gallery image"}
-                              </strong>
-
-                              <span>
-                                {image.category ||
-                                  "Uncategorised"}
-                              </span>
+                  {renderProfileSection(
+                    "Profile Gallery",
+                    candidate.media.galleryImages.length > 0 ? (
+                      <div style={styles.galleryGrid}>
+                        {candidate.media.galleryImages.map((image) => (
+                          <div key={image.id} style={styles.galleryCard}>
+                            {image.image ? (
+                              <img
+                                src={image.image}
+                                alt={image.name || "Candidate gallery image"}
+                                style={styles.galleryImage}
+                              />
+                            ) : (
+                              <div style={styles.mediaPlaceholder}>
+                                Image unavailable
+                              </div>
+                            )}
+                            <div style={styles.galleryCaption}>
+                              <strong>{image.name || "Gallery image"}</strong>
+                              <span>{image.category || "Uncategorised"}</span>
                             </div>
                           </div>
-                        )
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      style={
-                        styles.mediaPlaceholder
-                      }
-                    >
-                      No gallery images have been uploaded yet.
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={styles.mutedText}>
+                        No gallery images have been uploaded.
+                      </p>
+                    ),
+                    candidate.media.galleryImages.length
+                  )}
+
+                  {renderProfileSection(
+                   "Application Question Responses",
+                    loadingApplicationResponses ? (
+                    <div style={styles.responseNotice}>
+                    Loading application answers…
+                  </div>
+                   ) : applicationResponsesError ? (
+                  <div style={styles.responseError}>
+                  <p style={styles.responseErrorText}>
+                  {applicationResponsesError}
+                  </p>
+                 <button
+                 type="button"
+                 style={styles.responseRetryButton}
+                  onClick={() => setResponsesRetryKey((current) => current + 1)}
+                 >
+                 Try again
+                 </button>
+                 </div>
+                 ) : applicationResponses.length > 0 ? (
+                  <div style={styles.responseList}>
+                  {applicationResponses.map((item, index) => {
+                   const question =
+                   item.questionText || item.question || "Application question";
+
+                   
+                    const answer =
+                    item.answerText ??
+                    item.answer ??
+                    item.response ??
+                    item.answerJson;
+
+                    const formattedAnswer =
+                    answer == null
+                    ? ""
+                    : typeof answer === "string"
+                    ? answer
+                    : JSON.stringify(answer, null, 2);
+
+
+                return (
+                <article
+               key={item.id ?? `${application?.applicationId}-${index}`}
+               style={styles.responseCard}
+               >
+                <div style={styles.responseNumber}>
+                Question {index + 1}
+               </div>
+
+            <strong style={styles.responseQuestion}>
+              {question}
+            </strong>
+
+            {item.questionType && (
+              <span style={styles.responseType}>
+                {formatVerificationStatus(item.questionType)}
+              </span>
+            )}
+
+            
+              <p style={styles.responseAnswer}>
+               {formattedAnswer.trim()
+               ? formattedAnswer
+               : "No answer provided."}
+              </p>
+
+             </article>
+              );
+                 })}
+              </div>
+          ) : (
+              <div style={styles.responseNotice}>
+           No application-question responses were found for this application.
+            </div>
+          ),
+         applicationResponses.length
+          )}
+
+
+                  
+{renderProfileSection(
+  "CV Submitted With This Application",
+  loadingApplicationResume ? (
+    <div style={styles.responseNotice}>
+      Loading the CV submitted for this application…
+    </div>
+  ) : applicationResumeError ? (
+    <div style={styles.responseError}>
+      <p style={styles.responseErrorText}>
+        {applicationResumeError}
+      </p>
+
+      <button
+        type="button"
+        style={styles.responseRetryButton}
+        onClick={() => setResumeRetryKey((current) => current + 1)}
+      >
+        Try again
+      </button>
+    </div>
+  ) : applicationResume?.resume &&
+    Object.keys(applicationResume.resume).length > 0 ? (
+    <div
+      style={{
+        padding: 14,
+        border: "1px solid #D4D2E6",
+        borderRadius: 10,
+        background: "#F8FCFF",
+      }}
+    >
+      <div style={{ marginBottom: 12 }}>
+        <strong style={{ color: "#00273D", fontSize: 12 }}>
+          Application CV
+        </strong>
+
+        <p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 10 }}>
+          This is the resume snapshot associated with this specific application.
+        </p>
+      </div>
+
+      <ResumeValue value={applicationResume.resume} />
+    </div>
+  ) : (
+    <div style={styles.responseNotice}>
+      No saved CV snapshot was found for this application.
+      The candidate may have submitted an older application or one without
+      a saved resume.
+    </div>
+  )
+)}
+
+                  {renderProfileSection(                   
+                    "Application Details",
+                    <div style={styles.applicationDetails}>
+                      <div>
+                        <span style={styles.factLabel}>Application stage</span>
+                        <strong style={styles.factValue}>
+                          {formatVerificationStatus(application.stage)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={styles.factLabel}>Applied on</span>
+                        <strong style={styles.factValue}>
+                          {formatDate(application.appliedAt)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={styles.factLabel}>Application ID</span>
+                        <strong style={styles.factValue}>
+                          {application.applicationId}
+                        </strong>
+                      </div>
                     </div>
                   )}
+
+                  {renderProfileSection(
+                    "Availability",
+                    <p style={styles.summaryText}>
+                      {candidate.media.preferences?.availability
+                        ? formatVerificationStatus(
+                            candidate.media.preferences.availability
+                          )
+                        : "Not provided"}
+                    </p>
+                  )}
                 </div>
-              </section>
-
-              <section style={styles.detailSection}>
-                <div
-                  style={
-                    styles.detailSectionHeader
-                  }
-                >
-                  <h3
-                    style={
-                      styles.detailSectionTitle
-                    }
-                  >
-                    Portfolio Projects
-                  </h3>
-
-                  <span
-                    style={
-                      styles.detailCountBadge
-                    }
-                  >
-                    {
-                      selectedCandidate.media
-                        .projects.length
-                    }
-                  </span>
-                </div>
-
-                {selectedCandidate.media.projects
-                  .length > 0 ? (
-                  <div style={styles.projectGrid}>
-                    {selectedCandidate.media.projects.map(
-                      (project) => (
-                        <article
-                          key={project.id}
-                          style={
-                            styles.projectCard
-                          }
-                        >
-                          <div
-                            style={
-                              styles.projectCardTop
-                            }
-                          >
-                            <strong>
-                              {project.name ||
-                                "Portfolio project"}
-                            </strong>
-
-                            <span>
-                              {project.status ||
-                                "Not specified"}
-                            </span>
-                          </div>
-
-                          <p>
-                            {project.desc ||
-                              "No project description provided."}
-                          </p>
-
-                          <small>
-                            {project.tech ||
-                              "Technology not specified"}
-                          </small>
-                        </article>
-                      )
-                    )}
-                  </div>
-                ) : (
-                  <p style={styles.detailMuted}>
-                    No portfolio projects have been recorded.
-                  </p>
-                )}
-              </section>
-
-              <section style={styles.detailSection}>
-                <div
-                  style={
-                    styles.detailSectionHeader
-                  }
-                >
-                  <h3
-                    style={
-                      styles.detailSectionTitle
-                    }
-                  >
-                    Availability
-                  </h3>
-                </div>
-
-                <div
-                  style={styles.detailParagraph}
-                >
-                  {selectedCandidate.media
-                    .preferences?.availability
-                    ? formatVerificationStatus(
-                        selectedCandidate.media
-                          .preferences.availability
-                      )
-                    : "Not provided"}
-                </div>
-              </section>
-            </div>
-
-            <div style={styles.modalActionBar}>
-              {selectedPipelineCandidate &&
-                renderStageActions(
-                  selectedPipelineCandidate,
-                  true
-                )}
-            </div>
-
-            <div style={styles.modalFooter}>
-              <div>
-                <span
-                  style={
-                    styles.modalFooterLabel
-                  }
-                >
-                  Candidate ID
-                </span>
-
-                <span
-                  style={
-                    styles.modalFooterValue
-                  }
-                >
-                  {selectedCandidate.id}
-                </span>
               </div>
-
-              <button
-                type="button"
-                style={
-                  styles.closePrimaryButton
-                }
-                onClick={closeCandidateView}
-                disabled={Boolean(
-                  viewingCandidateId
-                )}
-              >
-                Close Profile
-              </button>
-            </div>
-          </div>
+            )}
+          </main>
         </div>
       )}
 
       {selectedDocument && (
-        <div
-          style={styles.documentOverlay}
-          onClick={() =>
-            setSelectedDocument(null)
-          }
-        >
-          <div
-            style={styles.documentViewer}
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+        <div style={styles.documentInlineNotice}>
+          Selected document:{" "}
+          {selectedDocument.name ||
+            selectedDocument.fileName ||
+            "Candidate document"}
+          <button
+            type="button"
+            style={styles.dismissButton}
+            onClick={() => setSelectedDocument(null)}
           >
-            <div
-              style={
-                styles.documentViewerHeader
-              }
-            >
-              <div>
-                <span
-                  style={styles.modalEyebrow}
-                >
-                  DOCUMENT VIEWER
-                </span>
-
-                <h3
-                  style={
-                    styles.documentViewerTitle
-                  }
-                >
-                  {selectedDocument.name ||
-                    selectedDocument.fileName ||
-                    "Candidate document"}
-                </h3>
-              </div>
-
-              <button
-                type="button"
-                style={
-                  styles.modalCloseButton
-                }
-                onClick={() =>
-                  setSelectedDocument(null)
-                }
-                aria-label="Close document viewer"
-              >
-                ×
-              </button>
-            </div>
-
-            <div
-              style={
-                styles.documentViewerBody
-              }
-            >
-              {selectedDocument.dataUrl?.startsWith(
-                "data:image/"
-              ) ? (
-                <img
-                  src={
-                    selectedDocument.dataUrl
-                  }
-                  alt={
-                    selectedDocument.name ||
-                    "Candidate document"
-                  }
-                  style={
-                    styles.documentViewerImage
-                  }
-                />
-              ) : (
-                <iframe
-                  title={
-                    selectedDocument.name ||
-                    "Candidate document"
-                  }
-                  src={
-                    selectedDocument.dataUrl ||
-                    "about:blank"
-                  }
-                  style={
-                    styles.documentViewerFrame
-                  }
-                />
-              )}
-            </div>
-          </div>
+            Dismiss
+          </button>
         </div>
       )}
     </div>
@@ -2551,153 +1832,126 @@ export default function Pipeline() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     width: "100%",
-    maxWidth: "1400px",
-    fontFamily: "Helvetica, Arial, sans-serif",
+    maxWidth: 1600,
     margin: "0 auto",
+    fontFamily: "Helvetica, Arial, sans-serif",
+    color: "#334155",
   },
 
-  header: {
+  pageHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: "30px",
-    marginBottom: "22px",
+    flexWrap: "wrap",
+    gap: 22,
+    marginBottom: 20,
   },
 
   eyebrow: {
     display: "inline-flex",
-    padding: "5px 10px",
-    borderRadius: "999px",
+    padding: "5px 9px",
+    borderRadius: 999,
     background: "#EAF6FD",
     border: "1px solid #B7DCEC",
     color: "#00466D",
-    fontSize: "9px",
+    fontSize: 9,
     fontWeight: 800,
-    letterSpacing: "0.8px",
+    letterSpacing: "0.7px",
   },
 
-  title: {
-    margin: "12px 0 5px",
+  pageTitle: {
+    margin: "10px 0 5px",
     color: "#00273D",
-    fontSize: "29px",
+    fontSize: 28,
     fontWeight: 800,
-    letterSpacing: "-0.7px",
+    letterSpacing: "-0.6px",
   },
 
-  subtitle: {
+  pageSubtitle: {
+    maxWidth: 690,
     margin: 0,
-    maxWidth: "700px",
     color: "#64748B",
-    fontSize: "13px",
+    fontSize: 12,
     lineHeight: 1.6,
   },
 
   summaryGrid: {
     display: "flex",
-    gap: "10px",
-    flexShrink: 0,
+    flexWrap: "wrap",
+    gap: 9,
   },
 
   summaryCard: {
-    minWidth: "105px",
-    padding: "12px 15px",
-    borderRadius: "12px",
-    background: "rgba(255,255,255,0.90)",
-    border: "1px solid rgba(148,163,184,0.20)",
-    boxShadow: "0 6px 20px rgba(15,23,42,0.04)",
-  },
-
-  summaryCardYellow: {
-    background: "#FFF9E6",
-    border: "1px solid rgba(250,204,21,0.30)",
-  },
-
-  summaryNumber: {
-    display: "block",
-    color: "#00273D",
-    fontSize: "21px",
-    fontWeight: 700,
-  },
-
-  summaryLabel: {
-    display: "block",
-    marginTop: "3px",
-    color: "#64748B",
-    fontSize: "9px",
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.4px",
+    minWidth: 94,
+    padding: "12px 14px",
+    borderRadius: 11,
+    border: "1px solid #D4D2E6",
+    background: "#FFFFFF",
+    boxShadow: "0 5px 16px rgba(15,23,42,0.04)",
   },
 
   workflow: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
-    marginBottom: "22px",
-    padding: "13px 16px",
-    background: "rgba(255,255,255,0.78)",
-    border: "1px solid rgba(148,163,184,0.18)",
-    borderRadius: "13px",
-    boxShadow: "0 6px 20px rgba(15,23,42,0.035)",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 18,
+    padding: "12px 15px",
+    border: "1px solid #D4D2E6",
+    borderRadius: 12,
+    background: "#FFFFFF",
   },
 
   workflowStep: {
-    flex: 1,
-    minWidth: 0,
     display: "flex",
     alignItems: "center",
-    gap: "9px",
-    padding: "8px",
-    borderRadius: "9px",
-  },
-
-  workflowActive: {
-    background: "#EAF6FD",
+    gap: 8,
+    color: "#334155",
+    fontSize: 11,
   },
 
   workflowNumber: {
-    width: "27px",
-    height: "27px",
-    display: "flex",
+    width: 27,
+    height: 27,
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
     borderRadius: "50%",
     background: "#DDEFF8",
     color: "#00466D",
-    fontSize: "11px",
-    fontWeight: 700,
+    fontWeight: 800,
   },
 
   workflowArrow: {
-    color: "#D4D2E6",
-    fontSize: "18px",
-    fontWeight: 700,
+    color: "#94A3B8",
+    fontWeight: 800,
   },
 
   viewTabs: {
     display: "flex",
-    gap: "5px",
-    padding: "5px",
-    marginBottom: "20px",
+    flexWrap: "wrap",
+    gap: 5,
+    padding: 5,
+    marginBottom: 17,
     width: "fit-content",
     maxWidth: "100%",
-    background: "rgba(241,245,249,0.80)",
     border: "1px solid #D4D2E6",
-    borderRadius: "11px",
+    borderRadius: 11,
+    background: "#F1F5F9",
   },
 
   viewTab: {
     display: "flex",
     alignItems: "center",
-    gap: "7px",
-    padding: "9px 13px",
+    gap: 7,
+    padding: "9px 12px",
     border: "none",
-    borderRadius: "8px",
+    borderRadius: 7,
     background: "transparent",
     color: "#64748B",
-    fontSize: "11px",
-    fontWeight: 700,
+    fontSize: 10,
+    fontWeight: 800,
     cursor: "pointer",
   },
 
@@ -2708,720 +1962,829 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   tabCount: {
-    minWidth: "19px",
-    height: "19px",
+    minWidth: 19,
+    padding: "3px 5px",
+    borderRadius: 5,
+    background: "#EAF6FD",
+    color: "#00466D",
+    textAlign: "center",
+    fontSize: 9,
+  },
+
+  workspace: {
+    display: "grid",
+    gridTemplateColumns: "minmax(290px, 0.85fr) minmax(0, 1.7fr)",
+    // Stretch both panels to a common height so each panel can scroll independently.
+    alignItems: "stretch",
+    gap: 16,
+    minWidth: 0,
+  },
+
+  leftPanel: {
+    minWidth: 0,
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    border: "1px solid #D4D2E6",
+    borderRadius: 13,
+    background: "#FFFFFF",
+    boxShadow: "0 6px 20px rgba(15,23,42,0.04)",
+  },
+
+  panelHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: "12px 13px",
+    flexShrink: 0,
+    borderBottom: "1px solid #E9E8F3",
+    background: "#FFFFFF",
+  },
+
+  panelTitle: {
+    margin: 0,
+    color: "#00273D",
+    fontSize: 14,
+    fontWeight: 800,
+  },
+
+  panelSubtitle: {
+    margin: "3px 0 0",
+    color: "#64748B",
+    fontSize: 10,
+    lineHeight: 1.4,
+  },
+
+  panelCount: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "0 5px",
-    borderRadius: "6px",
+    minWidth: 26,
+    height: 26,
+    padding: "0 7px",
+    borderRadius: 7,
     background: "#EAF6FD",
     color: "#00466D",
-    fontSize: "9px",
-    fontWeight: 700,
-  },
-
-  yellowTabCount: {
-    background: "#FFD784",
-    color: "#00466D",
-  },
-
-  rejectedTabCount: {
-    background: "#FFF1F4",
-    color: "#A61B3C",
-  },
-
-  sectionHeader: {
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: "20px",
-    marginBottom: "15px",
-  },
-
-  sectionTitle: {
-    margin: 0,
-    color: "#00273D",
-    fontSize: "18px",
+    fontSize: 10,
     fontWeight: 800,
   },
 
-  sectionDescription: {
-    margin: "4px 0 0",
-    color: "#64748B",
-    fontSize: "11px",
-  },
-
-  sectionCount: {
-    padding: "6px 10px",
-    borderRadius: "7px",
-    background: "#EAF6FD",
-    color: "#00466D",
-    fontSize: "9px",
-    fontWeight: 800,
-  },
-
-  shortlistHeaderBadge: {
-    padding: "7px 11px",
-    borderRadius: "8px",
-    background: "#FFD784",
-    border: "1px solid rgba(250,204,21,0.30)",
-    color: "#00466D",
-    fontSize: "9px",
-    fontWeight: 800,
-  },
-
-  rejectedHeaderBadge: {
-    padding: "7px 11px",
-    borderRadius: "8px",
-    background: "#FFF1F4",
-    border: "1px solid rgba(239,68,68,0.20)",
-    color: "#A61B3C",
-    fontSize: "9px",
-    fontWeight: 800,
+  leftPanelContent: {
+    flex: "1 1 auto",
+    height: 0,
+    maxHeight: "calc(100vh - 300px)",
+    minHeight: 300,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    padding: 7,
+    background: "#F8FCFF",
   },
 
   groups: {
     display: "flex",
     flexDirection: "column",
-    gap: "13px",
+    gap: 7,
   },
 
   group: {
     overflow: "hidden",
-    background: "rgba(255,255,255,0.86)",
-    border: "1px solid rgba(148,163,184,0.20)",
-    borderRadius: "14px",
-    boxShadow: "0 7px 24px rgba(15,23,42,0.04)",
+    border: "1px solid #D4D2E6",
+    borderRadius: 10,
+    background: "#FFFFFF",
   },
 
   groupHeader: {
     width: "100%",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-    padding: "15px 17px",
+    gap: 7,
+    padding: "8px 8px",
     border: "none",
     background: "#FFFFFF",
-    cursor: "pointer",
     textAlign: "left",
-  },
-
-  groupHeaderLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: "11px",
-    minWidth: 0,
+    cursor: "pointer",
   },
 
   groupIcon: {
-    width: "38px",
-    height: "38px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
+    width: 26,
+    height: 26,
     flexShrink: 0,
-    borderRadius: "10px",
-    background: "#DDEFF8",
-    color: "#00466D",
-    fontSize: "13px",
-    fontWeight: 700,
-  },
-
-  groupTitleRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "7px",
-  },
-
-  groupTitle: {
-    margin: 0,
-    color: "#00273D",
-    fontSize: "14px",
-    fontWeight: 800,
-  },
-
-  groupCount: {
-    minWidth: "20px",
-    height: "20px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "0 6px",
-    borderRadius: "6px",
-    background: "#EAF6FD",
+    borderRadius: 7,
+    background: "#DDEFF8",
     color: "#00466D",
-    fontSize: "9px",
-    fontWeight: 700,
-  },
-
-  groupDescription: {
-    margin: "3px 0 0",
-    color: "#94A3B8",
-    fontSize: "10px",
-  },
-
-  groupHeaderRight: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    flexShrink: 0,
-  },
-
-  groupShortlistBadge: {
-    padding: "5px 8px",
-    borderRadius: "6px",
-    background: "#FFD784",
-    color: "#00466D",
-    fontSize: "9px",
+    fontSize: 10,
     fontWeight: 800,
   },
 
-  rejectedGroupBadge: {
-    padding: "5px 8px",
-    borderRadius: "6px",
-    background: "#FFF1F4",
-    color: "#A61B3C",
-    fontSize: "9px",
+  groupHeaderText: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    flex: 1,
+    minWidth: 0,
+  },
+
+  groupTitle: {
+    color: "#00273D",
+    fontSize: 11,
+    lineHeight: 1.25,
+    overflowWrap: "anywhere",
+  },
+
+  groupDescription: {
+    color: "#94A3B8",
+    fontSize: 9,
+    lineHeight: 1.25,
+  },
+
+  groupCount: {
+    padding: "3px 5px",
+    borderRadius: 5,
+    background: "#FFD784",
+    color: "#00466D",
+    fontSize: 9,
     fontWeight: 800,
   },
 
   expandIcon: {
-    display: "inline-flex",
-    transition: "transform 0.2s ease",
     color: "#64748B",
-    fontSize: "15px",
+    fontSize: 15,
+    fontWeight: 700,
   },
 
-  simpleGroupHeader: {
+  groupCandidates: {
     display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-    padding: "15px 17px",
-    borderBottom: "1px solid #E9E8F3",
-  },
-
-  groupBody: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fill,minmax(300px,1fr))",
-    gap: "12px",
-    padding: "13px",
-    background: "rgba(248,250,252,0.55)",
+    flexDirection: "column",
+    gap: 5,
+    padding: "0 5px 5px",
   },
 
   candidateCard: {
+    display: "block",
+    width: "100%",
     minWidth: 0,
-    padding: "15px",
-    background: "rgba(255,255,255,0.97)",
-    border: "1px solid rgba(148,163,184,0.18)",
-    borderRadius: "12px",
-    boxShadow: "0 5px 18px rgba(15,23,42,0.035)",
+    padding: 7,
+    border: "1px solid #E2E8F0",
+    borderRadius: 8,
+    background: "#FFFFFF",
+    textAlign: "left",
+    cursor: "pointer",
+    color: "#334155",
+    transition: "border-color 0.15s ease, background 0.15s ease",
   },
 
-  cardTop: {
+  candidateCardSelected: {
+    border: "1px solid #1E92D2",
+    background: "#EAF6FD",
+    boxShadow: "inset 3px 0 0 #00466D",
+  },
+
+  candidateCardTop: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: 7,
+    minWidth: 0,
   },
 
   avatar: {
-    width: "39px",
-    height: "39px",
-    display: "flex",
+    width: 30,
+    height: 30,
+    flexShrink: 0,
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
-    borderRadius: "10px",
+    borderRadius: 8,
     background: "#00466D",
     color: "#FFFFFF",
-    fontSize: "14px",
-    fontWeight: 700,
-    boxShadow: "0 5px 13px rgba(29,78,216,0.15)",
+    fontSize: 11,
+    fontWeight: 800,
   },
 
-  identity: {
+  candidateIdentity: {
+    flex: 1,
     minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
   },
 
   nameRow: {
     display: "flex",
     alignItems: "center",
-    gap: "5px",
+    flexWrap: "wrap",
+    gap: 4,
+    minWidth: 0,
+    lineHeight: 1.25,
   },
 
-  name: {
-    margin: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    color: "#334155",
-    fontSize: "13px",
-    fontWeight: 800,
+  candidateName: {
+    color: "#00273D",
+    fontSize: 10,
+    lineHeight: 1.3,
+    overflowWrap: "anywhere",
   },
 
-  verified: {
-    width: "15px",
-    height: "15px",
+  candidateRole: {
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 1.3,
+    overflowWrap: "anywhere",
+  },
+
+  verifiedBadge: {
+    width: 14,
+    height: 14,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
     borderRadius: "50%",
     background: "#FFAD01",
     color: "#00273D",
-    fontSize: "8px",
-    fontWeight: 700,
+    fontSize: 8,
+    fontWeight: 900,
   },
 
-  role: {
-    margin: "3px 0 0",
-    color: "#64748B",
-    fontSize: "10px",
-  },
-
-  appliedJob: {
-    margin: "4px 0 0",
-    color: "#94A3B8",
-    fontSize: "9px",
-    lineHeight: 1.35,
-  },
-
-  details: {
-    display: "flex",
+  selectedDot: {
+    width: 19,
+    height: 19,
+    flexShrink: 0,
+    display: "inline-flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: "8px",
-    marginTop: "13px",
-  },
-
-  category: {
-    padding: "4px 7px",
-    borderRadius: "6px",
-    background: "#EAF6FD",
-    color: "#00466D",
-    fontSize: "8px",
+    justifyContent: "center",
+    borderRadius: "50%",
+    background: "#00466D",
+    color: "#FFFFFF",
+    fontSize: 9,
     fontWeight: 800,
   },
 
-  experience: {
-    color: "#64748B",
-    fontSize: "9px",
-    fontWeight: 600,
-  },
-
-  skills: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "5px",
-    marginTop: "11px",
-  },
-
-  skill: {
-    padding: "4px 6px",
-    borderRadius: "5px",
-    background: "#F8FCFF",
+  unselectedDot: {
+    width: 19,
+    height: 19,
+    flexShrink: 0,
     border: "1px solid #D4D2E6",
-    color: "#64748B",
-    fontSize: "8px",
-    fontWeight: 600,
+    borderRadius: "50%",
   },
 
-  cardFooter: {
+  candidateMeta: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "8px",
-    marginTop: "13px",
-    paddingTop: "11px",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 6,
+  },
+
+  categoryBadge: {
+    display: "inline-flex",
+    width: "fit-content",
+    padding: "3px 5px",
+    borderRadius: 5,
+    background: "#EAF6FD",
+    color: "#00466D",
+    fontSize: 8,
+    fontWeight: 800,
+  },
+
+  experienceText: {
+    color: "#64748B",
+    fontSize: 9,
+  },
+
+  appliedFor: {
+    marginTop: 5,
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 1.3,
+    overflowWrap: "anywhere",
+  },
+
+  skillsRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 3,
+    marginTop: 5,
+  },
+
+  skillChip: {
+    padding: "2px 4px",
+    border: "1px solid #D4D2E6",
+    borderRadius: 4,
+    background: "#F8FCFF",
+    color: "#64748B",
+    fontSize: 8,
+    lineHeight: 1.3,
+  },
+
+  candidateCardFooter: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 6,
+    paddingTop: 5,
     borderTop: "1px solid #E9E8F3",
   },
 
   reviewBadge: {
-    color: "#94A3B8",
-    fontSize: "9px",
-    fontWeight: 700,
+    color: "#8A6500",
+    fontSize: 8,
+    fontWeight: 800,
   },
 
   shortlistedBadge: {
     color: "#00466D",
-    fontSize: "9px",
+    fontSize: 8,
+    fontWeight: 800,
+  },
+
+  offerStageBadge: {
+    color: "#16804A",
+    fontSize: 8,
+    fontWeight: 800,
+  },
+
+  interviewStageBadge: {
+    color: "#1E92D2",
+    fontSize: 8,
     fontWeight: 800,
   },
 
   rejectedBadge: {
     color: "#A61B3C",
-    fontSize: "9px",
+    fontSize: 8,
     fontWeight: 800,
   },
 
-  cardActions: {
+  applicationDate: {
+    color: "#94A3B8",
+    fontSize: 8,
+  },
+
+  updatingText: {
+    display: "block",
+    marginTop: 5,
+    color: "#00466D",
+    fontSize: 9,
+  },
+
+  rightPanel: {
+    minWidth: 0,
+    minHeight: 400,
+    height: "calc(100vh - 300px)",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    border: "1px solid #D4D2E6",
+    borderRadius: 13,
+    background: "#FFFFFF",
+    boxShadow: "0 6px 20px rgba(15,23,42,0.04)",
+  },
+
+  profileEmptyState: {
+    flex: "1 1 auto",
+    minHeight: 400,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 35,
+    textAlign: "center",
+  },
+
+  emptyProfileIcon: {
+    width: 54,
+    height: 54,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    borderRadius: 15,
+    background: "#EAF6FD",
+    fontSize: 23,
+  },
+
+  profileEmptyTitle: {
+    margin: "0 0 7px",
+    color: "#00273D",
+    fontSize: 19,
+    fontWeight: 800,
+  },
+
+  profileEmptyText: {
+    maxWidth: 440,
+    margin: 0,
+    color: "#64748B",
+    fontSize: 12,
+    lineHeight: 1.7,
+  },
+
+  emptyStageHint: {
+    marginTop: 14,
+    color: "#94A3B8",
+    fontSize: 10,
+  },
+
+  profilePanel: {
+    display: "flex",
+    flexDirection: "column",
+    flex: "1 1 auto",
+    minWidth: 0,
+    minHeight: 0,
+    height: "100%",
+    overflow: "hidden",
+  },
+
+  profileHeader: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 15,
+    padding: 18,
+    flexShrink: 0,
+    borderBottom: "1px solid #E9E8F3",
+    background: "#FFFFFF",
+  },
+
+  profileHeading: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
+    gap: 13,
+    flex: "1 1 250px",
+    minWidth: 0,
   },
 
-  viewButton: {
-    padding: "7px 9px",
-    borderRadius: "7px",
-    border: "1px solid #D4D2E6",
-    background: "#FFFFFF",
-    color: "#334155",
-    fontSize: "9px",
+  profileAvatar: {
+    width: 65,
+    height: 65,
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: 14,
+    background: "#00466D",
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: 800,
+  },
+
+  profileAvatarImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+
+  profileHeadingText: {
+    minWidth: 0,
+  },
+
+  profileName: {
+    margin: "5px 0 3px",
+    color: "#00273D",
+    fontSize: 21,
+    fontWeight: 800,
+    overflowWrap: "anywhere",
+  },
+
+  profileRole: {
+    margin: 0,
+    color: "#64748B",
+    fontSize: 11,
+    overflowWrap: "anywhere",
+  },
+
+  profileBadges: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+
+  verifiedStatus: {
+    padding: "4px 7px",
+    borderRadius: 5,
+    background: "#E9FFF4",
+    color: "#16804A",
+    fontSize: 8,
+    fontWeight: 800,
+  },
+
+  unverifiedStatus: {
+    padding: "4px 7px",
+    borderRadius: 5,
+    background: "#FFF9E6",
+    color: "#8A6500",
+    fontSize: 8,
+    fontWeight: 800,
+  },
+
+  profileHeaderActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+
+  expandProfileButton: {
+    padding: "8px 10px",
+    border: "1px solid #B7DCEC",
+    borderRadius: 7,
+    background: "#EAF6FD",
+    color: "#00466D",
+    fontSize: 10,
     fontWeight: 800,
     cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+
+  compactAction: {
+    padding: "8px 9px",
+    fontSize: 9,
   },
 
   shortlistButton: {
     padding: "7px 9px",
-    borderRadius: "7px",
     border: "1px solid #B7DCEC",
+    borderRadius: 7,
     background: "#EAF6FD",
     color: "#00466D",
-    fontSize: "9px",
+    fontSize: 9,
     fontWeight: 800,
     cursor: "pointer",
   },
 
-  removeShortlistButton: {
+  removeButton: {
+    padding: "7px 9px",
+    border: "1px solid #FFD784",
+    borderRadius: 7,
     background: "#FFFFFF",
-    borderColor: "#FFD784",
     color: "#00466D",
+    fontSize: 9,
+    fontWeight: 800,
+    cursor: "pointer",
   },
 
   interviewButton: {
-    padding: "7px 10px",
+    padding: "7px 9px",
     border: "none",
-    borderRadius: "7px",
+    borderRadius: 7,
     background: "#00466D",
     color: "#FFFFFF",
-    fontSize: "9px",
+    fontSize: 9,
     fontWeight: 800,
     cursor: "pointer",
-    boxShadow: "0 4px 10px rgba(29,78,216,0.15)",
   },
 
   rejectButton: {
     padding: "7px 9px",
-    borderRadius: "7px",
     border: "1px solid #FFB7C5",
+    borderRadius: 7,
     background: "#FFF1F4",
     color: "#A61B3C",
-    fontSize: "9px",
+    fontSize: 9,
     fontWeight: 800,
     cursor: "pointer",
   },
 
   offerButton: {
-    padding: "7px 10px",
+    padding: "7px 9px",
     border: "none",
-    borderRadius: "7px",
+    borderRadius: 7,
     background: "#FFAD01",
     color: "#00273D",
-    fontSize: "9px",
+    fontSize: 9,
     fontWeight: 800,
     cursor: "pointer",
-    boxShadow: "0 4px 10px rgba(255,173,1,0.18)",
   },
 
-  disabledButton: {
-    opacity: 0.55,
-    cursor: "not-allowed",
-  },
-
-  cardHint: {
-    marginTop: "10px",
-    padding: "7px 9px",
-    borderRadius: "6px",
-    background: "#F8FCFF",
-    color: "#94A3B8",
-    fontSize: "8px",
-    lineHeight: 1.4,
-  },
-
-  applicationMeta: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "8px",
-    marginTop: "9px",
-    color: "#D4D2E6",
-    fontSize: "8px",
-  },
-
-  emptyState: {
-    minHeight: "270px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center",
-    padding: "35px",
-    background: "rgba(255,255,255,0.78)",
-    border: "1px solid rgba(148,163,184,0.18)",
-    borderRadius: "14px",
-  },
-
-  emptyIcon: {
-    width: "45px",
-    height: "45px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: "10px",
-    borderRadius: "50%",
-    background: "#DDEFF8",
-    color: "#00466D",
-    fontSize: "19px",
-    fontWeight: 700,
-  },
-
-  loadingCard: {
-    minHeight: "300px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "rgba(255,255,255,0.78)",
-    borderRadius: "15px",
-    color: "#64748B",
-  },
-
-  loadingCircle: {
-    width: "31px",
-    height: "31px",
-    marginBottom: "10px",
-    borderRadius: "50%",
-    border: "3px solid #DDEFF8",
-    borderTopColor: "#00466D",
-  },
-
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 1000,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-    background: "rgba(15,23,42,0.56)",
-    backdropFilter: "blur(4px)",
-  },
-
-  modal: {
-    width: "min(960px,100%)",
-    maxHeight: "92vh",
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-    borderRadius: "18px",
-    background: "#FFFFFF",
-    boxShadow: "0 24px 70px rgba(15,23,42,0.20)",
-  },
-
-  modalHeader: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "20px",
-    padding: "22px 24px",
-    borderBottom: "1px solid #E9E8F3",
-    background: "#FFFFFF",
-  },
-
-  modalIdentity: {
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-    minWidth: 0,
-  },
-
-  modalAvatar: {
-    width: "54px",
-    height: "54px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    borderRadius: "14px",
-    background: "#00466D",
-    color: "#FFFFFF",
-    fontSize: "20px",
-    fontWeight: 700,
-    overflow: "hidden",
-  },
-
-  modalEyebrow: {
-    color: "#00466D",
-    fontSize: "9px",
-    fontWeight: 700,
-    letterSpacing: "1px",
-  },
-
-  modalTitle: {
-    margin: "4px 0 2px",
-    color: "#00273D",
-    fontSize: "23px",
-    fontWeight: 700,
-  },
-
-  modalRole: {
-    margin: 0,
-    color: "#64748B",
-    fontSize: "11px",
-  },
-
-  modalCloseButton: {
-    width: "34px",
-    height: "34px",
-    flexShrink: 0,
-    border: "1px solid #D4D2E6",
-    borderRadius: "9px",
-    background: "#FFFFFF",
-    color: "#64748B",
-    fontSize: "22px",
-    lineHeight: 1,
-    cursor: "pointer",
-  },
-
-  modalBody: {
-    overflowY: "auto",
-    padding: "22px 24px",
-  },
-
-  detailLoading: {
-    marginBottom: "12px",
+  loadingNotice: {
+    margin: "12px 16px 0",
     padding: "9px 11px",
-    borderRadius: "8px",
+    flexShrink: 0,
+    borderRadius: 7,
     background: "#EAF6FD",
     color: "#00466D",
-    fontSize: "10px",
+    fontSize: 10,
     fontWeight: 700,
   },
 
-  detailGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit,minmax(180px,1fr))",
-    gap: "9px",
+  profileContent: {
+    display: "flex",
+    flexDirection: "column",
+    flex: "1 1 auto",
+    minHeight: 0,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    gap: 0,
+    padding: "16px 18px 22px",
   },
 
-  detailCard: {
-    padding: "11px 12px",
+  quickFacts: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))",
+    gap: 8,
+    marginBottom: 4,
+  },
+
+  factCard: {
+    minWidth: 0,
+    padding: "10px 11px",
     border: "1px solid #D4D2E6",
-    borderRadius: "10px",
+    borderRadius: 9,
     background: "#F8FCFF",
   },
 
-  detailLabel: {
+  factLabel: {
     display: "block",
-    marginBottom: "4px",
+    marginBottom: 5,
     color: "#94A3B8",
-    fontSize: "8px",
+    fontSize: 8,
     fontWeight: 800,
     textTransform: "uppercase",
-    letterSpacing: "0.6px",
+    letterSpacing: "0.5px",
   },
 
-  detailValue: {
+  factValue: {
     display: "block",
     color: "#334155",
-    fontSize: "11px",
-    lineHeight: 1.35,
-    wordBreak: "break-word",
+    fontSize: 10,
+    lineHeight: 1.45,
+    overflowWrap: "anywhere",
   },
 
-  detailSection: {
-    marginTop: "22px",
+  profileSection: {
+    marginTop: 20,
+    flexShrink: 0,
   },
 
-  detailSectionHeader: {
+  profileSectionHeader: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "10px",
-    marginBottom: "10px",
+    gap: 10,
+    marginBottom: 10,
   },
 
-  detailSectionTitle: {
+  profileSectionTitle: {
     margin: 0,
     color: "#00273D",
-    fontSize: "14px",
-    fontWeight: 700,
+    fontSize: 13,
+    fontWeight: 800,
   },
 
-  detailCountBadge: {
-    minWidth: "22px",
-    height: "22px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0 6px",
-    borderRadius: "7px",
+  countBadge: {
+    minWidth: 22,
+    padding: "4px 6px",
+    borderRadius: 6,
     background: "#EAF6FD",
     color: "#00466D",
-    fontSize: "9px",
-    fontWeight: 700,
+    textAlign: "center",
+    fontSize: 9,
+    fontWeight: 800,
   },
 
-  detailParagraph: {
+  mediaCard: {
+    minWidth: 0,
+    padding: 11,
+    border: "1px solid #D4D2E6",
+    borderRadius: 10,
+    background: "#FFFFFF",
+  },
+
+  reel: {
+    display: "block",
+    width: "100%",
+    maxHeight: 350,
+    borderRadius: 8,
+    background: "#00273D",
+  },
+
+  mediaMeta: {
+    marginTop: 7,
+    color: "#94A3B8",
+    fontSize: 9,
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
+  },
+
+  photoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+    gap: 10,
+  },
+
+  photoCard: {
+    minWidth: 0,
+    padding: 10,
+    border: "1px solid #D4D2E6",
+    borderRadius: 10,
+    background: "#FFFFFF",
+  },
+
+  photoTitle: {
+    margin: "0 0 9px",
+    color: "#334155",
+    fontSize: 10,
+    fontWeight: 800,
+  },
+
+  profilePhoto: {
+    display: "block",
+    width: "100%",
+    height: 210,
+    objectFit: "cover",
+    borderRadius: 8,
+    background: "#F1F5F9",
+  },
+
+  fullBodyPhoto: {
+    display: "block",
+    width: "100%",
+    height: 260,
+    objectFit: "contain",
+    borderRadius: 8,
+    background: "#F8FCFF",
+  },
+
+  mediaPlaceholder: {
+    minHeight: 100,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 8,
+    background: "#F8FCFF",
+    color: "#94A3B8",
+    fontSize: 10,
+    lineHeight: 1.5,
+    textAlign: "center",
+  },
+
+  summaryText: {
     margin: 0,
-    padding: "12px 13px",
-    borderRadius: "9px",
+    padding: 12,
+    borderRadius: 9,
     background: "#F8FCFF",
     color: "#64748B",
-    fontSize: "11px",
-    lineHeight: 1.6,
+    fontSize: 11,
+    lineHeight: 1.7,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
 
   detailSkills: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "7px",
+    gap: 7,
   },
 
   detailSkill: {
-    display: "inline-flex",
-    flexDirection: "column",
-    gap: "2px",
-    padding: "7px 9px",
-    borderRadius: "8px",
-    background: "#F8FCFF",
-    border: "1px solid #D4D2E6",
-    color: "#334155",
-    fontSize: "9px",
-  },
-
-  detailMuted: {
-    margin: 0,
-    color: "#94A3B8",
-    fontSize: "10px",
-  },
-
-  timelineList: {
     display: "flex",
     flexDirection: "column",
-    gap: "13px",
+    gap: 4,
+    padding: "8px 10px",
+    border: "1px solid #D4D2E6",
+    borderRadius: 8,
+    background: "#F8FCFF",
+    color: "#334155",
+    fontSize: 10,
+  },
+
+  mutedText: {
+    margin: 0,
+    color: "#94A3B8",
+    fontSize: 10,
+    lineHeight: 1.6,
+  },
+
+  timeline: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 9,
   },
 
   timelineItem: {
     display: "flex",
-    gap: "10px",
-    padding: "12px",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 12,
     border: "1px solid #E9E8F3",
-    borderRadius: "10px",
+    borderRadius: 9,
     background: "#FFFFFF",
   },
 
   timelineDot: {
-    width: "10px",
-    height: "10px",
+    width: 9,
+    height: 9,
     flexShrink: 0,
-    marginTop: "4px",
+    marginTop: 4,
     borderRadius: "50%",
     background: "#00466D",
     boxShadow: "0 0 0 4px #EAF6FD",
@@ -3429,410 +2792,359 @@ const styles: Record<string, React.CSSProperties> = {
 
   timelineContent: {
     minWidth: 0,
+    flex: 1,
   },
 
   timelineTitle: {
     display: "block",
     color: "#334155",
-    fontSize: "11px",
+    fontSize: 11,
+    lineHeight: 1.5,
+    overflowWrap: "anywhere",
   },
 
   timelineMeta: {
-    marginTop: "3px",
+    margin: "4px 0 0",
     color: "#64748B",
-    fontSize: "9px",
-  },
-
-  timelineStatus: {
-    display: "inline-flex",
-    marginTop: "7px",
-    padding: "4px 6px",
-    borderRadius: "6px",
-    background: "#FFD784",
-    color: "#00466D",
-    fontSize: "8px",
-    fontWeight: 800,
-  },
-
-  timelineDescription: {
-    margin: "8px 0 0",
-    color: "#64748B",
-    fontSize: "10px",
+    fontSize: 9,
     lineHeight: 1.5,
   },
 
-  modalAvatarImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    borderRadius: "14px",
-  },
-
-  applicationStageBadge: {
-    padding: "5px 8px",
-    borderRadius: "7px",
-    background: "#EAF6FD",
+  statusTag: {
+    display: "inline-block",
+    marginTop: 7,
+    padding: "4px 6px",
+    borderRadius: 5,
+    background: "#FFD784",
     color: "#00466D",
-    fontSize: "8px",
+    fontSize: 8,
     fontWeight: 800,
-    textTransform: "uppercase",
   },
 
-  applicationContext: {
+  descriptionText: {
+    margin: "8px 0 0",
+    color: "#64748B",
+    fontSize: 10,
+    lineHeight: 1.6,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+  },
+
+  projectGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit,minmax(180px,1fr))",
-    gap: "9px",
-    padding: "11px 12px",
-    border: "1px solid #D4D2E6",
-    borderRadius: "10px",
-    background: "#F8FCFF",
+    gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
+    gap: 9,
   },
 
-  mediaOverviewGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit,minmax(240px,1fr))",
-    gap: "12px",
-  },
-
-  mediaCard: {
+  projectCard: {
     minWidth: 0,
-    padding: "12px",
+    padding: 11,
     border: "1px solid #D4D2E6",
-    borderRadius: "11px",
+    borderRadius: 9,
     background: "#FFFFFF",
   },
 
-  mediaCardWide: {
-    marginTop: "12px",
-    padding: "12px",
-    border: "1px solid #D4D2E6",
-    borderRadius: "11px",
-    background: "#FFFFFF",
-  },
-
-  mediaCardHeader: {
+  projectHeader: {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: "10px",
-    marginBottom: "10px",
-  },
-
-  mediaCardTitle: {
-    display: "block",
+    gap: 8,
     color: "#334155",
-    fontSize: "10px",
-    fontWeight: 800,
+    fontSize: 10,
+    overflowWrap: "anywhere",
   },
 
-  mediaMeta: {
-    display: "block",
-    marginTop: "3px",
-    color: "#94A3B8",
-    fontSize: "8px",
-    lineHeight: 1.4,
+  projectStatus: {
+    flexShrink: 0,
+    padding: "3px 5px",
+    borderRadius: 5,
+    background: "#EAF6FD",
+    color: "#00466D",
+    fontSize: 8,
   },
 
-  mediaPresent: {
-    padding: "4px 6px",
-    borderRadius: "6px",
-    background: "#E9FFF4",
-    color: "#16804A",
-    fontSize: "8px",
-    fontWeight: 800,
-  },
-
-  mediaMissing: {
-    padding: "4px 6px",
-    borderRadius: "6px",
-    background: "#F1F5F9",
-    color: "#94A3B8",
-    fontSize: "8px",
-    fontWeight: 800,
-  },
-
-  mediaPlaceholder: {
-    minHeight: "100px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "18px",
-    borderRadius: "9px",
-    background: "#F8FCFF",
-    color: "#94A3B8",
-    fontSize: "9px",
-    textAlign: "center",
-  },
-
-  profilePhotoPreview: {
-    width: "100%",
-    height: "190px",
-    objectFit: "cover",
-    borderRadius: "9px",
-    background: "#F1F5F9",
-  },
-
-  fullBodyPreview: {
-    width: "100%",
-    height: "190px",
-    objectFit: "contain",
-    borderRadius: "9px",
-    background: "#F8FCFF",
-  },
-
-  reelPreview: {
-    width: "100%",
-    maxHeight: "340px",
-    borderRadius: "9px",
-    background: "#00273D",
+  projectCardParagraph: {
+    color: "#64748B",
+    fontSize: 10,
+    lineHeight: 1.5,
   },
 
   documentList: {
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: 8,
   },
 
   documentCard: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
-    padding: "10px",
+    flexWrap: "wrap",
+    gap: 10,
+    padding: 10,
     border: "1px solid #E9E8F3",
-    borderRadius: "9px",
+    borderRadius: 9,
     background: "#F8FCFF",
   },
 
   documentIcon: {
-    width: "34px",
-    height: "34px",
-    display: "flex",
+    width: 33,
+    height: 33,
+    flexShrink: 0,
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
-    borderRadius: "8px",
+    borderRadius: 8,
     background: "#DDEFF8",
     color: "#00466D",
-    fontSize: "8px",
+    fontSize: 8,
     fontWeight: 800,
   },
 
   documentInfo: {
-    minWidth: 0,
-    flex: 1,
     display: "flex",
+    flex: "1 1 130px",
+    minWidth: 0,
     flexDirection: "column",
-    gap: "3px",
-  },
-
-  documentName: {
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    gap: 4,
     color: "#334155",
-    fontSize: "10px",
+    fontSize: 10,
+    overflowWrap: "anywhere",
   },
 
   documentMeta: {
     color: "#94A3B8",
-    fontSize: "8px",
+    fontSize: 8,
   },
 
   documentVerified: {
     width: "fit-content",
     padding: "3px 5px",
-    borderRadius: "5px",
+    borderRadius: 5,
     background: "#E9FFF4",
     color: "#16804A",
-    fontSize: "7px",
+    fontSize: 8,
     fontWeight: 800,
   },
 
   documentPending: {
     width: "fit-content",
     padding: "3px 5px",
-    borderRadius: "5px",
+    borderRadius: 5,
     background: "#FFF9E6",
     color: "#8A6500",
-    fontSize: "7px",
+    fontSize: 8,
     fontWeight: 800,
   },
 
-  documentViewButton: {
+  documentLink: {
+    display: "inline-block",
     padding: "7px 9px",
     border: "1px solid #B7DCEC",
-    borderRadius: "7px",
+    borderRadius: 7,
     background: "#FFFFFF",
     color: "#00466D",
-    fontSize: "8px",
+    fontSize: 9,
     fontWeight: 800,
-    cursor: "pointer",
+    textDecoration: "none",
   },
 
   galleryGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fill,minmax(130px,1fr))",
-    gap: "9px",
+    gridTemplateColumns: "repeat(auto-fill,minmax(125px,1fr))",
+    gap: 9,
   },
 
   galleryCard: {
+    minWidth: 0,
     overflow: "hidden",
     border: "1px solid #E9E8F3",
-    borderRadius: "9px",
+    borderRadius: 9,
     background: "#F8FCFF",
   },
 
-  galleryPreview: {
-    width: "100%",
-    height: "120px",
-    objectFit: "cover",
+  galleryImage: {
     display: "block",
+    width: "100%",
+    height: 125,
+    objectFit: "cover",
   },
 
   galleryCaption: {
     display: "flex",
     flexDirection: "column",
-    gap: "2px",
-    padding: "7px",
+    gap: 4,
+    padding: 8,
+    color: "#334155",
+    fontSize: 9,
+    overflowWrap: "anywhere",
   },
 
-  projectGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit,minmax(220px,1fr))",
-    gap: "9px",
-  },
-
-  projectCard: {
-    padding: "11px",
-    border: "1px solid #E9E8F3",
-    borderRadius: "9px",
-    background: "#FFFFFF",
-  },
-
-  projectCardTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "8px",
-  },
-
-  documentOverlay: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 1100,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-    background: "rgba(15,23,42,0.72)",
-    backdropFilter: "blur(4px)",
-  },
-
-  documentViewer: {
-    width: "min(1050px,100%)",
-    height: "min(90vh,800px)",
+  
+  responseList: {
     display: "flex",
     flexDirection: "column",
-    overflow: "hidden",
-    borderRadius: "16px",
+    gap: 9,
+  },
+
+  responseCard: {
+    padding: 12,
+    border: "1px solid #D4D2E6",
+    borderRadius: 9,
     background: "#FFFFFF",
-    boxShadow: "0 24px 70px rgba(15,23,42,0.28)",
   },
 
-  documentViewerHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "15px",
-    padding: "15px 18px",
-    borderBottom: "1px solid #E9E8F3",
-  },
-
-  documentViewerTitle: {
-    margin: "4px 0 0",
-    color: "#00273D",
-    fontSize: "16px",
+  responseNumber: {
+    marginBottom: 7,
+    color: "#1E92D2",
+    fontSize: 9,
     fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.4px",
   },
 
-  documentViewerBody: {
-    flex: 1,
-    minHeight: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "14px",
-    background: "#F1F5F9",
+  responseQuestion: {
+    display: "block",
+    color: "#00273D",
+    fontSize: 11,
+    lineHeight: 1.6,
+    overflowWrap: "anywhere",
   },
 
-  documentViewerImage: {
-    maxWidth: "100%",
-    maxHeight: "100%",
-    objectFit: "contain",
-    borderRadius: "8px",
+  responseType: {
+    display: "inline-block",
+    marginTop: 6,
+    padding: "3px 6px",
+    borderRadius: 5,
+    background: "#EAF6FD",
+    color: "#00466D",
+    fontSize: 8,
+    fontWeight: 700,
+  },
+
+  responseAnswer: {
+    margin: "9px 0 0",
+    padding: 10,
+    borderRadius: 7,
+    background: "#F8FCFF",
+    color: "#475569",
+    fontSize: 10,
+    lineHeight: 1.7,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+  },
+
+  responseNotice: {
+    padding: 12,
+    border: "1px solid #D4D2E6",
+    borderRadius: 8,
+    background: "#F8FCFF",
+    color: "#64748B",
+    fontSize: 10,
+    lineHeight: 1.6,
+  },
+
+  responseError: {
+    padding: 12,
+    border: "1px solid #FFB7C5",
+    borderRadius: 8,
+    background: "#FFF1F4",
+  },
+
+  responseErrorText: {
+    margin: "0 0 9px",
+    color: "#A61B3C",
+    fontSize: 10,
+    lineHeight: 1.6,
+  },
+
+  responseRetryButton: {
+    padding: "7px 10px",
+    border: "1px solid #B7DCEC",
+    borderRadius: 7,
     background: "#FFFFFF",
+    color: "#00466D",
+    fontSize: 9,
+    fontWeight: 800,
+    cursor: "pointer",
   },
 
-  documentViewerFrame: {
-    width: "100%",
-    height: "100%",
-    border: "none",
-    borderRadius: "8px",
-    background: "#FFFFFF",
-  },
 
-  modalActionBar: {
-    display: "flex",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: "8px",
-    padding: "14px 24px",
-    borderTop: "1px solid #E9E8F3",
-    background: "#FFFFFF",
-  },
-
-  modalActionButton: {
-    minWidth: "105px",
-    padding: "9px 12px",
-    fontSize: "10px",
-  },
-
-  modalFooter: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "15px",
-    padding: "14px 24px",
-    borderTop: "1px solid #E9E8F3",
+  applicationDetails: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+    gap: 9,
+    padding: 12,
+    border: "1px solid #D4D2E6",
+    borderRadius: 9,
     background: "#F8FCFF",
   },
 
-  modalFooterLabel: {
-    display: "block",
-    color: "#94A3B8",
-    fontSize: "8px",
-    fontWeight: 800,
-    textTransform: "uppercase",
-  },
-
-  modalFooterValue: {
-    display: "block",
-    marginTop: "2px",
+  documentInlineNotice: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 12,
+    padding: 10,
+    border: "1px solid #D4D2E6",
+    borderRadius: 8,
+    background: "#FFFFFF",
     color: "#64748B",
-    fontSize: "9px",
+    fontSize: 10,
   },
 
-  closePrimaryButton: {
-    padding: "9px 14px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#00466D",
-    color: "#FFFFFF",
-    fontSize: "10px",
-    fontWeight: 800,
+  dismissButton: {
+    padding: "5px 8px",
+    border: "1px solid #D4D2E6",
+    borderRadius: 6,
+    background: "#FFFFFF",
+    color: "#00466D",
+    fontSize: 9,
     cursor: "pointer",
+  },
+
+  emptyState: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 8,
+    padding: "24px 12px",
+    color: "#64748B",
+    textAlign: "center",
+    fontSize: 11,
+  },
+
+  emptyIcon: {
+    width: 35,
+    height: 35,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+    background: "#EAF6FD",
+    color: "#00466D",
+    fontSize: 16,
+  },
+
+  loadingState: {
+    minHeight: 260,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    border: "1px solid #D4D2E6",
+    borderRadius: 13,
+    background: "#FFFFFF",
+    color: "#64748B",
+    fontSize: 11,
+  },
+
+  loadingCircle: {
+    width: 29,
+    height: 29,
+    border: "3px solid #DDEFF8",
+    borderTopColor: "#00466D",
+    borderRadius: "50%",
   },
 };

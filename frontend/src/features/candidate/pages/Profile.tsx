@@ -12,6 +12,7 @@ import {
   Code2,
   FileCheck2,
   FileText,
+  ExternalLink,
   Image,
   Mail,
   MapPin,
@@ -51,6 +52,7 @@ interface DocItem {
   fileName?: string;
   fileSize?: string;
   dataUrl?: string;
+  storagePath?: string;
 }
 
 interface ProjectItem {
@@ -75,15 +77,16 @@ interface IntroReelMeta {
   fileSize: string;
   uploadedAt: string;
   dataUrl?: string;
+  storagePath?: string;
+  url?: string;
+  publicUrl?: string;
+  videoUrl?: string;
 }
 
 type GalleryImageCategory =
-  | 'front'
-  | 'side'
-  | 'back'
+  | 'close-up'
+  | 'full-body'
   | 'professional'
-  | 'project'
-  | 'certificate'
   | 'other';
 
 interface GalleryImage {
@@ -157,6 +160,40 @@ function fileToDataUrl(file: File) {
 
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Resolves a playable intro reel URL from the metadata returned
+ * by the backend.
+ *
+ * A storage path such as "candidate-id/video.mp4" is not a
+ * playable URL by itself. The backend should return a public
+ * or signed URL in one of the URL fields below.
+ */
+function getPlayableReelUrl(
+  reel: IntroReelMeta | null | undefined,
+): string | null {
+  if (!reel) {
+    return null;
+  }
+
+  const candidates = [
+    reel.dataUrl,
+    reel.videoUrl,
+    reel.publicUrl,
+    reel.url,
+    reel.storagePath,
+  ];
+
+  return (
+    candidates.find(
+      (value): value is string =>
+        typeof value === 'string' &&
+        /^(https?:\/\/|data:|blob:)/i.test(
+          value.trim(),
+        ),
+    ) ?? null
+  );
 }
 
 function createGalleryId() {
@@ -269,46 +306,80 @@ export function Profile({
           `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() ||
             'Candidate',
         );
+
         setProfileHeadline(
           profile.headline?.trim() ||
             'Professional profile',
         );
+
         setProfileLocation(
           profile.location?.trim() ||
             'Location not provided',
         );
 
         setFacePhoto(media.facePhoto ?? null);
+
         setGalleryImages(
-          Array.isArray(media.galleryImages)
-            ? media.galleryImages
-            : [],
-        );
+  Array.isArray(media.galleryImages)
+    ? media.galleryImages.map((image) => {
+        const legacyCategory =
+          image.category as string;
+
+        let category: GalleryImageCategory;
+
+        if (
+          legacyCategory === 'front' ||
+          legacyCategory === 'side' ||
+          legacyCategory === 'back' ||
+          legacyCategory === 'full-body'
+        ) {
+          category = 'full-body';
+        } else if (
+          legacyCategory === 'professional' ||
+          legacyCategory === 'close-up'
+        ) {
+          category = 'close-up';
+        } else {
+          category = 'other';
+        }
+
+        return {
+          ...image,
+          category,
+        };
+      })
+    : [],
+);
+
         setDocs(
           Array.isArray(media.documents)
             ? media.documents
             : [],
         );
+
         setProjects(
           Array.isArray(media.projects)
             ? media.projects
             : [],
         );
-        setReelMeta(media.reelMeta ?? null);
 
-        if (media.reelMeta?.dataUrl) {
-          setReelPreviewUrl(media.reelMeta.dataUrl);
-        }
+        // Load the saved reel metadata and resolve its playable URL.
+        const savedReel = media.reelMeta ?? null;
 
+        setReelMeta(savedReel);
+        setReelPreviewUrl(
+          getPlayableReelUrl(savedReel),
+        );
       } catch (error) {
-        console.error('Unable to load candidate profile:', error);
+        console.error(
+          'Unable to load candidate profile:',
+          error,
+        );
+
         if (mounted) {
           setProfileError(
             'Unable to load your profile from TruCity. Please refresh and try again.',
           );
-        }
-      } finally {
-        if (mounted) {
         }
       }
     };
@@ -367,9 +438,7 @@ export function Profile({
       label: 'Gallery',
       badge:
         galleryImages.length > 0
-          ? String(
-              galleryImages.length,
-            )
+          ? String(galleryImages.length)
           : undefined,
     },
     {
@@ -423,19 +492,11 @@ export function Profile({
           profileHeadline={profileHeadline}
           profileLocation={profileLocation}
           facePhoto={facePhoto}
-          setFacePhoto={
-            setFacePhoto
-          }
+          setFacePhoto={setFacePhoto}
           reelMeta={reelMeta}
-          setReelMeta={
-            setReelMeta
-          }
-          reelPreviewUrl={
-            reelPreviewUrl
-          }
-          setReelPreviewUrl={
-            setReelPreviewUrl
-          }
+          setReelMeta={setReelMeta}
+          reelPreviewUrl={reelPreviewUrl}
+          setReelPreviewUrl={setReelPreviewUrl}
         />
 
         {/* =================================================
@@ -458,135 +519,113 @@ export function Profile({
           "
         >
           <div className="flex gap-2 overflow-x-auto">
-            {sections.map(
-              (section) => {
-                const isActive =
-                  activeTab ===
-                  section.id;
+            {sections.map((section) => {
+              const isActive =
+                activeTab === section.id;
 
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() =>
-                      setActiveTab(
-                        section.id,
-                      )
-                    }
-                    className={`
-                      flex
-                      min-h-[42px]
-                      shrink-0
-                      items-center
-                      justify-center
-                      gap-2
-                      rounded-[13px]
-                      px-4
-                      py-2.5
-                      text-[12px]
-                      font-bold
-                      transition-all
-                      duration-200
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() =>
+                    setActiveTab(section.id)
+                  }
+                  className={`
+                    flex
+                    min-h-[42px]
+                    shrink-0
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-[13px]
+                    px-4
+                    py-2.5
+                    text-[12px]
+                    font-bold
+                    transition-all
+                    duration-200
 
-                      ${
-                        isActive
-                          ? `
-                            text-white
-                            shadow-[0_7px_18px_rgba(0,70,109,0.15)]
-                          `
-                          : `
-                            text-brand-textMuted
-                            hover:bg-brand-bg
-                            hover:text-brand-primary
-                          `
-                      }
-
-                      focus-visible:outline-none
-                      focus-visible:ring-4
-                      focus-visible:ring-brand-accent/20
-                    `}
-                    style={
+                    ${
                       isActive
-                        ? {
-                            background:
-                              'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
-                          }
-                        : undefined
+                        ? `
+                          text-white
+                          shadow-[0_7px_18px_rgba(0,70,109,0.15)]
+                        `
+                        : `
+                          text-brand-textMuted
+                          hover:bg-brand-bg
+                          hover:text-brand-primary
+                        `
                     }
-                  >
-                    {section.label}
 
-                    {section.badge && (
-                      <span
-                        className={`
-                          rounded-full
-                          px-2
-                          py-0.5
-                          text-[10px]
-                          font-bold
-
-                          ${
-                            isActive
-                              ? 'bg-white/15 text-white'
-                              : 'bg-brand-accent/10 text-brand-primary'
-                          }
-                        `}
-                      >
-                        {
-                          section.badge
+                    focus-visible:outline-none
+                    focus-visible:ring-4
+                    focus-visible:ring-brand-accent/20
+                  `}
+                  style={
+                    isActive
+                      ? {
+                          background:
+                            'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)',
                         }
-                      </span>
-                    )}
-                  </button>
-                );
-              },
-            )}
+                      : undefined
+                  }
+                >
+                  {section.label}
+
+                  {section.badge && (
+                    <span
+                      className={`
+                        rounded-full
+                        px-2
+                        py-0.5
+                        text-[10px]
+                        font-bold
+
+                        ${
+                          isActive
+                            ? 'bg-white/15 text-white'
+                            : 'bg-brand-accent/10 text-brand-primary'
+                        }
+                      `}
+                    >
+                      {section.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </nav>
 
         <main className="min-h-[420px]">
-          {activeTab ===
-            'profile' && (
+          {activeTab === 'profile' && (
             <ProfileDetails />
           )}
 
-          {activeTab ===
-            'documents' && (
+          {activeTab === 'documents' && (
             <DocumentsSection
               docs={docs}
               setDocs={setDocs}
             />
           )}
 
-          {activeTab ===
-            'gallery' && (
+          {activeTab === 'gallery' && (
             <GallerySection
-              images={
-                galleryImages
-              }
-              setImages={
-                setGalleryImages
-              }
+              images={galleryImages}
+              setImages={setGalleryImages}
             />
           )}
 
-          {activeTab ===
-            'projects' && (
+          {activeTab === 'projects' && (
             <ProjectsSection
-              projects={
-                projects
-              }
-              setProjects={
-                setProjects
-              }
-              activeCount={
-                activeProjectsCount
-              }
+              projects={projects}
+              setProjects={setProjects}
+              activeCount={activeProjectsCount}
             />
           )}
 
-          {activeTab ===
-            'preferences' && (
+          {activeTab === 'preferences' && (
             <PreferencesSection />
           )}
         </main>
@@ -609,25 +648,17 @@ interface ProfileHeaderProps {
     value: string | null,
   ) => void;
 
-  reelMeta:
-    IntroReelMeta | null;
+  reelMeta: IntroReelMeta | null;
 
-  setReelMeta:
-    React.Dispatch<
-      React.SetStateAction<
-        IntroReelMeta | null
-      >
-    >;
+  setReelMeta: React.Dispatch<
+    React.SetStateAction<IntroReelMeta | null>
+  >;
 
-  reelPreviewUrl:
-    string | null;
+  reelPreviewUrl: string | null;
 
-  setReelPreviewUrl:
-    React.Dispatch<
-      React.SetStateAction<
-        string | null
-      >
-    >;
+  setReelPreviewUrl: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
 }
 
 function ProfileHeader({
@@ -642,119 +673,162 @@ function ProfileHeader({
   setReelPreviewUrl,
 }: ProfileHeaderProps) {
   const faceInputRef =
-    useRef<HTMLInputElement | null>(
-      null,
-    );
+    useRef<HTMLInputElement | null>(null);
 
   const reelInputRef =
-    useRef<HTMLInputElement | null>(
-      null,
-    );
+    useRef<HTMLInputElement | null>(null);
 
-  const handleFaceChange =
-    async (
-      event:
-        React.ChangeEvent<HTMLInputElement>,
-    ) => {
-      const file =
-        event.target.files?.[0];
-
-      if (
-        !file ||
-        !file.type.startsWith(
-          'image/',
-        )
-      ) {
-        return;
-      }
-
-      try {
-        const image =
-          await fileToDataUrl(file);
-
-        setFacePhoto(image);
-        await saveProfileMedia({
-          facePhoto: image,
-        });
-      } catch (error) {
-        console.error(
-          'Unable to update profile photo:',
-          error,
-        );
-      }
-
-      event.target.value = '';
-    };
-
-  const handleReelChange = async (
-    event:
-      React.ChangeEvent<HTMLInputElement>,
+  const handleFaceChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (
       !file ||
-      !file.type.startsWith(
-        'video/',
-      )
+      !file.type.startsWith('image/')
     ) {
       return;
     }
 
-    if (reelPreviewUrl) {
-      URL.revokeObjectURL(
-        reelPreviewUrl,
+    try {
+      const image = await fileToDataUrl(file);
+
+      setFacePhoto(image);
+
+      await saveProfileMedia({
+        facePhoto: image,
+      });
+    } catch (error) {
+      console.error(
+        'Unable to update profile photo:',
+        error,
       );
     }
-
-    const previewUrl =
-      URL.createObjectURL(file);
-
-    const dataUrl =
-      await fileToDataUrl(file);
-
-    const nextMeta: IntroReelMeta = {
-      fileName: file.name,
-      fileSize: `${(
-        file.size /
-        (1024 * 1024)
-      ).toFixed(1)} MB`,
-      uploadedAt:
-        new Date().toISOString(),
-      dataUrl,
-    };
-
-    setReelPreviewUrl(previewUrl);
-    setReelMeta(nextMeta);
-    await saveProfileMedia({
-      reelMeta: nextMeta,
-    });
 
     event.target.value = '';
   };
 
-  const handleRemoveReel =
-    async () => {
-      if (reelPreviewUrl) {
-        URL.revokeObjectURL(
-          reelPreviewUrl,
+  const handleReelChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('video/')) {
+      window.alert('Please select a valid video file.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      window.alert('Video must be smaller than 50 MB.');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post<IntroReelMeta>(
+        '/api/candidate/profile/setup/upload/reel',
+        formData,
+      );
+
+      const savedReel = response.data;
+
+      if (
+        !savedReel ||
+        typeof savedReel !== 'object'
+      ) {
+        throw new Error(
+          'The server did not return reel upload information.',
         );
       }
 
-      setReelPreviewUrl(null);
-      setReelMeta(null);
-      await api.delete(
-        `${PROFILE_MEDIA_ENDPOINT}/reel`,
+      /*
+       * Preview the selected file immediately.
+       *
+       * The server does not have to return a dataUrl specifically.
+       * It may return a public URL, signed URL or storage path.
+       * The local object URL allows the video to preview while
+       * the saved URL is resolved separately on future page loads.
+       */
+      const previewUrl = URL.createObjectURL(file);
+
+      setReelPreviewUrl((previousUrl) => {
+        if (
+          previousUrl &&
+          previousUrl.startsWith('blob:')
+        ) {
+          URL.revokeObjectURL(previousUrl);
+        }
+
+        return previewUrl;
+      });
+
+      setReelMeta({
+        ...savedReel,
+        fileName:
+          savedReel.fileName || file.name,
+        fileSize:
+          savedReel.fileSize ||
+          `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        uploadedAt:
+          savedReel.uploadedAt ||
+          new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(
+        'Unable to save intro reel:',
+        error,
       );
 
-      if (
-        reelInputRef.current
-      ) {
-        reelInputRef.current.value =
-          '';
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : 'The intro reel could not be saved. Please try again.',
+      );
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  
+const handleRemoveReel = async () => {
+  try {
+    await api.delete(
+      `${PROFILE_MEDIA_ENDPOINT}/reel`,
+    );
+
+    setReelPreviewUrl((previousUrl) => {
+      if (previousUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(previousUrl);
       }
-    };
+
+      return null;
+    });
+
+    setReelMeta(null);
+
+    if (reelInputRef.current) {
+      reelInputRef.current.value = '';
+    }
+  } catch (error) {
+    console.error(
+      'Unable to remove intro reel:',
+      error,
+    );
+
+    window.alert(
+      'The intro reel could not be removed from your saved profile. Please try again.',
+    );
+  }
+};
+
 
   return (
     <section
@@ -783,14 +857,13 @@ function ProfileHeader({
           ref={reelInputRef}
           type="file"
           accept="video/*"
-          onChange={
-            handleReelChange
-          }
+          onChange={handleReelChange}
           className="hidden"
         />
 
         {reelPreviewUrl ? (
           <video
+            key={reelPreviewUrl}
             src={reelPreviewUrl}
             autoPlay
             muted
@@ -803,6 +876,12 @@ function ProfileHeader({
               object-cover
               object-center
             "
+            onError={() => {
+              console.error(
+                'The intro reel URL could not be played:',
+                reelPreviewUrl,
+              );
+            }}
           />
         ) : (
           <div
@@ -903,9 +982,7 @@ function ProfileHeader({
           {reelMeta && (
             <button
               type="button"
-              onClick={
-                handleRemoveReel
-              }
+              onClick={handleRemoveReel}
               aria-label="Remove intro reel"
               className="
                 grid
@@ -977,9 +1054,7 @@ function ProfileHeader({
               ref={faceInputRef}
               type="file"
               accept="image/*"
-              onChange={
-                handleFaceChange
-              }
+              onChange={handleFaceChange}
               className="hidden"
             />
 
@@ -1186,8 +1261,7 @@ function ProfileDetails() {
     useState('');
 
   const handleAddSkill = () => {
-    const value =
-      newSkill.trim();
+    const value = newSkill.trim();
 
     if (
       !value ||
@@ -1212,11 +1286,9 @@ function ProfileDetails() {
   ) => {
     setForm({
       ...form,
-      skills:
-        form.skills.filter(
-          (item) =>
-            item !== skill,
-        ),
+      skills: form.skills.filter(
+        (item) => item !== skill,
+      ),
     });
   };
 
@@ -1235,6 +1307,7 @@ function ProfileDetails() {
               'Unable to save candidate profile:',
               error,
             );
+
             window.alert(
               'Your profile could not be saved. Please try again.',
             );
@@ -1285,9 +1358,7 @@ function ProfileDetails() {
           <button
             type="button"
             aria-label="Close profile editor"
-            onClick={() =>
-              setEditing(false)
-            }
+            onClick={() => setEditing(false)}
             className="
               grid
               h-9
@@ -1340,8 +1411,7 @@ function ProfileDetails() {
               onChange={(event) =>
                 setForm({
                   ...form,
-                  bio:
-                    event.target.value,
+                  bio: event.target.value,
                 })
               }
               className="
@@ -1420,15 +1490,10 @@ function ProfileDetails() {
               <input
                 value={newSkill}
                 onChange={(event) =>
-                  setNewSkill(
-                    event.target.value,
-                  )
+                  setNewSkill(event.target.value)
                 }
                 onKeyDown={(event) => {
-                  if (
-                    event.key ===
-                    'Enter'
-                  ) {
+                  if (event.key === 'Enter') {
                     event.preventDefault();
                     handleAddSkill();
                   }
@@ -1457,9 +1522,7 @@ function ProfileDetails() {
 
               <button
                 type="button"
-                onClick={
-                  handleAddSkill
-                }
+                onClick={handleAddSkill}
                 className="
                   min-h-[46px]
                   rounded-[14px]
@@ -1485,46 +1548,42 @@ function ProfileDetails() {
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {form.skills.map(
-                (skill) => (
-                  <span
-                    key={skill}
+              {form.skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="
+                    inline-flex
+                    items-center
+                    gap-2
+                    rounded-full
+                    border
+                    border-brand-accent/30
+                    bg-brand-accent/10
+                    px-3
+                    py-1.5
+                    text-[12px]
+                    font-bold
+                    text-brand-primary
+                  "
+                >
+                  {skill}
+
+                  <button
+                    type="button"
+                    aria-label={`Remove ${skill}`}
+                    onClick={() =>
+                      handleRemoveSkill(skill)
+                    }
                     className="
-                      inline-flex
-                      items-center
-                      gap-2
-                      rounded-full
-                      border
-                      border-brand-accent/30
-                      bg-brand-accent/10
-                      px-3
-                      py-1.5
-                      text-[12px]
-                      font-bold
-                      text-brand-primary
+                      text-brand-textMuted
+                      transition
+                      hover:text-brand-crimson
                     "
                   >
-                    {skill}
-
-                    <button
-                      type="button"
-                      aria-label={`Remove ${skill}`}
-                      onClick={() =>
-                        handleRemoveSkill(
-                          skill,
-                        )
-                      }
-                      className="
-                        text-brand-textMuted
-                        transition
-                        hover:text-brand-crimson
-                      "
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ),
-              )}
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -1563,18 +1622,14 @@ function ProfileDetails() {
         <section className="rounded-[24px] border border-brand-border bg-white p-5 shadow-[0_14px_34px_rgba(0,70,109,0.06)] sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
             <SectionTitle
-              icon={
-                <UserRound className="h-4 w-4" />
-              }
+              icon={<UserRound className="h-4 w-4" />}
             >
               About
             </SectionTitle>
 
             <button
               type="button"
-              onClick={() =>
-                setEditing(true)
-              }
+              onClick={() => setEditing(true)}
               className="
                 inline-flex
                 min-h-[38px]
@@ -1614,68 +1669,56 @@ function ProfileDetails() {
 
         <section className="rounded-[24px] border border-brand-border bg-white p-5 shadow-[0_14px_34px_rgba(0,70,109,0.06)] sm:p-6">
           <SectionTitle
-            icon={
-              <Code2 className="h-4 w-4" />
-            }
+            icon={<Code2 className="h-4 w-4" />}
           >
             Skills & Competencies
           </SectionTitle>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {form.skills.map(
-              (skill) => (
-                <span
-                  key={skill}
-                  className="
-                    rounded-[10px]
-                    border
-                    border-brand-border
-                    bg-brand-bg
-                    px-3
-                    py-2
-                    text-[12px]
-                    font-bold
-                    text-brand-textMuted
-                  "
-                >
-                  {skill}
-                </span>
-              ),
-            )}
+            {form.skills.map((skill) => (
+              <span
+                key={skill}
+                className="
+                  rounded-[10px]
+                  border
+                  border-brand-border
+                  bg-brand-bg
+                  px-3
+                  py-2
+                  text-[12px]
+                  font-bold
+                  text-brand-textMuted
+                "
+              >
+                {skill}
+              </span>
+            ))}
           </div>
         </section>
       </div>
 
       <aside className="rounded-[24px] border border-brand-border bg-white p-5 shadow-[0_14px_34px_rgba(0,70,109,0.06)] sm:p-6">
         <SectionTitle
-          icon={
-            <Mail className="h-4 w-4" />
-          }
+          icon={<Mail className="h-4 w-4" />}
         >
           Contact Information
         </SectionTitle>
 
         <div className="mt-5 space-y-5">
           <ContactRow
-            icon={
-              <Mail className="h-4 w-4" />
-            }
+            icon={<Mail className="h-4 w-4" />}
             label="Email"
             value={form.email}
           />
 
           <ContactRow
-            icon={
-              <Phone className="h-4 w-4" />
-            }
+            icon={<Phone className="h-4 w-4" />}
             label="Phone"
             value={form.phone}
           />
 
           <ContactRow
-            icon={
-              <MapPin className="h-4 w-4" />
-            }
+            icon={<MapPin className="h-4 w-4" />}
             label="Location"
             value={form.location}
           />
@@ -1685,6 +1728,7 @@ function ProfileDetails() {
   );
 }
 
+
 /* =========================================================
    GALLERY
 ========================================================= */
@@ -1692,12 +1736,9 @@ function ProfileDetails() {
 interface GallerySectionProps {
   images: GalleryImage[];
 
-  setImages:
-    React.Dispatch<
-      React.SetStateAction<
-        GalleryImage[]
-      >
-    >;
+  setImages: React.Dispatch<
+    React.SetStateAction<GalleryImage[]>
+  >;
 }
 
 function GallerySection({
@@ -1705,53 +1746,29 @@ function GallerySection({
   setImages,
 }: GallerySectionProps) {
   const fileInputRef =
-    useRef<HTMLInputElement | null>(
-      null,
-    );
+    useRef<HTMLInputElement | null>(null);
 
   const [
     selectedCategory,
     setSelectedCategory,
-  ] =
-    useState<GalleryImageCategory>(
-      'professional',
-    );
+  ] = useState<GalleryImageCategory>('close-up');
 
   const [
     selectedImage,
     setSelectedImage,
-  ] =
-    useState<GalleryImage | null>(
-      null,
-    );
+  ] = useState<GalleryImage | null>(null);
 
   const categories: {
     value: GalleryImageCategory;
     label: string;
   }[] = [
     {
-      value: 'professional',
-      label: 'Professional',
+      value: 'close-up',
+      label: 'Close-up',
     },
     {
-      value: 'front',
-      label: 'Full Body · Front',
-    },
-    {
-      value: 'side',
-      label: 'Full Body · Side',
-    },
-    {
-      value: 'back',
-      label: 'Full Body · Back',
-    },
-    {
-      value: 'project',
-      label: 'Project',
-    },
-    {
-      value: 'certificate',
-      label: 'Certificate',
+      value: 'full-body',
+      label: 'Full Body',
     },
     {
       value: 'other',
@@ -1760,102 +1777,110 @@ function GallerySection({
   ];
 
   const categoryLabel = (
-    category:
-      GalleryImageCategory,
+    category: GalleryImageCategory,
   ) =>
     categories.find(
-      (item) =>
-        item.value === category,
+      (item) => item.value === category,
     )?.label ?? 'Other';
 
-  const handleUpload =
-    async (
-      event:
-        React.ChangeEvent<HTMLInputElement>,
-    ) => {
-      const files: File[] =
-        Array.from(
-          event.target.files ?? [],
-        );
+  const closeUpCount = images.filter(
+    (image) => image.category === 'close-up',
+  ).length;
 
-      if (!files.length) {
-        return;
-      }
+  const fullBodyCount = images.filter(
+    (image) => image.category === 'full-body',
+  ).length;
 
-      const imageFiles =
-        files.filter((file) =>
-          file.type.startsWith(
-            'image/',
-          ),
-        );
-
-      if (!imageFiles.length) {
-        return;
-      }
-
-      try {
-        const uploaded =
-          await Promise.all(
-            imageFiles.map(
-              async (
-                file,
-              ): Promise<GalleryImage> => ({
-                id:
-                  createGalleryId(),
-                name: file.name,
-                category:
-                  selectedCategory,
-                image:
-                  await fileToDataUrl(file),
-                uploadedAt:
-                  new Date().toISOString(),
-              }),
-            ),
-          );
-
-        const nextImages = [
-          ...uploaded,
-          ...images,
-        ];
-
-        setImages(nextImages);
-        await saveProfileMedia({
-          galleryImages: nextImages,
-        });
-      } catch (error) {
-        console.error(
-          'Unable to upload gallery images:',
-          error,
-        );
-      }
-
-      event.target.value = '';
-    };
-
-  const handleDelete = (
-    id: string,
+  const handleUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
+    const files: File[] = Array.from(
+      event.target.files ?? [],
+    );
+
+    if (!files.length) {
+      return;
+    }
+
+    const imageFiles = files.filter((file) =>
+      file.type.startsWith('image/'),
+    );
+
+    if (!imageFiles.length) {
+      window.alert(
+        'Please select valid image files.',
+      );
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const uploaded = await Promise.all(
+        imageFiles.map(
+          async (file): Promise<GalleryImage> => ({
+            id: createGalleryId(),
+            name: file.name,
+            category: selectedCategory,
+            image: await fileToDataUrl(file),
+            uploadedAt: new Date().toISOString(),
+          }),
+        ),
+      );
+
+      const nextImages = [
+        ...uploaded,
+        ...images,
+      ];
+
+      await saveProfileMedia({
+        galleryImages: nextImages,
+      });
+
+      setImages(nextImages);
+    } catch (error) {
+      console.error(
+        'Unable to upload gallery images:',
+        error,
+      );
+
+      window.alert(
+        'Unable to save your gallery images. Please try again.',
+      );
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleDelete = async (id: string) => {
     const nextImages = images.filter(
       (image) => image.id !== id,
     );
 
-    setImages(nextImages);
-    void saveProfileMedia({
-      galleryImages: nextImages,
-    });
+    try {
+      await saveProfileMedia({
+        galleryImages: nextImages,
+      });
 
-    setSelectedImage(
-      (current) =>
-        current?.id === id
-          ? null
-          : current,
-    );
+      setImages(nextImages);
+
+      setSelectedImage((current) =>
+        current?.id === id ? null : current,
+      );
+    } catch (error) {
+      console.error(
+        'Unable to delete gallery image:',
+        error,
+      );
+
+      window.alert(
+        'Unable to remove this image. Please try again.',
+      );
+    }
   };
 
-  const updateCategory = (
+  const updateCategory = async (
     id: string,
-    category:
-      GalleryImageCategory,
+    category: GalleryImageCategory,
   ) => {
     const nextImages = images.map((image) =>
       image.id === id
@@ -1866,42 +1891,32 @@ function GallerySection({
         : image,
     );
 
-    setImages(nextImages);
-    void saveProfileMedia({
-      galleryImages: nextImages,
-    });
+    try {
+      await saveProfileMedia({
+        galleryImages: nextImages,
+      });
 
-    setSelectedImage(
-      (current) =>
+      setImages(nextImages);
+
+      setSelectedImage((current) =>
         current?.id === id
           ? {
               ...current,
               category,
             }
           : current,
-    );
+      );
+    } catch (error) {
+      console.error(
+        'Unable to update gallery image category:',
+        error,
+      );
+
+      window.alert(
+        'Unable to update the image category. Please try again.',
+      );
+    }
   };
-
-  const frontCount =
-    images.filter(
-      (image) =>
-        image.category ===
-        'front',
-    ).length;
-
-  const sideCount =
-    images.filter(
-      (image) =>
-        image.category ===
-        'side',
-    ).length;
-
-  const backCount =
-    images.filter(
-      (image) =>
-        image.category ===
-        'back',
-    ).length;
 
   return (
     <>
@@ -1938,46 +1953,31 @@ function GallerySection({
             </h2>
 
             <p className="mt-2 max-w-[680px] text-[14px] leading-6 text-brand-textMuted">
-              Store all professional profile images here, including
-              front, side and back full-body images, professional
-              photos, project images, certificates and other relevant
-              visual media.
+              Upload a close-up photo, a full-body photo,
+              or other relevant images to showcase your
+              professional profile.
             </p>
           </div>
 
           <span className="shrink-0 rounded-full border border-brand-border bg-brand-bg px-3 py-1.5 text-[10px] font-bold text-brand-primary">
             {images.length}{' '}
-            {images.length === 1
-              ? 'image'
-              : 'images'}
+            {images.length === 1 ? 'image' : 'images'}
           </span>
         </div>
 
-        {/* BODY PHOTO STATUS */}
+        {/* PHOTO STATUS */}
 
-        <div className="grid gap-3 border-b border-brand-border bg-brand-bg p-5 sm:grid-cols-3 sm:p-6">
+        <div className="grid gap-3 border-b border-brand-border bg-brand-bg p-5 sm:grid-cols-2 sm:p-6">
           <BodyViewStatus
-            label="Front View"
-            complete={
-              frontCount > 0
-            }
-            count={frontCount}
+            label="Close-up"
+            complete={closeUpCount > 0}
+            count={closeUpCount}
           />
 
           <BodyViewStatus
-            label="Side View"
-            complete={
-              sideCount > 0
-            }
-            count={sideCount}
-          />
-
-          <BodyViewStatus
-            label="Back View"
-            complete={
-              backCount > 0
-            }
-            count={backCount}
+            label="Full Body"
+            complete={fullBodyCount > 0}
+            count={fullBodyCount}
           />
         </div>
 
@@ -1989,9 +1989,7 @@ function GallerySection({
             type="file"
             accept="image/*"
             multiple
-            onChange={
-              handleUpload
-            }
+            onChange={handleUpload}
             className="hidden"
           />
 
@@ -2002,13 +2000,10 @@ function GallerySection({
               </label>
 
               <select
-                value={
-                  selectedCategory
-                }
+                value={selectedCategory}
                 onChange={(event) =>
                   setSelectedCategory(
-                    event.target
-                      .value as GalleryImageCategory,
+                    event.target.value as GalleryImageCategory,
                   )
                 }
                 className="
@@ -2023,28 +2018,19 @@ function GallerySection({
                   text-brand-text
                   outline-none
                   transition
-
                   focus:border-brand-accent
                   focus:ring-4
                   focus:ring-brand-accent/10
                 "
               >
-                {categories.map(
-                  (category) => (
-                    <option
-                      key={
-                        category.value
-                      }
-                      value={
-                        category.value
-                      }
-                    >
-                      {
-                        category.label
-                      }
-                    </option>
-                  ),
-                )}
+                {categories.map((category) => (
+                  <option
+                    key={category.value}
+                    value={category.value}
+                  >
+                    {category.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -2059,12 +2045,13 @@ function GallerySection({
           </div>
 
           <p className="mt-3 text-[12px] leading-5 text-brand-textMuted">
-            Multiple images can be selected at once. Choose the image
-            type first so uploaded images are organised correctly.
+            Select one or more images. Choose Close-up
+            or Full Body before uploading to keep your
+            gallery organised.
           </p>
         </div>
 
-        {/* GRID */}
+        {/* IMAGE GRID */}
 
         <div className="p-5 sm:p-6">
           {images.length === 0 ? (
@@ -2088,9 +2075,7 @@ function GallerySection({
                 px-6
                 text-center
                 transition
-
                 hover:border-brand-accent
-
                 focus-visible:outline-none
                 focus-visible:ring-4
                 focus-visible:ring-brand-accent/15
@@ -2105,9 +2090,9 @@ function GallerySection({
               </h3>
 
               <p className="mt-2 max-w-[470px] text-[14px] leading-6 text-brand-textMuted">
-                Upload professional photos, front, side and back
-                full-body images, project images, certificates and
-                other profile media.
+                Add your close-up and full-body photos
+                to help employers get a better view of
+                your professional profile.
               </p>
 
               <span
@@ -2134,125 +2119,109 @@ function GallerySection({
             </button>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {images.map(
-                (image) => (
-                  <article
-                    key={image.id}
+              {images.map((image) => (
+                <article
+                  key={image.id}
+                  className="
+                    group
+                    relative
+                    overflow-hidden
+                    rounded-[18px]
+                    border
+                    border-brand-border
+                    bg-brand-bg
+                    shadow-sm
+                  "
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedImage(image)
+                    }
                     className="
-                      group
                       relative
+                      block
+                      aspect-[4/5]
+                      w-full
                       overflow-hidden
-                      rounded-[18px]
-                      border
-                      border-brand-border
-                      bg-brand-bg
-                      shadow-sm
+                      focus-visible:outline-none
+                      focus-visible:ring-4
+                      focus-visible:ring-inset
+                      focus-visible:ring-brand-accent/30
                     "
                   >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedImage(
-                          image,
-                        )
-                      }
+                    <img
+                      src={image.image}
+                      alt={image.name}
                       className="
-                        relative
-                        block
-                        aspect-[4/5]
+                        h-full
                         w-full
-                        overflow-hidden
-
-                        focus-visible:outline-none
-                        focus-visible:ring-4
-                        focus-visible:ring-inset
-                        focus-visible:ring-brand-accent/30
-                      "
-                    >
-                      <img
-                        src={image.image}
-                        alt={image.name}
-                        className="
-                          h-full
-                          w-full
-                          object-cover
-                          transition
-                          duration-300
-                          group-hover:scale-[1.03]
-                        "
-                      />
-
-                      <div className="absolute inset-0 bg-brand-dark/0 transition group-hover:bg-brand-dark/15" />
-                    </button>
-
-                    <div className="absolute left-2.5 top-2.5">
-                      <span className="rounded-full border border-white/60 bg-white/95 px-2.5 py-1 text-[10px] font-bold text-brand-primary shadow-sm backdrop-blur">
-                        {categoryLabel(
-                          image.category,
-                        )}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleDelete(
-                          image.id,
-                        )
-                      }
-                      aria-label={`Delete ${image.name}`}
-                      className="
-                        absolute
-                        right-2.5
-                        top-2.5
-                        grid
-                        h-8
-                        w-8
-                        place-items-center
-                        rounded-full
-                        border
-                        border-white/60
-                        bg-white/95
-                        text-brand-crimson
-                        shadow-sm
-                        backdrop-blur
+                        object-cover
                         transition
-                        sm:opacity-0
-                        sm:group-hover:opacity-100
-
-                        focus-visible:opacity-100
-                        focus-visible:outline-none
-                        focus-visible:ring-4
-                        focus-visible:ring-brand-crimson/20
+                        duration-300
+                        group-hover:scale-[1.03]
                       "
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    />
 
-                    <div className="p-3">
-                      <p className="truncate text-[12px] font-bold text-brand-primary">
-                        {image.name}
-                      </p>
+                    <div className="absolute inset-0 bg-brand-dark/0 transition group-hover:bg-brand-dark/15" />
+                  </button>
 
-                      <p className="mt-1 text-[10px] text-brand-textMuted">
-                        {new Date(
-                          image.uploadedAt,
-                        ).toLocaleDateString(
-                          'en-ZA',
-                          {
-                            day:
-                              '2-digit',
-                            month:
-                              'short',
-                            year:
-                              'numeric',
-                          },
-                        )}
-                      </p>
-                    </div>
-                  </article>
-                ),
-              )}
+                  <div className="absolute left-2.5 top-2.5">
+                    <span className="rounded-full border border-white/60 bg-white/95 px-2.5 py-1 text-[10px] font-bold text-brand-primary shadow-sm backdrop-blur">
+                      {categoryLabel(image.category)}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleDelete(image.id)
+                    }
+                    aria-label={`Delete ${image.name}`}
+                    className="
+                      absolute
+                      right-2.5
+                      top-2.5
+                      grid
+                      h-8
+                      w-8
+                      place-items-center
+                      rounded-full
+                      border
+                      border-white/60
+                      bg-white/95
+                      text-brand-crimson
+                      shadow-sm
+                      backdrop-blur
+                      transition
+                      sm:opacity-0
+                      sm:group-hover:opacity-100
+                      focus-visible:opacity-100
+                      focus-visible:outline-none
+                      focus-visible:ring-4
+                      focus-visible:ring-brand-crimson/20
+                    "
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+
+                  <div className="p-3">
+                    <p className="truncate text-[12px] font-bold text-brand-primary">
+                      {image.name}
+                    </p>
+
+                    <p className="mt-1 text-[10px] text-brand-textMuted">
+                      {new Date(
+                        image.uploadedAt,
+                      ).toLocaleDateString('en-ZA', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </div>
@@ -2266,24 +2235,22 @@ function GallerySection({
             </p>
 
             <p className="mt-1 text-[10px] leading-5 text-brand-textMuted">
-              Gallery media forms part of your TruCity profile and may
-              be visible to employers when you apply through Express
-              Interest.
+              Gallery media forms part of your TruCity
+              profile and may be visible to employers
+              when you apply through Express Interest.
             </p>
           </div>
         </div>
       </section>
 
-      {/* VIEWER */}
+      {/* IMAGE VIEWER */}
 
       {selectedImage && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Gallery image"
-          onClick={() =>
-            setSelectedImage(null)
-          }
+          onClick={() => setSelectedImage(null)}
           className="
             fixed
             inset-0
@@ -2313,11 +2280,7 @@ function GallerySection({
           >
             <button
               type="button"
-              onClick={() =>
-                setSelectedImage(
-                  null,
-                )
-              }
+              onClick={() => setSelectedImage(null)}
               aria-label="Close image"
               className="
                 absolute
@@ -2332,7 +2295,6 @@ function GallerySection({
                 bg-brand-dark/75
                 text-white
                 backdrop-blur
-
                 focus-visible:outline-none
                 focus-visible:ring-4
                 focus-visible:ring-white/40
@@ -2343,12 +2305,8 @@ function GallerySection({
 
             <div className="flex max-h-[72vh] items-center justify-center bg-brand-dark">
               <img
-                src={
-                  selectedImage.image
-                }
-                alt={
-                  selectedImage.name
-                }
+                src={selectedImage.image}
+                alt={selectedImage.name}
                 className="max-h-[72vh] w-full object-contain"
               />
             </div>
@@ -2357,38 +2315,27 @@ function GallerySection({
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <h3 className="truncate text-[14px] font-bold text-brand-primary">
-                    {
-                      selectedImage.name
-                    }
+                    {selectedImage.name}
                   </h3>
 
                   <p className="mt-1 text-[12px] text-brand-textMuted">
                     Uploaded{' '}
                     {new Date(
                       selectedImage.uploadedAt,
-                    ).toLocaleDateString(
-                      'en-ZA',
-                      {
-                        day:
-                          '2-digit',
-                        month:
-                          'long',
-                        year:
-                          'numeric',
-                      },
-                    )}
+                    ).toLocaleDateString('en-ZA', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
                   </p>
                 </div>
 
                 <select
-                  value={
-                    selectedImage.category
-                  }
+                  value={selectedImage.category}
                   onChange={(event) =>
-                    updateCategory(
+                    void updateCategory(
                       selectedImage.id,
-                      event.target
-                        .value as GalleryImageCategory,
+                      event.target.value as GalleryImageCategory,
                     )
                   }
                   className="
@@ -2402,37 +2349,26 @@ function GallerySection({
                     font-bold
                     text-brand-primary
                     outline-none
-
                     focus:border-brand-accent
                     focus:ring-4
                     focus:ring-brand-accent/10
                   "
                 >
-                  {categories.map(
-                    (category) => (
-                      <option
-                        key={
-                          category.value
-                        }
-                        value={
-                          category.value
-                        }
-                      >
-                        {
-                          category.label
-                        }
-                      </option>
-                    ),
-                  )}
+                  {categories.map((category) => (
+                    <option
+                      key={category.value}
+                      value={category.value}
+                    >
+                      {category.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <button
                 type="button"
                 onClick={() =>
-                  handleDelete(
-                    selectedImage.id,
-                  )
+                  void handleDelete(selectedImage.id)
                 }
                 className="
                   mt-4
@@ -2445,7 +2381,6 @@ function GallerySection({
                   text-[12px]
                   font-bold
                   text-brand-crimson
-
                   focus-visible:outline-none
                   focus-visible:ring-4
                   focus-visible:ring-brand-crimson/15
@@ -2461,6 +2396,7 @@ function GallerySection({
     </>
   );
 }
+
 
 /* =========================================================
    BODY VIEW STATUS
@@ -2532,6 +2468,7 @@ function BodyViewStatus({
   );
 }
 
+
 /* =========================================================
    DOCUMENTS
 ========================================================= */
@@ -2539,240 +2476,532 @@ function BodyViewStatus({
 interface DocumentsSectionProps {
   docs: DocItem[];
 
-  setDocs:
-    React.Dispatch<
-      React.SetStateAction<
-        DocItem[]
-      >
-    >;
+  setDocs: React.Dispatch<
+    React.SetStateAction<DocItem[]>
+  >;
 }
 
 function DocumentsSection({
   docs,
   setDocs,
 }: DocumentsSectionProps) {
-  const fileInputRefs =
-    useRef<
-      Record<
-        number,
-        HTMLInputElement | null
-      >
-    >({});
+  const fileInputRefs = useRef<
+    Record<number, HTMLInputElement | null>
+  >({});
+
+  const quickUploadInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  const [selectedDocumentName, setSelectedDocumentName] =
+    useState('Identity Document');
+
+  const [uploadingId, setUploadingId] =
+    useState<number | null>(null);
+
+  const [uploadError, setUploadError] =
+    useState('');
+
+  const [openingDocumentId, setOpeningDocumentId] =
+    useState<number | null>(null);
+
+  const documentTypes = [
+    'Identity Document',
+    'CV / Resume',
+    'Qualification Certificate',
+    'Professional Certificate',
+    'Proof of Address',
+    'Other Supporting Document',
+  ];
+
+  const documentOptions = Array.from(
+    new Set([
+      ...documentTypes,
+      ...docs.map((document) => document.name),
+    ]),
+  );
+
+  const uploadedDocuments = docs.filter(
+    (document) => document.status !== 'none',
+  ).length;
 
   const handleFileUpload = async (
     id: number,
-    event:
-      React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>,
+    documentName?: string,
   ) => {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    const size = `${(
-      file.size /
-      (1024 * 1024)
-    ).toFixed(2)} MB`;
+    setUploadError('');
 
-    const dataUrl =
-      await fileToDataUrl(file);
+    const allowedTypes = [
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+    ];
 
-    const nextDocs = docs.map(
-      (document) =>
-        document.id === id
-          ? {
-              ...document,
-              status: 'pending' as const,
-              fileName:
-                file.name,
-              fileSize: size,
-              dataUrl,
-            }
-          : document,
+    const validExtension = /\.(pdf|png|jpe?g)$/i.test(
+      file.name,
     );
 
-    setDocs(nextDocs);
-    await saveProfileMedia({
-      documents: nextDocs,
-    });
+    if (
+      !allowedTypes.includes(file.type) &&
+      !(!file.type && validExtension)
+    ) {
+      setUploadError(
+        'Please select a PDF, PNG or JPEG document.',
+      );
+      event.target.value = '';
+      return;
+    }
 
-    event.target.value = '';
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadError(
+        'Your document exceeds the 50 MB limit. Please choose a smaller file.',
+      );
+      event.target.value = '';
+      return;
+    }
+
+    const existingDocument = docs.find(
+      (document) => document.id === id,
+    );
+
+    const resolvedName =
+      existingDocument?.name ??
+      documentName ??
+      selectedDocumentName;
+
+    setUploadingId(id);
+
+    try {
+      const formData = new FormData();
+
+      formData.append('file', file);
+      formData.append('documentId', String(id));
+
+      const response = await api.post<{
+  storagePath: string;
+}>(
+  '/api/candidate/profile/setup/upload/document',
+  formData,
+);
+
+if (!response.data?.storagePath) {
+  throw new Error(
+    'The server did not return the saved document storage path.',
+  );
+}
+
+      const savedDocument = response.data;
+
+      if (
+        !savedDocument ||
+        typeof savedDocument.storagePath !== 'string' ||
+        !savedDocument.storagePath.trim()
+      ) {
+        throw new Error(
+          'The server did not return a document storage path.',
+        );
+      }
+
+      const size = `${(
+        file.size /
+        (1024 * 1024)
+      ).toFixed(2)} MB`;
+
+      const uploadedDocument: DocItem = {
+        ...(existingDocument ?? {
+          id,
+          name: resolvedName,
+          status: 'none' as const,
+        }),
+        status: 'pending',
+        fileName: file.name,
+        fileSize: size,
+        // Signed URLs expire; persist only the permanent storage path.
+        dataUrl: undefined,
+        storagePath: savedDocument.storagePath,
+      };
+
+      const nextDocs = existingDocument
+        ? docs.map((document) =>
+            document.id === id
+              ? uploadedDocument
+              : document,
+          )
+        : [...docs, uploadedDocument];
+
+      // Save the document metadata only after the file upload succeeds.
+      await saveProfileMedia({
+        documents: nextDocs,
+      });
+
+      setDocs(nextDocs);
+    } catch (error) {
+      console.error(
+        'Unable to save document:',
+        error,
+      );
+
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'The document could not be saved. Please try again.',
+      );
+    } finally {
+      setUploadingId(null);
+      event.target.value = '';
+    }
+  };
+
+  const handleOpenDocument = async (document: DocItem) => {
+    if (!document.storagePath) {
+      setUploadError(
+        'This document has no saved storage path. Please replace it with a fresh upload.',
+      );
+      return;
+    }
+
+    // Open the tab synchronously during the click so the browser does not
+    // block it as a popup after the API request completes.
+    const documentTab = window.open('about:blank', '_blank');
+
+    if (!documentTab) {
+      setUploadError(
+        'Your browser blocked the document tab. Allow pop-ups for TruCity and try again.',
+      );
+      return;
+    }
+
+    documentTab.opener = null;
+    setUploadError('');
+    setOpeningDocumentId(document.id);
+
+    try {
+      const response = await api.get<{ url: string }>(
+        `/api/candidate/profile/media/documents/${document.id}/url`,
+      );
+
+      if (!response.data?.url) {
+        throw new Error('The server did not return a document URL.');
+      }
+
+      documentTab.location.replace(response.data.url);
+    } catch (error) {
+      documentTab.close();
+      console.error('Unable to open candidate document:', error);
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to open this document. Please try again.',
+      );
+    } finally {
+      setOpeningDocumentId(null);
+    }
+  };
+
+  const handleQuickUpload = () => {
+    setUploadError('');
+    quickUploadInputRef.current?.click();
+  };
+
+  
+  const handleQuickFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const existingDocument = docs.find(
+      (document) =>
+        document.name === selectedDocumentName,
+    );
+
+    // Reuse the existing ID when replacing a document.
+    // Otherwise, generate a small positive integer that fits Java int.
+    const nextDocumentId =
+      docs.reduce(
+        (maximumId, document) =>
+          Number.isInteger(document.id) &&
+          document.id > maximumId &&
+          document.id <= 2_147_483_647
+            ? document.id
+            : maximumId,
+        0,
+      ) + 1;
+
+    const id = existingDocument
+      ? existingDocument.id
+      : nextDocumentId;
+
+    if (id > 2_147_483_647) {
+      setUploadError(
+        'Unable to generate a document ID. Please refresh your profile and try again.',
+      );
+      event.target.value = '';
+      return;
+    }
+
+    void handleFileUpload(
+      id,
+      event,
+      selectedDocumentName,
+    );
   };
 
   return (
     <div className="max-w-[900px] space-y-5">
-      <div>
-        <h2 className="!m-0 text-[24px] font-bold !text-brand-primary">
-          Documents
-        </h2>
+      {/* HEADING */}
 
-        <p className="mt-1 text-[14px] text-brand-textMuted">
-          Manage supporting documents associated with your profile.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="!m-0 text-[24px] font-bold !text-brand-primary">
+            Documents
+          </h2>
+
+          <p className="mt-1 text-[14px] text-brand-textMuted">
+            Upload and manage the documents employers may need
+            to verify your profile and qualifications.
+          </p>
+        </div>
+
+        <span className="w-fit rounded-full border border-brand-border bg-white px-3 py-1.5 text-[11px] font-bold text-brand-primary">
+          {uploadedDocuments} uploaded
+        </span>
       </div>
+
+      {/* UPLOAD AREA */}
+
+      <section className="rounded-[24px] border border-brand-border bg-white p-5 shadow-[0_14px_34px_rgba(0,70,109,0.06)] sm:p-6">
+        <input
+          ref={quickUploadInputRef}
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+          onChange={handleQuickFileChange}
+          className="hidden"
+        />
+
+        <div className="rounded-[20px] border-2 border-dashed border-brand-accent/40 bg-brand-bg px-5 py-8 text-center sm:px-8">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[20px] border border-brand-border bg-white text-brand-primary shadow-sm">
+            <Upload className="h-7 w-7" />
+          </div>
+
+          <h3 className="!m-0 mt-4 text-[18px] font-bold !text-brand-primary">
+            Upload your documents
+          </h3>
+
+          <p className="mx-auto mt-2 max-w-[480px] text-[13px] leading-6 text-brand-textMuted">
+            Choose the type of document you want to add, then
+            select a file from your device. You can upload your
+            first document here or replace an existing one below.
+          </p>
+
+          <div className="mx-auto mt-5 max-w-[440px] text-left">
+            <label
+              htmlFor="candidate-document-type"
+              className="mb-1.5 block text-[12px] font-bold text-brand-primary"
+            >
+              Document type
+            </label>
+
+            <select
+              id="candidate-document-type"
+              value={selectedDocumentName}
+              onChange={(event) =>
+                setSelectedDocumentName(event.target.value)
+              }
+              className="min-h-[46px] w-full rounded-[14px] border border-brand-border bg-white px-4 text-[14px] text-brand-text outline-none transition focus:border-brand-accent focus:ring-4 focus:ring-brand-accent/10"
+            >
+              {documentOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mt-5 flex justify-center">
+            <PrimaryButton
+              onClick={handleQuickUpload}
+              disabled={uploadingId !== null}
+            >
+              <Upload className="h-4 w-4" />
+              {uploadingId !== null
+                ? 'Uploading...'
+                : 'Choose file and upload'}
+            </PrimaryButton>
+          </div>
+
+          <p className="mt-4 text-[11px] leading-5 text-brand-textMuted">
+            Accepted formats: PDF, PNG and JPEG. Maximum file
+            size: 50 MB.
+          </p>
+        </div>
+
+        {uploadingId !== null && (
+          <div
+            role="status"
+            className="mt-4 flex items-center gap-3 rounded-[14px] border border-brand-accent/30 bg-brand-accent/10 p-3 text-[12px] font-bold text-brand-primary"
+          >
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-accent/30 border-t-brand-primary" />
+            Uploading your document and saving its details...
+          </div>
+        )}
+
+        {uploadError && (
+          <div
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-[14px] border border-brand-crimson/20 bg-brand-crimson/5 p-3 text-[12px] leading-5 text-brand-crimson"
+          >
+            <X className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{uploadError}</span>
+          </div>
+        )}
+      </section>
+
+      {/* GUIDANCE */}
 
       <div className="flex items-start gap-3 rounded-[18px] border border-brand-accent/30 bg-brand-accent/10 p-4">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-primary" />
 
-        <p className="text-[12px] leading-5 text-brand-textMuted">
-          Upload only documents relevant to employment or verification.
-          Accepted formats are PDF, PNG and JPEG.
-        </p>
+        <div>
+          <p className="text-[12px] font-bold text-brand-primary">
+            Keep your documents secure
+          </p>
+
+          <p className="mt-1 text-[12px] leading-5 text-brand-textMuted">
+            Only upload documents relevant to employment or
+            verification. Uploaded documents are marked as under
+            review until their verification status is updated.
+          </p>
+        </div>
       </div>
 
-      <div className="space-y-3">
-        {docs.map(
-          (document) => (
-            <article
-              key={document.id}
-              className="
-                flex
-                flex-col
-                gap-4
-                rounded-[20px]
-                border
-                border-brand-border
-                bg-white
-                p-4
-                shadow-[0_10px_28px_rgba(0,70,109,0.05)]
-                sm:flex-row
-                sm:items-center
-                sm:justify-between
-                sm:px-5
-              "
-            >
-              <input
-                type="file"
-                ref={(element) => {
-                  fileInputRefs.current[
-                    document.id
-                  ] = element;
-                }}
-                onChange={(event) =>
-                  handleFileUpload(
-                    document.id,
-                    event,
-                  )
-                }
-                className="hidden"
-                accept=".pdf,.png,.jpg,.jpeg"
-              />
+      {/* SAVED DOCUMENTS */}
 
-              <div className="flex min-w-0 items-center gap-4">
-                <div
-                  className={`
-                    grid
-                    h-11
-                    w-11
-                    shrink-0
-                    place-items-center
-                    rounded-[14px]
-                    border
+      <div>
+        <h3 className="mb-3 text-[15px] font-bold text-brand-primary">
+          Your documents
+        </h3>
 
-                    ${
-                      document.status ===
-                      'verified'
+        {docs.length === 0 ? (
+          <div className="rounded-[20px] border border-brand-border bg-white px-5 py-8 text-center">
+            <FileText className="mx-auto h-8 w-8 text-brand-textMuted" />
+
+            <p className="mt-3 text-[14px] font-bold text-brand-primary">
+              No documents uploaded yet
+            </p>
+
+            <p className="mt-1 text-[12px] leading-5 text-brand-textMuted">
+              Use the upload area above to add your first document.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {docs.map((document) => (
+              <article
+                key={document.id}
+                className="flex flex-col gap-4 rounded-[20px] border border-brand-border bg-white p-4 shadow-[0_10px_28px_rgba(0,70,109,0.05)] sm:flex-row sm:items-center sm:justify-between sm:px-5"
+              >
+                <input
+                  type="file"
+                  ref={(element) => {
+                    fileInputRefs.current[document.id] =
+                      element;
+                  }}
+                  onChange={(event) =>
+                    void handleFileUpload(
+                      document.id,
+                      event,
+                      document.name,
+                    )
+                  }
+                  className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                />
+
+                <div className="flex min-w-0 items-center gap-4">
+                  <div
+                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] border ${
+                      document.status === 'verified'
                         ? 'border-brand-emerald bg-brand-emerald/10 text-brand-primary'
-                        : document.status ===
-                            'pending'
+                        : document.status === 'pending'
                           ? 'border-brand-warning bg-brand-warning/10 text-brand-dark'
                           : 'border-brand-border bg-brand-bg text-brand-textMuted'
-                    }
-                  `}
-                >
-                  <FileText className="h-5 w-5" />
+                    }`}
+                  >
+                    <FileText className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h4 className="truncate text-[14px] font-bold text-brand-primary">
+                      {document.name}
+                    </h4>
+
+                    {document.fileName ? (
+                      <p className="mt-1 truncate text-[12px] text-brand-textMuted">
+                        {document.fileName}
+                        {document.fileSize &&
+                          ` · ${document.fileSize}`}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[12px] text-brand-textMuted">
+                        No document uploaded
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="min-w-0">
-                  <h3 className="truncate text-[14px] font-bold text-brand-primary">
-                    {document.name}
-                  </h3>
-
-                  {document.fileName ? (
-                    <p className="mt-1 truncate text-[12px] text-brand-textMuted">
-                      {document.fileName}
-                      {document.fileSize &&
-                        ` · ${document.fileSize}`}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-[12px] text-brand-textMuted">
-                      No document uploaded
-                    </p>
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  {document.storagePath && (
+                    <button
+                      type="button"
+                      disabled={openingDocumentId !== null}
+                      onClick={() => void handleOpenDocument(document)}
+                      className="inline-flex min-h-[40px] items-center gap-2 rounded-[12px] border border-brand-accent bg-brand-accent/10 px-3 text-[12px] font-bold text-brand-primary transition hover:bg-brand-accent/20 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-accent/15"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      {openingDocumentId === document.id
+                        ? 'Opening...'
+                        : 'View'}
+                    </button>
                   )}
-                </div>
-              </div>
 
-              <div className="flex items-center gap-3 self-end sm:self-auto">
-                {document.status ===
-                  'none' && (
+                  {document.status === 'pending' && (
+                    <span className="rounded-full border border-brand-warning bg-brand-warning/10 px-3 py-1.5 text-[10px] font-bold text-brand-dark">
+                      Under review
+                    </span>
+                  )}
+
+                  {document.status === 'verified' && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-emerald bg-brand-emerald/10 px-3 py-1.5 text-[12px] font-bold text-brand-primary">
+                      <FileCheck2 className="h-4 w-4 text-brand-emerald" />
+                      Verified
+                    </span>
+                  )}
+
                   <button
                     type="button"
+                    disabled={uploadingId !== null}
                     onClick={() =>
                       fileInputRefs.current[
                         document.id
                       ]?.click()
                     }
-                    className="
-                      inline-flex
-                      min-h-[42px]
-                      items-center
-                      gap-2
-                      rounded-[12px]
-                      border
-                      border-brand-primary
-                      bg-white
-                      px-4
-                      text-[12px]
-                      font-bold
-                      text-brand-primary
-                      transition
-
-                      hover:bg-brand-primary
-                      hover:text-white
-
-                      focus-visible:outline-none
-                      focus-visible:ring-4
-                      focus-visible:ring-brand-accent/15
-                    "
+                    className="inline-flex min-h-[40px] items-center gap-2 rounded-[12px] border border-brand-primary bg-white px-3 text-[12px] font-bold text-brand-primary transition hover:bg-brand-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-accent/15"
                   >
                     <Upload className="h-4 w-4" />
-                    Upload
+                    {uploadingId === document.id
+                      ? 'Uploading...'
+                      : document.status === 'none'
+                        ? 'Upload'
+                        : 'Replace'}
                   </button>
-                )}
-
-                {document.status ===
-                  'pending' && (
-                  <>
-                    <span className="rounded-full border border-brand-warning bg-brand-warning/10 px-3 py-1.5 text-[10px] font-bold text-brand-dark">
-                      Under review
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        fileInputRefs.current[
-                          document.id
-                        ]?.click()
-                      }
-                      className="text-[12px] font-bold text-brand-primary hover:underline"
-                    >
-                      Replace
-                    </button>
-                  </>
-                )}
-
-                {document.status ===
-                  'verified' && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-emerald bg-brand-emerald/10 px-3 py-1.5 text-[12px] font-bold text-brand-primary">
-                    <FileCheck2 className="h-4 w-4 text-brand-emerald" />
-                    Verified
-                  </span>
-                )}
-              </div>
-            </article>
-          ),
+                </div>
+              </article>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -2786,12 +3015,9 @@ function DocumentsSection({
 interface ProjectsSectionProps {
   projects: ProjectItem[];
 
-  setProjects:
-    React.Dispatch<
-      React.SetStateAction<
-        ProjectItem[]
-      >
-    >;
+  setProjects: React.Dispatch<
+    React.SetStateAction<ProjectItem[]>
+  >;
 
   activeCount: number;
 }
@@ -2808,14 +3034,12 @@ function ProjectsSection({
     useState({
       name: '',
       tech: '',
-      status:
-        'Active Development',
+      status: 'Active Development',
       desc: '',
     });
 
   const handleCreateProject = (
-    event:
-      React.FormEvent<HTMLFormElement>,
+    event: React.FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
 
@@ -2837,6 +3061,7 @@ function ProjectsSection({
     ];
 
     setProjects(nextProjects);
+
     void saveProfileMedia({
       projects: nextProjects,
     });
@@ -2844,8 +3069,7 @@ function ProjectsSection({
     setNewProject({
       name: '',
       tech: '',
-      status:
-        'Active Development',
+      status: 'Active Development',
       desc: '',
     });
 
@@ -2866,9 +3090,7 @@ function ProjectsSection({
         </div>
 
         <PrimaryButton
-          onClick={() =>
-            setShowForm(true)
-          }
+          onClick={() => setShowForm(true)}
         >
           <Plus className="h-4 w-4" />
           Add project
@@ -2879,17 +3101,13 @@ function ProjectsSection({
         <div className="inline-flex rounded-full border border-brand-accent/30 bg-brand-accent/10 px-3 py-1.5 text-[10px] font-bold text-brand-primary">
           {activeCount}{' '}
           active
-          {activeCount === 1
-            ? ' project'
-            : ' projects'}
+          {activeCount === 1 ? ' project' : ' projects'}
         </div>
       )}
 
       {showForm && (
         <form
-          onSubmit={
-            handleCreateProject
-          }
+          onSubmit={handleCreateProject}
           className="
             rounded-[24px]
             border
@@ -2907,9 +3125,7 @@ function ProjectsSection({
             <button
               type="button"
               aria-label="Close project form"
-              onClick={() =>
-                setShowForm(false)
-              }
+              onClick={() => setShowForm(false)}
               className="
                 grid
                 h-8
@@ -2931,9 +3147,7 @@ function ProjectsSection({
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField
               label="Project name"
-              value={
-                newProject.name
-              }
+              value={newProject.name}
               onChange={(value) =>
                 setNewProject({
                   ...newProject,
@@ -2944,9 +3158,7 @@ function ProjectsSection({
 
             <FormField
               label="Technology / tools"
-              value={
-                newProject.tech
-              }
+              value={newProject.tech}
               onChange={(value) =>
                 setNewProject({
                   ...newProject,
@@ -2962,14 +3174,11 @@ function ProjectsSection({
             </label>
 
             <textarea
-              value={
-                newProject.desc
-              }
+              value={newProject.desc}
               onChange={(event) =>
                 setNewProject({
                   ...newProject,
-                  desc:
-                    event.target.value,
+                  desc: event.target.value,
                 })
               }
               placeholder="Describe the project and your contribution."
@@ -3004,62 +3213,59 @@ function ProjectsSection({
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {projects.map(
-          (project) => (
-            <article
-              key={project.id}
-              className="
-                flex
-                h-full
-                flex-col
-                rounded-[22px]
-                border
-                border-brand-border
-                bg-white
-                p-5
-                shadow-[0_12px_32px_rgba(0,70,109,0.06)]
-              "
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="grid h-11 w-11 place-items-center rounded-[14px] bg-brand-accent/10 text-brand-primary">
-                  <Code2 className="h-5 w-5" />
-                </div>
-
-                <span
-                  className={`
-                    rounded-full
-                    border
-                    px-3
-                    py-1
-                    text-[10px]
-                    font-bold
-
-                    ${
-                      project.status ===
-                      'Active Development'
-                        ? 'border-brand-accent/30 bg-brand-accent/10 text-brand-primary'
-                        : 'border-brand-emerald bg-brand-emerald/10 text-brand-primary'
-                    }
-                  `}
-                >
-                  {project.status}
-                </span>
+        {projects.map((project) => (
+          <article
+            key={project.id}
+            className="
+              flex
+              h-full
+              flex-col
+              rounded-[22px]
+              border
+              border-brand-border
+              bg-white
+              p-5
+              shadow-[0_12px_32px_rgba(0,70,109,0.06)]
+            "
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-[14px] bg-brand-accent/10 text-brand-primary">
+                <Code2 className="h-5 w-5" />
               </div>
 
-              <h3 className="!m-0 text-[16px] font-bold !text-brand-primary">
-                {project.name}
-              </h3>
+              <span
+                className={`
+                  rounded-full
+                  border
+                  px-3
+                  py-1
+                  text-[10px]
+                  font-bold
 
-              <p className="mt-1 text-[12px] font-bold text-brand-accent">
-                {project.tech}
-              </p>
+                  ${
+                    project.status === 'Active Development'
+                      ? 'border-brand-accent/30 bg-brand-accent/10 text-brand-primary'
+                      : 'border-brand-emerald bg-brand-emerald/10 text-brand-primary'
+                  }
+                `}
+              >
+                {project.status}
+              </span>
+            </div>
 
-              <p className="mt-3 text-[14px] leading-6 text-brand-textMuted">
-                {project.desc}
-              </p>
-            </article>
-          ),
-        )}
+            <h3 className="!m-0 text-[16px] font-bold !text-brand-primary">
+              {project.name}
+            </h3>
+
+            <p className="mt-1 text-[12px] font-bold text-brand-accent">
+              {project.tech}
+            </p>
+
+            <p className="mt-3 text-[14px] leading-6 text-brand-textMuted">
+              {project.desc}
+            </p>
+          </article>
+        ))}
       </div>
     </div>
   );
@@ -3103,12 +3309,15 @@ function PreferencesSection() {
   const handleSave = async () => {
     try {
       setSaving(true);
+
       await saveProfileMedia({
         preferences: {
           availability,
         },
       });
+
       setSaved(true);
+
       window.setTimeout(
         () => setSaved(false),
         2500,
@@ -3118,6 +3327,7 @@ function PreferencesSection() {
         'Unable to save candidate preferences:',
         error,
       );
+
       window.alert(
         'Your preferences could not be saved. Please try again.',
       );
@@ -3149,28 +3359,18 @@ function PreferencesSection() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <PreferenceCard
-            selected={
-              availability ===
-              'full-time'
-            }
+            selected={availability === 'full-time'}
             onClick={() =>
-              setAvailability(
-                'full-time',
-              )
+              setAvailability('full-time')
             }
             title="Full-time employment"
             description="Permanent employment opportunities."
           />
 
           <PreferenceCard
-            selected={
-              availability ===
-              'contract'
-            }
+            selected={availability === 'contract'}
             onClick={() =>
-              setAvailability(
-                'contract',
-              )
+              setAvailability('contract')
             }
             title="Contract / freelance"
             description="Project-based and fixed-term opportunities."
@@ -3279,9 +3479,7 @@ function PrimaryButton({
 interface FormFieldProps {
   label: string;
   value: string;
-  onChange: (
-    value: string,
-  ) => void;
+  onChange: (value: string) => void;
   readOnly?: boolean;
 }
 
@@ -3309,9 +3507,7 @@ function FormField({
         value={value}
         readOnly={readOnly}
         onChange={(event) =>
-          onChange(
-            event.target.value,
-          )
+          onChange(event.target.value)
         }
         className="
           min-h-[46px]

@@ -6,21 +6,16 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import org.springframework.http.HttpMethod;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
-
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -30,19 +25,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-
 @Configuration
 @RequiredArgsConstructor
 @EnableMethodSecurity
 public class SecurityConfig {
 
-
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
     private final PasswordEncoder passwordEncoder;
-
     private final org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
-
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -50,97 +40,60 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
+            .csrf(csrf -> csrf.disable())
 
-        .csrf(csrf -> csrf.disable())
-
-
-        // Enable CORS
-        .cors(cors ->
-            cors.configurationSource(
-                corsConfigurationSource()
+            .cors(cors ->
+                cors.configurationSource(corsConfigurationSource())
             )
-        )
 
-
-        // JWT authentication = stateless
-        .sessionManagement(session ->
-            session.sessionCreationPolicy(
-                SessionCreationPolicy.STATELESS
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-        )
 
+            .authorizeHttpRequests(auth -> auth
 
-        .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**")
+                .permitAll()
 
+                // Public authentication endpoints
+                .requestMatchers(
+                    "/api/v1/auth/register",
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/forgot-password",
+                    "/api/v1/auth/reset-password"
+                )
+                .permitAll()
 
-            // CORS preflight
-            .requestMatchers(
-                HttpMethod.OPTIONS,
-                "/**"
+                // Health check
+                .requestMatchers("/api/health")
+                .permitAll()
+
+                // All other endpoints require authentication
+                .anyRequest()
+                .authenticated()
             )
-            .permitAll()
 
+            .authenticationProvider(authenticationProvider())
 
-            // Public authentication endpoints
-            .requestMatchers(
-                "/api/v1/auth/register",
-                "/api/v1/auth/login"
-            )
-            .permitAll()
-
-
-            // Swagger
-            .requestMatchers(
-                "/swagger-ui/**",
-                "/v3/api-docs/**"
-            )
-            .permitAll()
-
-
-            // Health
-            .requestMatchers(
-                "/api/health"
-            )
-            .permitAll()
-
-
-            // Everything else requires JWT
-            .anyRequest()
-            .authenticated()
-
-        )
-
-
-        .authenticationProvider(
-            authenticationProvider()
-        )
-
-
-        .addFilterBefore(
-            jwtAuthenticationFilter,
-            UsernamePasswordAuthenticationFilter.class
-        );
-
+            .addFilterBefore(
+                jwtAuthenticationFilter,
+                UsernamePasswordAuthenticationFilter.class
+            );
 
         return http.build();
-
     }
-
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
-        CorsConfiguration configuration =
-                new CorsConfiguration();
-
+        CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(
             List.of(
                 "http://localhost:5173",
-                "https://trucity-frontend.vercel.app/"
+                "https://trucity-frontend.vercel.app"
             )
         );
-
 
         configuration.setAllowedMethods(
             List.of(
@@ -153,7 +106,6 @@ public class SecurityConfig {
             )
         );
 
-
         configuration.setAllowedHeaders(
             List.of(
                 "Authorization",
@@ -161,39 +113,26 @@ public class SecurityConfig {
             )
         );
 
-
         configuration.setAllowCredentials(true);
-
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
-
-        source.registerCorsConfiguration(
-            "/**",
-            configuration
-        );
-
+        source.registerCorsConfiguration("/**", configuration);
 
         return source;
     }
-
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
 
         DaoAuthenticationProvider provider =
-                new DaoAuthenticationProvider(
-                        userDetailsService
-                );
+                new DaoAuthenticationProvider(userDetailsService);
 
-        provider.setPasswordEncoder(
-                passwordEncoder
-        );
+        provider.setPasswordEncoder(passwordEncoder);
 
         return provider;
     }
-
 
     @Bean
     public AuthenticationManager authenticationManager(
@@ -201,7 +140,5 @@ public class SecurityConfig {
     ) throws Exception {
 
         return configuration.getAuthenticationManager();
-
     }
-
 }

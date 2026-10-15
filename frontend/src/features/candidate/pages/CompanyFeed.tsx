@@ -133,6 +133,34 @@ interface ItemDetails {
   applicationDeadline?: string;
 }
 
+type ApplicationQuestionType =
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'YES_NO'
+  | 'SINGLE_SELECT'
+  | 'MULTI_SELECT'
+  | 'NUMBER';
+
+interface WizardQuestion {
+  id: string;
+  jobId: string;
+  questionText: string;
+  questionType: ApplicationQuestionType;
+  required: boolean;
+  options: string[];
+  displayOrder: number;
+}
+
+interface SavedResume {
+  id: string;
+  title: string;
+  professionalTitle?: string;
+  structuredData?: Record<string, any>;
+  structured_data?: Record<string, any> | string;
+}
+
+type WizardAnswer = string | string[];
+
 /* =========================================================
    BACKEND DATA
 ========================================================= */
@@ -672,6 +700,19 @@ export default function CompanyFeed({
       [jobs],
     );
 
+  const [applicationWizardJob, setApplicationWizardJob] =
+    useState<Job | null>(null);
+  const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
+  const [wizardQuestions, setWizardQuestions] = useState<WizardQuestion[]>([]);
+  const [wizardAnswers, setWizardAnswers] = useState<Record<string, WizardAnswer>>({});
+  const [wizardResumes, setWizardResumes] = useState<SavedResume[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState('');
+  const [useJobSpecificResume, setUseJobSpecificResume] = useState(false);
+  const [jobSpecificResume, setJobSpecificResume] = useState<Record<string, any>>({});
+  const [wizardLoading, setWizardLoading] = useState(false);
+  const [wizardSubmitting, setWizardSubmitting] = useState(false);
+  const [wizardError, setWizardError] = useState('');
+
   useEffect(() => {
     let mounted = true;
 
@@ -976,92 +1017,203 @@ export default function CompanyFeed({
     );
   };
 
-  const handleApply =
-    async (
-      job: Job,
-    ) => {
-      if (
-        appliedJobs.includes(
-          job.id,
-        ) ||
-        applyingJobId
-      ) {
-        return;
+  const handleApply = async (job: Job) => {
+    if (appliedJobs.includes(job.id) || applyingJobId || applicationWizardJob) {
+      return;
+    }
+
+    setApplyingJobId(job.id);
+    setWizardError('');
+    setWizardStep(0);
+    setWizardAnswers({});
+    setSelectedResumeId('');
+    setUseJobSpecificResume(false);
+    setWizardQuestions([]);
+    setWizardResumes([]);
+    setApplicationWizardJob(job);
+    setWizardLoading(true);
+
+    try {
+      const [questionsResult, resumesResult] = await Promise.allSettled([
+        api.get<WizardQuestion[]>(
+          `/api/candidate/jobs/${encodeURIComponent(job.id)}/application-questions`,
+        ),
+        api.get<SavedResume[]>('/api/candidate/resumes'),
+      ]);
+
+      if (questionsResult.status === 'fulfilled') {
+        const data = questionsResult.value.data;
+        setWizardQuestions(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Unable to load application questions:', questionsResult.reason);
+        setWizardError(
+          'We could not load this job’s application questions. Please close this window and try again.',
+        );
       }
 
+      if (resumesResult.status === 'fulfilled') {
+        const data = resumesResult.value.data;
+        const resumes = Array.isArray(data) ? data : [];
+        setWizardResumes(resumes);
+        const preferred = resumes.find((resume) => resume.id);
+        if (preferred) setSelectedResumeId(preferred.id);
+      } else {
+        // A candidate can still create a job-specific CV from the current CV Builder draft.
+        console.warn('Saved CV list could not be loaded:', resumesResult.reason);
+      }
+
+      let draft: Record<string, any> = {};
       try {
-        setApplyingJobId(
-          job.id,
-        );
-
-        /*
-         * The authenticated candidate is resolved by the
-         * backend from the JWT. Only the selected job id is
-         * sent by the browser.
-         */
-        await api.post(
-          '/api/candidate/applications',
-          {
-            jobId: job.id,
-          },
-        );
-
-        setAppliedJobs(
-          (current) =>
-            current.includes(
-              job.id,
-            )
-              ? current
-              : [
-                  ...current,
-                  job.id,
-                ],
-        );
-
-        addNotification({
-          id: `application-${job.id}-${Date.now()}`,
-          type: 'application',
-          title:
-            'Application submitted',
-          message:
-            `Your TruCity profile was submitted to ${job.company} for the ${job.title} position.`,
-          time: 'Just now',
-          read: false,
-          destination:
-            '/candidate/feed',
-        });
-      } catch (error: any) {
-        console.error(
-          'Failed to submit application:',
-          error,
-        );
-
-        const message =
-          error?.response?.data?.message ||
-          error?.response?.data?.error ||
-          'Unable to submit your application. Please try again.';
-
-        addNotification({
-          id: `application-error-${job.id}-${Date.now()}`,
-          type: 'system',
-          title:
-            'Application not submitted',
-          message:
-            typeof message ===
-            'string'
-              ? message
-              : 'Unable to submit your application. Please try again.',
-          time: 'Just now',
-          read: false,
-          destination:
-            '/candidate/feed',
-        });
-      } finally {
-        setApplyingJobId(
-          null,
-        );
+        const stored = localStorage.getItem('trucity-cv-builder-draft-v1');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            draft = parsed;
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to read the local CV Builder draft:', error);
       }
-    };
+
+      setJobSpecificResume({
+        ...draft,
+        fullName: draft.fullName || '',
+        professionalTitle: draft.professionalTitle || '',
+        email: draft.email || '',
+        phone: draft.phone || '',
+        location: draft.location || '',
+        summary: draft.summary || '',
+        experiences: Array.isArray(draft.experiences) ? draft.experiences : [],
+        skills: Array.isArray(draft.skills) ? draft.skills : [],
+        education: Array.isArray(draft.education) ? draft.education : [],
+      });
+    } finally {
+      setWizardLoading(false);
+      setApplyingJobId(null);
+    }
+  };
+
+  const updateWizardAnswer = (questionId: string, value: WizardAnswer) => {
+    setWizardAnswers((current) => ({ ...current, [questionId]: value }));
+  };
+
+  const isWizardAnswerEmpty = (value: WizardAnswer | undefined) =>
+    value === undefined ||
+    value === '' ||
+    (Array.isArray(value) && value.length === 0) ||
+    (typeof value === 'string' && value.trim() === '');
+
+  const validateWizardQuestions = () => {
+    const missing = wizardQuestions.find(
+      (question) => question.required && isWizardAnswerEmpty(wizardAnswers[question.id]),
+    );
+    if (missing) {
+      setWizardError(`Please answer the required question: ${missing.questionText}`);
+      return false;
+    }
+    return true;
+  };
+
+  const canUseJobSpecificResume = () =>
+    Boolean(
+      String(jobSpecificResume.fullName || '').trim() &&
+      String(jobSpecificResume.professionalTitle || '').trim() &&
+      String(jobSpecificResume.email || '').trim(),
+    );
+
+  const submitApplicationWizard = async () => {
+    const job = applicationWizardJob;
+    if (!job || wizardSubmitting) return;
+
+    if (!validateWizardQuestions()) {
+      setWizardStep(0);
+      return;
+    }
+
+    if (!selectedResumeId && !useJobSpecificResume) {
+      setWizardError('Choose a saved CV or select “Create a CV for this application”.');
+      setWizardStep(1);
+      return;
+    }
+
+    if (useJobSpecificResume && !canUseJobSpecificResume()) {
+      setWizardError('Complete your full name, professional title and email for the application CV.');
+      setWizardStep(1);
+      return;
+    }
+
+    setWizardSubmitting(true);
+    setWizardError('');
+
+    try {
+      const answers = wizardQuestions
+        .filter((question) => !isWizardAnswerEmpty(wizardAnswers[question.id]))
+        .map((question) => {
+          const value = wizardAnswers[question.id];
+          return {
+            questionId: question.id,
+            answerText: Array.isArray(value) ? value.join(', ') : value,
+            answerJson: value,
+          };
+        });
+
+      const payload: Record<string, any> = {
+        jobId: job.id,
+        answers,
+      };
+
+      if (useJobSpecificResume) {
+        payload.resumeTitle = `Application CV — ${job.title}`;
+        payload.resumeSnapshot = jobSpecificResume;
+      } else {
+        payload.resumeId = selectedResumeId;
+      }
+
+      await api.post('/api/candidate/applications/submit', payload);
+
+      setAppliedJobs((current) => {
+        const updated = current.includes(job.id) ? current : [...current, job.id];
+        try {
+          localStorage.setItem('trucity-candidate-applied-jobs', JSON.stringify(updated));
+        } catch {
+          // The server remains the source of truth if local storage is unavailable.
+        }
+        return updated;
+      });
+
+      addNotification({
+        id: `application-${job.id}-${Date.now()}`,
+        type: 'application',
+        title: 'Application submitted',
+        message: `Your application for ${job.title} at ${job.company} has been submitted.`,
+        time: 'Just now',
+        read: false,
+        destination: '/candidate/feed',
+      });
+
+      setApplicationWizardJob(null);
+      setWizardQuestions([]);
+      setWizardAnswers({});
+      setWizardResumes([]);
+      setSelectedResumeId('');
+      setUseJobSpecificResume(false);
+    } catch (error: any) {
+      console.error('Failed to submit application:', error);
+      const responseData = error?.response?.data;
+      const message =
+        (typeof responseData === 'string' && responseData) ||
+        responseData?.message ||
+        responseData?.error ||
+        'Unable to submit your application. Please try again.';
+      setWizardError(
+        typeof message === 'string'
+          ? message
+          : 'Unable to submit your application. Please try again.',
+      );
+    } finally {
+      setWizardSubmitting(false);
+    }
+  };
 
   const openJobDetails = (
     job: Job,
@@ -1847,6 +1999,400 @@ export default function CompanyFeed({
           </>
         )}
       </main>
+
+      {applicationWizardJob && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00273D]/70 p-3 backdrop-blur-sm sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="application-wizard-title"
+        >
+          <section className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-[#D4D2E6] bg-[#F8FCFF] shadow-2xl">
+            <header className="flex items-start justify-between gap-4 border-b border-[#D4D2E6] bg-white px-5 py-5 sm:px-7">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#1E92D2]">
+                  TRUCITY · APPLICATION
+                </p>
+                <h2 id="application-wizard-title" className="mt-1 text-xl font-black text-[#00273D] sm:text-2xl">
+                  Apply for {applicationWizardJob.title}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {applicationWizardJob.company} · {applicationWizardJob.location}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!wizardSubmitting) {
+                    setApplicationWizardJob(null);
+                    setWizardError('');
+                  }
+                }}
+                disabled={wizardSubmitting}
+                className="rounded-xl border border-[#D4D2E6] bg-white px-3 py-2 text-sm font-bold text-[#00466D] hover:bg-slate-50 disabled:opacity-50"
+                aria-label="Close application wizard"
+              >
+                ✕
+              </button>
+            </header>
+
+            <div className="grid grid-cols-3 gap-2 border-b border-[#D4D2E6] bg-white px-5 py-4 sm:px-7">
+              {['Questions', 'Your CV', 'Review & submit'].map((label, index) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    if (index === 0) setWizardStep(0);
+                    if (index === 1 && validateWizardQuestions()) setWizardStep(1);
+                    if (index === 2) {
+                      if (validateWizardQuestions()) {
+                        if (!selectedResumeId && !useJobSpecificResume) {
+                          setWizardError('Choose a saved CV or create a CV for this application.');
+                          setWizardStep(1);
+                        } else if (useJobSpecificResume && !canUseJobSpecificResume()) {
+                          setWizardError('Complete your name, professional title and email first.');
+                          setWizardStep(1);
+                        } else {
+                          setWizardError('');
+                          setWizardStep(2);
+                        }
+                      }
+                    }
+                  }}
+                  className={`rounded-xl px-2 py-3 text-xs font-extrabold transition sm:text-sm ${
+                    wizardStep === index
+                      ? 'bg-[#00466D] text-white'
+                      : wizardStep > index
+                        ? 'bg-[#E5F5FC] text-[#00466D]'
+                        : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <span className="mr-1">{index + 1}.</span> {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+              {wizardError && (
+                <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                  {wizardError}
+                </div>
+              )}
+
+              {wizardLoading ? (
+                <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                  <div className="h-9 w-9 animate-spin rounded-full border-4 border-[#D9EFFA] border-t-[#1E92D2]" />
+                  <p className="mt-4 text-sm font-semibold text-[#00466D]">Preparing your application…</p>
+                </div>
+              ) : (
+                <>
+                  {wizardStep === 0 && (
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="text-lg font-black text-[#00273D]">Employer questions</h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Answer the questions attached to this position. Required questions are marked.
+                        </p>
+                      </div>
+                      {wizardQuestions.length === 0 ? (
+                        <div className="rounded-2xl border border-[#D4D2E6] bg-white p-5 text-sm text-slate-600">
+                          No additional questions have been added for this position.
+                        </div>
+                      ) : wizardQuestions.map((question) => (
+                        <div key={question.id} className="rounded-2xl border border-[#D4D2E6] bg-white p-4 sm:p-5">
+                          <label className="block text-sm font-extrabold text-[#00273D]">
+                            {question.questionText}
+                            {question.required && <span className="ml-1 text-rose-600">*</span>}
+                          </label>
+                          <div className="mt-3">
+                            {question.questionType === 'TEXT' && (
+                              <input
+                                value={String(wizardAnswers[question.id] ?? '')}
+                                onChange={(event) => updateWizardAnswer(question.id, event.target.value)}
+                                className="w-full rounded-xl border border-[#D4D2E6] bg-white px-3 py-3 text-sm outline-none focus:border-[#1E92D2]"
+                                placeholder="Your answer"
+                              />
+                            )}
+                            {question.questionType === 'NUMBER' && (
+                              <input
+                                type="number"
+                                value={String(wizardAnswers[question.id] ?? '')}
+                                onChange={(event) => updateWizardAnswer(question.id, event.target.value)}
+                                className="w-full rounded-xl border border-[#D4D2E6] bg-white px-3 py-3 text-sm outline-none focus:border-[#1E92D2]"
+                                placeholder="Enter a number"
+                              />
+                            )}
+                            {question.questionType === 'TEXTAREA' && (
+                              <textarea
+                                rows={4}
+                                value={String(wizardAnswers[question.id] ?? '')}
+                                onChange={(event) => updateWizardAnswer(question.id, event.target.value)}
+                                className="w-full resize-y rounded-xl border border-[#D4D2E6] bg-white px-3 py-3 text-sm outline-none focus:border-[#1E92D2]"
+                                placeholder="Write your answer"
+                              />
+                            )}
+                            {question.questionType === 'YES_NO' && (
+                              <div className="flex gap-3">
+                                {['Yes', 'No'].map((choice) => (
+                                  <label key={choice} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#D4D2E6] bg-white px-4 py-3 text-sm font-semibold text-[#00466D]">
+                                    <input
+                                      type="radio"
+                                      name={`question-${question.id}`}
+                                      checked={String(wizardAnswers[question.id] ?? '').toLowerCase() === choice.toLowerCase()}
+                                      onChange={() => updateWizardAnswer(question.id, choice)}
+                                    />
+                                    {choice}
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                            {question.questionType === 'SINGLE_SELECT' && (
+                              <select
+                                value={String(wizardAnswers[question.id] ?? '')}
+                                onChange={(event) => updateWizardAnswer(question.id, event.target.value)}
+                                className="w-full rounded-xl border border-[#D4D2E6] bg-white px-3 py-3 text-sm outline-none focus:border-[#1E92D2]"
+                              >
+                                <option value="">Choose an option</option>
+                                {question.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                              </select>
+                            )}
+                            {question.questionType === 'MULTI_SELECT' && (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {question.options.map((option) => {
+                                  const selected = Array.isArray(wizardAnswers[question.id]) ? wizardAnswers[question.id] as string[] : [];
+                                  return (
+                                    <label key={option} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#D4D2E6] bg-white px-3 py-3 text-sm text-[#00466D]">
+                                      <input
+                                        type="checkbox"
+                                        checked={selected.includes(option)}
+                                        onChange={(event) => updateWizardAnswer(
+                                          question.id,
+                                          event.target.checked
+                                            ? [...selected, option]
+                                            : selected.filter((value) => value !== option),
+                                        )}
+                                      />
+                                      {option}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {wizardStep === 1 && (
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="text-lg font-black text-[#00273D]">Choose the CV to submit</h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                          The selected CV is saved with this application so the employer sees the version you submitted.
+                        </p>
+                      </div>
+
+                      {wizardResumes.length > 0 && (
+                        <div className="space-y-3">
+                          {wizardResumes.map((resume) => (
+                            <label key={resume.id} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 ${
+                              !useJobSpecificResume && selectedResumeId === resume.id
+                                ? 'border-[#1E92D2] bg-[#EAF7FD]'
+                                : 'border-[#D4D2E6] bg-white'
+                            }`}>
+                              <input
+                                type="radio"
+                                name="application-resume"
+                                checked={!useJobSpecificResume && selectedResumeId === resume.id}
+                                onChange={() => {
+                                  setSelectedResumeId(resume.id);
+                                  setUseJobSpecificResume(false);
+                                }}
+                                className="mt-1"
+                              />
+                              <span>
+                                <span className="block text-sm font-extrabold text-[#00273D]">{resume.title || 'Saved CV'}</span>
+                                <span className="mt-1 block text-xs text-slate-600">{resume.professionalTitle || 'Saved candidate resume'}</span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className={`rounded-2xl border p-4 sm:p-5 ${
+                        useJobSpecificResume
+                          ? 'border-[#1E92D2] bg-[#EAF7FD]'
+                          : 'border-[#D4D2E6] bg-white'
+                      }`}>
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="radio"
+                            name="application-resume"
+                            checked={useJobSpecificResume}
+                            onChange={() => {
+                              setUseJobSpecificResume(true);
+                              setSelectedResumeId('');
+                            }}
+                            className="mt-1"
+                          />
+                          <span>
+                            <span className="block text-sm font-extrabold text-[#00273D]">Create a CV for this application</span>
+                            <span className="mt-1 block text-xs leading-5 text-slate-600">
+                              Start with your saved CV Builder draft and tailor the contact and summary details for this job.
+                            </span>
+                          </span>
+                        </label>
+
+                        {useJobSpecificResume && (
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            {([
+                              ['fullName', 'Full name'],
+                              ['professionalTitle', 'Professional title'],
+                              ['email', 'Email address'],
+                              ['phone', 'Phone number'],
+                              ['location', 'Location'],
+                            ] as const).map(([field, label]) => (
+                              <label key={field} className="block">
+                                <span className="mb-1.5 block text-xs font-bold text-[#00466D]">{label}{['fullName', 'professionalTitle', 'email'].includes(field) ? ' *' : ''}</span>
+                                <input
+                                  value={String(jobSpecificResume[field] ?? '')}
+                                  onChange={(event) => setJobSpecificResume((current) => ({ ...current, [field]: event.target.value }))}
+                                  className="w-full rounded-xl border border-[#D4D2E6] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1E92D2]"
+                                  required={['fullName', 'professionalTitle', 'email'].includes(field)}
+                                />
+                              </label>
+                            ))}
+                            <label className="block sm:col-span-2">
+                              <span className="mb-1.5 block text-xs font-bold text-[#00466D]">Professional summary</span>
+                              <textarea
+                                rows={4}
+                                value={String(jobSpecificResume.summary ?? '')}
+                                onChange={(event) => setJobSpecificResume((current) => ({ ...current, summary: event.target.value }))}
+                                className="w-full rounded-xl border border-[#D4D2E6] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1E92D2]"
+                                placeholder="A concise summary of your experience and strengths"
+                              />
+                            </label>
+                            <p className="text-xs leading-5 text-slate-500 sm:col-span-2">
+                              Existing experience, skills and education from your CV Builder draft are preserved. This job-specific version will be saved to your TruCity CVs.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {wizardStep === 2 && (
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="text-lg font-black text-[#00273D]">Review your application</h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Nothing is submitted until you confirm below.
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-[#D4D2E6] bg-white p-5">
+                        <p className="text-xs font-extrabold uppercase tracking-wider text-[#1E92D2]">Position</p>
+                        <h4 className="mt-1 text-base font-black text-[#00273D]">{applicationWizardJob.title}</h4>
+                        <p className="text-sm text-slate-600">{applicationWizardJob.company} · {applicationWizardJob.location}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#D4D2E6] bg-white p-5">
+                        <p className="text-xs font-extrabold uppercase tracking-wider text-[#1E92D2]">CV being submitted</p>
+                        {useJobSpecificResume ? (
+                          <>
+                            <h4 className="mt-1 font-black text-[#00273D]">{jobSpecificResume.fullName}</h4>
+                            <p className="text-sm text-slate-600">{jobSpecificResume.professionalTitle}</p>
+                            <p className="mt-2 text-sm text-slate-600">{jobSpecificResume.email} · {jobSpecificResume.location}</p>
+                            {jobSpecificResume.summary && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{jobSpecificResume.summary}</p>}
+                            <p className="mt-3 text-xs text-slate-500">
+                              {Array.isArray(jobSpecificResume.experiences) ? jobSpecificResume.experiences.length : 0} experience entries · {Array.isArray(jobSpecificResume.skills) ? jobSpecificResume.skills.length : 0} skills · {Array.isArray(jobSpecificResume.education) ? jobSpecificResume.education.length : 0} education entries
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <h4 className="mt-1 font-black text-[#00273D]">{wizardResumes.find((resume) => resume.id === selectedResumeId)?.title || 'Saved CV'}</h4>
+                            <p className="text-sm text-slate-600">{wizardResumes.find((resume) => resume.id === selectedResumeId)?.professionalTitle || 'Your selected saved CV'}</p>
+                          </>
+                        )}
+                      </div>
+                      <div className="rounded-2xl border border-[#D4D2E6] bg-white p-5">
+                        <p className="text-xs font-extrabold uppercase tracking-wider text-[#1E92D2]">Your answers</p>
+                        {wizardQuestions.length === 0 ? (
+                          <p className="mt-2 text-sm text-slate-600">No additional questions were required.</p>
+                        ) : (
+                          <div className="mt-3 space-y-3">
+                            {wizardQuestions.map((question) => (
+                              <div key={question.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                                <p className="text-sm font-bold text-[#00273D]">{question.questionText}</p>
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+                                  {Array.isArray(wizardAnswers[question.id])
+                                    ? (wizardAnswers[question.id] as string[]).join(', ') || 'Not answered'
+                                    : String(wizardAnswers[question.id] ?? 'Not answered')}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <footer className="flex flex-col-reverse gap-3 border-t border-[#D4D2E6] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+              <button
+                type="button"
+                onClick={() => {
+                  if (wizardStep === 0) {
+                    setApplicationWizardJob(null);
+                    setWizardError('');
+                  } else {
+                    setWizardStep((wizardStep - 1) as 0 | 1 | 2);
+                    setWizardError('');
+                  }
+                }}
+                disabled={wizardSubmitting || wizardLoading}
+                className="rounded-xl border border-[#D4D2E6] px-5 py-3 text-sm font-extrabold text-[#00466D] hover:bg-slate-50 disabled:opacity-50"
+              >
+                {wizardStep === 0 ? 'Cancel application' : 'Back'}
+              </button>
+
+              {wizardStep < 2 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWizardError('');
+                    if (wizardStep === 0) {
+                      if (validateWizardQuestions()) setWizardStep(1);
+                    } else if (!selectedResumeId && !useJobSpecificResume) {
+                      setWizardError('Choose a saved CV or create a CV for this application.');
+                    } else if (useJobSpecificResume && !canUseJobSpecificResume()) {
+                      setWizardError('Complete your full name, professional title and email.');
+                    } else {
+                      setWizardStep(2);
+                    }
+                  }}
+                  disabled={wizardLoading || wizardSubmitting}
+                  className="rounded-xl px-5 py-3 text-sm font-extrabold text-white shadow-lg disabled:opacity-50"
+                  style={{ background: 'linear-gradient(90deg, #00466D 0%, #1E92D2 100%)' }}
+                >
+                  Continue
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void submitApplicationWizard()}
+                  disabled={wizardSubmitting || wizardLoading}
+                  className="rounded-xl px-5 py-3 text-sm font-extrabold text-[#00273D] shadow-lg disabled:opacity-50"
+                  style={{ background: 'linear-gradient(90deg, #FFAD01 0%, #FFD784 100%)' }}
+                >
+                  {wizardSubmitting ? 'Submitting application…' : 'Confirm & submit application'}
+                </button>
+              )}
+            </footer>
+          </section>
+        </div>
+      )}
 
       {selectedItemDetails && (
         <DetailModal

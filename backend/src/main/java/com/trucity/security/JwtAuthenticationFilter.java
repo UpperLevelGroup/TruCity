@@ -18,146 +18,88 @@ import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationFilter
-extends OncePerRequestFilter {
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-private final JwtService jwtService;
+    private final JwtService jwtService;
+    private final CustomUserDetailsService userDetailsService;
 
-private final CustomUserDetailsService userDetailsService;
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
 
-
-@Override
-protected boolean shouldNotFilter(
-        HttpServletRequest request
-) {
-
-    String path = request.getServletPath();
-
-    return path.equals("/api/v1/auth/register")
-            || path.equals("/api/v1/auth/login");
-}
-
-
-@Override
-protected void doFilterInternal(
-        HttpServletRequest request,
-        HttpServletResponse response,
-        FilterChain filterChain
-) throws ServletException, IOException {
-
-    String authHeader =
-            request.getHeader("Authorization");
-
-    System.out.println(
-            "AUTH HEADER: " + authHeader
-    );
-
-
-    if (
-            authHeader == null ||
-            !authHeader.startsWith("Bearer ")
-    ) {
-
-        filterChain.doFilter(
-                request,
-                response
-        );
-
-        return;
+        return path.equals("/api/v1/auth/register")
+                || path.equals("/api/v1/auth/login")
+                || path.equals("/api/v1/auth/forgot-password")
+                || path.equals("/api/v1/auth/reset-password");
     }
 
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-    String token =
-            authHeader.substring(7);
+        String authHeader = request.getHeader("Authorization");
 
-
-    if (
-            token.isBlank() ||
-            token.equalsIgnoreCase("undefined") ||
-            token.equalsIgnoreCase("null")
-    ) {
-
-        filterChain.doFilter(
-                request,
-                response
-        );
-
-        return;
-    }
-
-
-    try {
-
-        String email =
-                jwtService.extractUsername(token);
-
-        System.out.println(
-                "JWT EMAIL: " + email
-        );
-
-
-        if (
-                email != null &&
-                SecurityContextHolder
-                        .getContext()
-                        .getAuthentication() == null
-        ) {
-
-            UserDetails userDetails =
-                    userDetailsService
-                            .loadUserByUsername(email);
-
-
-            if (jwtService.validateToken(token)) {
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-
-
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
-
-
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(
-                                authentication
-                        );
-
-
-                System.out.println(
-                        "AUTH USER: " + email
-                );
-
-                System.out.println(
-                        "AUTHORITIES: " +
-                        userDetails.getAuthorities()
-                );
-            }
+        if (authHeader == null
+                || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
-    } catch (Exception exception) {
+        String token = authHeader.substring(7).trim();
 
-        System.out.println(
-                "JWT authentication failed: " +
-                exception.getMessage()
-        );
+        if (token.isEmpty()
+                || token.equalsIgnoreCase("undefined")
+                || token.equalsIgnoreCase("null")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-        SecurityContextHolder
-                .clearContext();
+        try {
+            if (!jwtService.validateToken(token)) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String email = jwtService.extractUsername(token);
+
+            if (email != null
+                    && SecurityContextHolder.getContext()
+                            .getAuthentication() == null) {
+
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(email);
+
+                if (userDetails.isEnabled()
+                        && userDetails.isAccountNonLocked()
+                        && userDetails.isAccountNonExpired()
+                        && userDetails.isCredentialsNonExpired()) {
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(request)
+                    );
+
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(authentication);
+                }
+            }
+
+        } catch (Exception exception) {
+            // Never log tokens, user details, or exception messages.
+            SecurityContextHolder.clearContext();
+        }
+
+        filterChain.doFilter(request, response);
     }
-
-
-    filterChain.doFilter(
-            request,
-            response
-    );
-}
-
 }

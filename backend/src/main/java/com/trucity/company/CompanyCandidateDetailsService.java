@@ -2,7 +2,9 @@ package com.trucity.company;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trucity.storage.SupabaseStorageService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,8 +19,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CompanyCandidateDetailsService {
 
+    private static final String INTRO_REEL_BUCKET =
+            "candidate-profile-intro-reel";
+
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
+    private final SupabaseStorageService supabaseStorageService;
 
     @Transactional(readOnly = true)
     public CompanyCandidateDetailsResponse getCandidateDetails(
@@ -30,7 +36,9 @@ public class CompanyCandidateDetailsService {
         }
 
         if (employerEmail == null || employerEmail.isBlank()) {
-            throw new IllegalArgumentException("Authenticated employer is required.");
+            throw new IllegalArgumentException(
+                    "Authenticated employer is required."
+            );
         }
 
         boolean belongsToEmployer = hasApplicationForEmployer(
@@ -130,7 +138,9 @@ public class CompanyCandidateDetailsService {
                 .getResultList();
 
         if (rows.isEmpty()) {
-            throw new IllegalArgumentException("Candidate not found: " + candidateId);
+            throw new IllegalArgumentException(
+                    "Candidate not found: " + candidateId
+            );
         }
 
         return rows.get(0);
@@ -168,9 +178,8 @@ public class CompanyCandidateDetailsService {
         return result;
     }
 
-    private List<CompanyCandidateDetailsResponse.QualificationResponse> getQualifications(
-            UUID candidateId
-    ) {
+    private List<CompanyCandidateDetailsResponse.QualificationResponse>
+    getQualifications(UUID candidateId) {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = entityManager.createNativeQuery("""
                 SELECT
@@ -193,23 +202,24 @@ public class CompanyCandidateDetailsService {
                 new ArrayList<>();
 
         for (Object[] row : rows) {
-            result.add(new CompanyCandidateDetailsResponse.QualificationResponse(
-                    toUuid(row[0]),
-                    toStringValue(row[1]),
-                    toStringValue(row[2]),
-                    toStringValue(row[3]),
-                    toNullableInt(row[4]),
-                    toNullableInt(row[5]),
-                    toStringValue(row[6])
-            ));
+            result.add(
+                    new CompanyCandidateDetailsResponse.QualificationResponse(
+                            toUuid(row[0]),
+                            toStringValue(row[1]),
+                            toStringValue(row[2]),
+                            toStringValue(row[3]),
+                            toNullableInt(row[4]),
+                            toNullableInt(row[5]),
+                            toStringValue(row[6])
+                    )
+            );
         }
 
         return result;
     }
 
-    private List<CompanyCandidateDetailsResponse.ExperienceResponse> getExperience(
-            UUID candidateId
-    ) {
+    private List<CompanyCandidateDetailsResponse.ExperienceResponse>
+    getExperience(UUID candidateId) {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = entityManager.createNativeQuery("""
                 SELECT
@@ -231,23 +241,23 @@ public class CompanyCandidateDetailsService {
                 new ArrayList<>();
 
         for (Object[] row : rows) {
-            result.add(new CompanyCandidateDetailsResponse.ExperienceResponse(
-                    toUuid(row[0]),
-                    toStringValue(row[1]),
-                    toStringValue(row[2]),
-                    toStringValue(row[3]),
-                    toDateString(row[4]),
-                    toDateString(row[5])
-            ));
+            result.add(
+                    new CompanyCandidateDetailsResponse.ExperienceResponse(
+                            toUuid(row[0]),
+                            toStringValue(row[1]),
+                            toStringValue(row[2]),
+                            toStringValue(row[3]),
+                            toDateString(row[4]),
+                            toDateString(row[5])
+                    )
+            );
         }
 
         return result;
     }
 
-
-    private CompanyCandidateDetailsResponse.ProfileMediaResponse getProfileMedia(
-            UUID candidateId
-    ) {
+    private CompanyCandidateDetailsResponse.ProfileMediaResponse
+    getProfileMedia(UUID candidateId) {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = entityManager.createNativeQuery("""
                 SELECT
@@ -272,37 +282,51 @@ public class CompanyCandidateDetailsService {
 
         Object[] row = rows.get(0);
 
-        List<CompanyCandidateDetailsResponse.GalleryImageResponse> galleryImages =
-                readJsonList(
+        List<CompanyCandidateDetailsResponse.GalleryImageResponse>
+                galleryImages = readJsonList(
                         toStringValue(row[2]),
-                        new TypeReference<List<CompanyCandidateDetailsResponse.GalleryImageResponse>>() {}
+                        new TypeReference<
+                                List<CompanyCandidateDetailsResponse.GalleryImageResponse>
+                        >() {}
                 );
 
         List<CompanyCandidateDetailsResponse.DocumentResponse> documents =
                 readJsonList(
                         toStringValue(row[3]),
-                        new TypeReference<List<CompanyCandidateDetailsResponse.DocumentResponse>>() {}
+                        new TypeReference<
+                                List<CompanyCandidateDetailsResponse.DocumentResponse>
+                        >() {}
                 );
 
         List<CompanyCandidateDetailsResponse.ProjectResponse> projects =
                 readJsonList(
                         toStringValue(row[4]),
-                        new TypeReference<List<CompanyCandidateDetailsResponse.ProjectResponse>>() {}
+                        new TypeReference<
+                                List<CompanyCandidateDetailsResponse.ProjectResponse>
+                        >() {}
                 );
+
+        String reelJson = firstNonBlank(
+                toStringValue(row[5]),
+                toStringValue(row[6])
+        );
 
         CompanyCandidateDetailsResponse.IntroReelResponse reelMeta =
                 readJson(
-                        firstNonBlank(
-                                toStringValue(row[5]),
-                                toStringValue(row[6])
-                        ),
-                        new TypeReference<CompanyCandidateDetailsResponse.IntroReelResponse>() {}
+                        reelJson,
+                        new TypeReference<
+                                CompanyCandidateDetailsResponse.IntroReelResponse
+                        >() {}
                 );
+
+        reelMeta = refreshReelUrl(reelMeta, reelJson);
 
         CompanyCandidateDetailsResponse.PreferencesResponse preferences =
                 readJson(
                         toStringValue(row[7]),
-                        new TypeReference<CompanyCandidateDetailsResponse.PreferencesResponse>() {}
+                        new TypeReference<
+                                CompanyCandidateDetailsResponse.PreferencesResponse
+                        >() {}
                 );
 
         return new CompanyCandidateDetailsResponse.ProfileMediaResponse(
@@ -316,7 +340,48 @@ public class CompanyCandidateDetailsService {
         );
     }
 
-    private CompanyCandidateDetailsResponse.ProfileMediaResponse emptyProfileMedia() {
+    private CompanyCandidateDetailsResponse.IntroReelResponse
+    refreshReelUrl(
+            CompanyCandidateDetailsResponse.IntroReelResponse reelMeta,
+            String reelJson
+    ) {
+        if (reelMeta == null || reelJson == null || reelJson.isBlank()) {
+            return reelMeta;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(reelJson);
+            JsonNode storagePathNode = root.get("storagePath");
+
+            if (storagePathNode == null || storagePathNode.isNull()) {
+                return reelMeta;
+            }
+
+            String storagePath = storagePathNode.asText();
+
+            if (storagePath.isBlank()) {
+                return reelMeta;
+            }
+
+            String signedUrl = supabaseStorageService.createSignedUrl(
+                    INTRO_REEL_BUCKET,
+                    storagePath,
+                    3600
+            );
+
+            return new CompanyCandidateDetailsResponse.IntroReelResponse(
+                    reelMeta.fileName(),
+                    reelMeta.fileSize(),
+                    reelMeta.uploadedAt(),
+                    signedUrl
+            );
+        } catch (JsonProcessingException e) {
+            return reelMeta;
+        }
+    }
+
+    private CompanyCandidateDetailsResponse.ProfileMediaResponse
+    emptyProfileMedia() {
         return new CompanyCandidateDetailsResponse.ProfileMediaResponse(
                 null,
                 null,
@@ -340,7 +405,10 @@ public class CompanyCandidateDetailsService {
         }
     }
 
-    private <T> List<T> readJsonList(String value, TypeReference<List<T>> type) {
+    private <T> List<T> readJsonList(
+            String value,
+            TypeReference<List<T>> type
+    ) {
         List<T> result = readJson(value, type);
         return result == null ? List.of() : result;
     }
@@ -349,6 +417,7 @@ public class CompanyCandidateDetailsService {
         if (first != null && !first.isBlank()) {
             return first;
         }
+
         return second;
     }
 
@@ -372,6 +441,7 @@ public class CompanyCandidateDetailsService {
         if (value == null) {
             return 0;
         }
+
         return ((Number) value).intValue();
     }
 
@@ -379,6 +449,7 @@ public class CompanyCandidateDetailsService {
         if (value == null) {
             return null;
         }
+
         return ((Number) value).intValue();
     }
 
@@ -386,9 +457,11 @@ public class CompanyCandidateDetailsService {
         if (value == null) {
             return false;
         }
+
         if (value instanceof Boolean bool) {
             return bool;
         }
+
         return Boolean.parseBoolean(value.toString());
     }
 
@@ -396,16 +469,20 @@ public class CompanyCandidateDetailsService {
         if (value == null) {
             return null;
         }
+
         if (value instanceof Date sqlDate) {
             return sqlDate.toLocalDate().toString();
         }
+
         return value.toString();
     }
 
     private String buildName(String firstName, String lastName) {
         String first = firstName == null ? "" : firstName.trim();
         String last = lastName == null ? "" : lastName.trim();
+
         String combined = (first + " " + last).trim();
+
         return combined.isBlank() ? "Unnamed Candidate" : combined;
     }
 }

@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+import com.trucity.application.ApplicationResponseService;
+
 @RestController
 @RequestMapping("/api/applications")
 @CrossOrigin(origins = "http://localhost:5173")
@@ -18,6 +20,7 @@ import java.util.UUID;
 public class ApplicationController {
 
     private final ApplicationService applicationService;
+    private final ApplicationResponseService applicationResponseService;
 
 
     /*
@@ -44,27 +47,6 @@ public class ApplicationController {
     /*
      * =========================================================
      * GET LOGGED-IN EMPLOYER PIPELINE
-     * =========================================================
-     *
-     * URL:
-     *
-     * GET /api/applications/company-pipeline
-     *
-     * Authentication.getName() returns the authenticated
-     * employer's email.
-     *
-     * The service then resolves:
-     *
-     * employer email
-     *      ↓
-     * employer_profiles
-     *      ↓
-     * company_id
-     *      ↓
-     * jobs
-     *      ↓
-     * applications
-     *
      * =========================================================
      */
 
@@ -93,28 +75,6 @@ public class ApplicationController {
     /*
      * =========================================================
      * UPDATE PIPELINE STAGE
-     * =========================================================
-     *
-     * URL:
-     *
-     * PATCH
-     * /api/applications/company-pipeline/{applicationId}/stage
-     *
-     * Example:
-     *
-     * PATCH
-     * /api/applications/company-pipeline/
-     * 80000000-0000-0000-0000-000000000001/stage
-     * ?stage=shortlisted
-     *
-     * The service updates the database only if the application
-     * belongs to the authenticated employer's company.
-     *
-     * The endpoint deliberately returns 204 NO CONTENT.
-     *
-     * The frontend should call GET /company-pipeline afterwards
-     * to refresh the pipeline.
-     *
      * =========================================================
      */
 
@@ -147,4 +107,37 @@ public class ApplicationController {
                 authentication.getName()
         );
     }
+    /*
+     * =========================================================
+     * GET APPLICATION QUESTION RESPONSES
+     * =========================================================
+    */
+
+    @GetMapping(
+            "/company-pipeline/{applicationId}/responses"
+    )
+    @PreAuthorize("hasRole('EMPLOYER')")
+    public List<ApplicationResponseService.ApplicationAnswerResponse>
+    getApplicationResponses(
+            @PathVariable UUID applicationId,
+            Authentication authentication
+    ) {
+
+        if (
+                authentication == null ||
+                authentication.getName() == null ||
+                authentication.getName().isBlank()
+        ) {
+
+            throw new IllegalStateException(
+                    "Authenticated employer could not be identified."
+            );
+        }
+
+        return applicationResponseService.getResponses(
+                applicationId,
+                authentication.getName()
+        );
+    }
+
 }

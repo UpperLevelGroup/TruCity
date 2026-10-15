@@ -94,6 +94,15 @@ public class MessagingService {
                 target
         );
 
+        // Candidates do not need to know an administrator's internal UUID.
+        // When a candidate requests an ADMIN conversation without targetId,
+        // resolve the first account assigned the ADMIN role.
+        if ("CANDIDATE".equals(currentType)
+                && target == MessageType.ADMIN
+                && targetId == null) {
+            targetId = resolveDefaultAdminId();
+        }
+
         validateTarget(
                 target,
                 targetId
@@ -180,11 +189,6 @@ public class MessagingService {
                 messages.stream()
                         .map(this::toMessageResponse)
                         .collect(Collectors.toList());
-
-        markMessagesRead(
-                conversation,
-                currentType
-        );
 
         return new ConversationMessagesResponse(
                 conversationResponse,
@@ -325,6 +329,31 @@ public class MessagingService {
      * TARGET VALIDATION
      * ============================================================
      */
+
+
+    private UUID resolveDefaultAdminId() {
+        List<UUID> adminIds = jdbcTemplate.query(
+                """
+                SELECT u.id
+                FROM users u
+                JOIN user_roles ur ON ur.user_id = u.id
+                JOIN roles r ON r.id = ur.role_id
+                WHERE UPPER(r.name) = 'ADMIN'
+                ORDER BY u.id
+                LIMIT 1
+                """,
+                (rs, rowNum) -> UUID.fromString(rs.getString("id"))
+        );
+
+        if (adminIds.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "No TruCity administrator is currently available."
+            );
+        }
+
+        return adminIds.get(0);
+    }
 
     private void validateTarget(
             MessageType target,
@@ -633,8 +662,8 @@ public class MessagingService {
         long unread =
                 messages.stream()
                         .filter(message ->
-                                !message.getSenderType()
-                                        .equals(currentType)
+                                !(message.getSenderType().equals(currentType)
+                                        && idsMatch(message.getSenderId(), currentId))
                         )
                         .filter(message ->
                                 message.getReadAt() == null
@@ -778,28 +807,39 @@ public class MessagingService {
      */
 
     @Transactional
+    public void markConversationRead(
+            UUID conversationId,
+            String email
+    ) {
+        User user = getUser(email);
+        String currentType = getUserType(user);
+        UUID currentId = getParticipantId(user, currentType);
+        Conversation conversation = getConversation(conversationId);
+
+        ensureParticipant(conversation, currentType, currentId);
+        markMessagesRead(conversation, currentType, currentId);
+    }
+
+    @Transactional
     protected void markMessagesRead(
             Conversation conversation,
-            String currentType
+            String currentType,
+            UUID currentId
     ) {
         List<Message> messages =
-                messageRepository
-                        .findByConversationIdOrderByCreatedAtAsc(
-                                conversation.getId()
-                        );
+                messageRepository.findByConversationIdOrderByCreatedAtAsc(
+                        conversation.getId()
+                );
 
-        LocalDateTime now =
-                LocalDateTime.now();
-
+        LocalDateTime now = LocalDateTime.now();
         boolean changed = false;
 
         for (Message message : messages) {
+            boolean sentByCurrentUser =
+                    message.getSenderType().equals(currentType)
+                            && idsMatch(message.getSenderId(), currentId);
 
-            if (!message.getSenderType()
-                    .equals(currentType)
-                    &&
-                    message.getReadAt() == null) {
-
+            if (!sentByCurrentUser && message.getReadAt() == null) {
                 message.setReadAt(now);
                 changed = true;
             }
@@ -809,4 +849,5 @@ public class MessagingService {
             messageRepository.saveAll(messages);
         }
     }
+
 }

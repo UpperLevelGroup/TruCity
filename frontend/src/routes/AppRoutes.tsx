@@ -12,6 +12,8 @@ import ForgotPassword from "../features/auth/components/login/ForgotPassword";
 import RoleChoice from "../features/auth/components/register/RoleChoice";
 import RegisterCandidate from "../features/auth/components/register/RegisterCandidate";
 import RegisterCompany from "../features/auth/components/register/RegisterCompany";
+import PublicGuidanceHub from "../features/homepage/PublicGuidanceHub";
+
 
 import AdminLayout from "../layouts/AdminLayout";
 import AdminDashboard from "../features/admin/pages/AdminDashboard";
@@ -46,6 +48,7 @@ import Messages from "../features/candidate/pages/Messages";
 import Notifications from "../features/candidate/pages/Notifications";
 import { Profile } from "../features/candidate/pages/Profile";
 import ProfileSetup from "../features/candidate/pages/ProfileSetup";
+import CompanyHubFeed from "../features/candidate/pages/CompanyHubFeed";
 
 export default function AppRoutes() {
   return (
@@ -90,12 +93,11 @@ export default function AppRoutes() {
           element={<RegisterCompany />}
         />
 
-        {/*
         <Route
-          path="/dashboard"
-          element={<Dashboard />}
+          path="/guidance"
+          element={<PublicGuidanceHub />}
         />
-        */}
+        
       </Route>
 
       {/* =====================================================
@@ -145,6 +147,11 @@ export default function AppRoutes() {
         <Route
           path="/candidate/hub"
           element={<GuidanceHub />}
+        />
+         {/* Company Hub */}
+        <Route
+          path="/candidate/companyhubfeed"
+          element={<CompanyHubFeed />}
         />
 
         {/* CV */}

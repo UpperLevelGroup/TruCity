@@ -1,304 +1,1551 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
-import TalentFeed from "./TalentFeed";
-import Pipeline from "./Pipeline";
-import JobListing from "./JobListing";
-import Messages from "./Messages";
-import Plans from "./Plans";
-import CompanyProfile from "./CompanyProfile";
+import { useNavigate } from 'react-router-dom';
 
-import { companyService } from "../company.service";
+import {
+  Activity,
+  ArrowRight,
+  ArrowUpRight,
+  Bell,
+  BookOpen,
+  BriefcaseBusiness,
+  Building2,
+  CheckCircle2,
+  CircleHelp,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  MessageSquare,
+  Plus,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  X,
+} from 'lucide-react';
+
+import api from '../../../api/axios';
+import logo from '../../../assets/trucity-nav-logo.png';
+
+import CompanyHub from './CompanyHub';
+import Pipeline from './Pipeline';
+import JobListing from './JobListing';
+import Messages from './Messages';
+import Plans from './Plans';
+import CompanyProfile from './CompanyProfile';
+
+import { companyService } from '../company.service';
 
 import type {
   CompanyDashboardSummary,
-  CompanyDashboardMetric,
-  CompanyActivity,
-} from "../company.types";
-
-import logo from "../../../assets/trucity-nav-logo.png";
-
-interface GuideItem {
-  id: string;
-  title: string;
-  category: string;
-  readTime: string;
-  description: string;
-  badge: string;
-}
-
-interface VideoItem {
-  id: string;
-  title: string;
-  duration: string;
-  category: string;
-  description: string;
-}
-
-type CompanyTab =
-  | "overview"
-  | "talent"
-  | "pipeline"
-  | "jobs"
-  | "messages"
-  | "plans"
-  | "profile"
-  | "guidance";
-
-const COLORS = {
-  white: "#FFFFFF",
-  page: "#F8FCFF",
-  teal: "#00466D",
-  darkBlue: "#00273D",
-  blue: "#1E92D2",
-  gold: "#FFAD01",
-  orange: "#FFD784",
-  border: "#D4D2E6",
-  bodyText: "#334155",
-  mutedText: "#64748B",
-  success: "#43ED9C",
-  errorBg: "#FFF5F5",
-  errorBorder: "#FF4672",
-  errorText: "#A61B3C",
-} as const;
+} from '../company.types';
 
 /* =========================================================
-   GUIDANCE HUB
-   ========================================================= */
+   TRUCITY BRAND
+========================================================= */
 
-function GuidanceHubContent() {
-  const guides: GuideItem[] = [
-    {
-      id: "1",
-      title: "CIPC Enterprise Verification Workflow",
-      category: "Compliance & Legal",
-      readTime: "4 min read",
-      description:
-        "Step-by-step guide to cross-referencing South African company registration details and director background validation.",
-      badge: "Essential",
-    },
-    {
-      id: "2",
-      title: "Optimizing Embedded C++ Candidate Assessments",
-      category: "Technical Hiring",
-      readTime: "6 min read",
-      description:
-        "Frameworks for evaluating microcontroller firmware engineers, BLE protocol implementations, and real-time hardware testing.",
-      badge: "Best Practice",
-    },
-    {
-      id: "3",
-      title: "Direct Talent Messaging Protocols",
-      category: "Recruitment",
-      readTime: "3 min read",
-      description:
-        "Effective communication strategies for outreach, scheduling technical screens, and extending verified offers.",
-      badge: "Guide",
-    },
-  ];
+const COLORS = {
+  white: '#FFFFFF',
+  page: '#F8FCFF',
+  teal: '#00466D',
+  darkBlue: '#00273D',
+  blue: '#1E92D2',
+  gold: '#FFAD01',
+  orange: '#FFD784',
+  border: '#DCE7EF',
+  bodyText: '#334155',
+  mutedText: '#64748B',
+  success: '#15803D',
+  successBg: '#F0FDF4',
+  warning: '#B45309',
+  warningBg: '#FFFBEB',
+  purple: '#6D5BD0',
+  purpleBg: '#F5F3FF',
+};
 
-  const videos: VideoItem[] = [
-    {
-      id: "v1",
-      title: "Platform Walkthrough & Dashboard Overview",
-      duration: "04:45",
-      category: "Getting Started",
-      description:
-        "A complete video demonstration on navigating candidate views, filtering verified profiles, and managing team permissions.",
-    },
-    {
-      id: "v2",
-      title: "Running Automated CIPC Compliance Checks",
-      duration: "03:15",
-      category: "Compliance",
-      description:
-        "See how real-time registry queries validate company legitimacy and director status instantly.",
-    },
-    {
-      id: "v3",
-      title: "Conducting Technical Interviews for Embedded Engineers",
-      duration: "08:20",
-      category: "Best Practices",
-      description:
-        "Expert tips on reviewing microcontroller code submissions, testing BLE modules, and hardware integration tasks.",
-    },
-  ];
+type CompanyTab =
+  | 'overview'
+  | 'companyHub'
+  | 'guidance'
+  | 'pipeline'
+  | 'jobs'
+  | 'messages'
+  | 'profile';
+
+type ProfileSection = 'details' | 'billing';
+
+type NavigationItem = {
+  id: CompanyTab;
+  label: string;
+  icon: React.ElementType;
+  group: 'workspace' | 'recruitment';
+};
+
+const NAVIGATION: NavigationItem[] = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    icon: LayoutDashboard,
+    group: 'workspace',
+  },
+  {
+    id: 'companyHub',
+    label: 'Company Hub',
+    icon: Building2,
+    group: 'workspace',
+  },
+  {
+    id: 'guidance',
+    label: 'Guidance Hub',
+    icon: BookOpen,
+    group: 'workspace',
+  },
+  {
+    id: 'pipeline',
+    label: 'Talent Pipeline',
+    icon: Users,
+    group: 'recruitment',
+  },
+  {
+    id: 'jobs',
+    label: 'Job Listings',
+    icon: BriefcaseBusiness,
+    group: 'recruitment',
+  },
+  {
+    id: 'messages',
+    label: 'Messages',
+    icon: MessageSquare,
+    group: 'recruitment',
+  },
+  {
+    id: 'profile',
+    label: 'Profile & Settings',
+    icon: Settings2,
+    group: 'recruitment',
+  },
+];
+
+/* =========================================================
+   SHARED DISPLAY HELPERS
+========================================================= */
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function getFirstValue(
+  record: Record<string, unknown>,
+  keys: string[],
+): unknown {
+  for (const key of keys) {
+    const value = record[key];
+
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function displayValue(
+  value: unknown,
+  fallback = '0',
+): string {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+
+  if (typeof value === 'number') {
+    return value.toLocaleString();
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return fallback;
+}
+
+function getActivityTitle(
+  activity: Record<string, unknown>,
+): string {
+  return displayValue(
+    getFirstValue(activity, [
+      'title',
+      'action',
+      'event',
+      'type',
+      'activity',
+    ]),
+    'Recent activity',
+  );
+}
+
+function getActivityDescription(
+  activity: Record<string, unknown>,
+): string {
+  return displayValue(
+    getFirstValue(activity, [
+      'description',
+      'message',
+      'details',
+      'summary',
+    ]),
+    'A recruitment activity was recorded.',
+  );
+}
+
+function getActivityTime(
+  activity: Record<string, unknown>,
+): string {
+  const rawTime = getFirstValue(activity, [
+    'time',
+    'timestamp',
+    'createdAt',
+    'date',
+    'occurredAt',
+  ]);
+
+  if (!rawTime) {
+    return '';
+  }
+
+  const date = new Date(String(rawTime));
+
+  if (Number.isNaN(date.getTime())) {
+    return String(rawTime);
+  }
+
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+/* =========================================================
+   GLOBAL DASHBOARD STYLES
+========================================================= */
+
+const STYLES = `
+  .tc-company {
+    min-height: 100vh;
+    color: ${COLORS.bodyText};
+    background: ${COLORS.page};
+    font-family: Helvetica, Arial, sans-serif;
+    isolation: isolate;
+    position: relative;
+  }
+
+  .tc-company *,
+  .tc-company *::before,
+  .tc-company *::after {
+    box-sizing: border-box;
+  }
+
+  .tc-company button,
+  .tc-company input {
+    font: inherit;
+  }
+
+  .tc-company button {
+    cursor: pointer;
+  }
+
+  
+  .tc-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 258px minmax(0, 1fr);
+  }
+
+  /* SIDEBAR */
+
+  .tc-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    min-height: 0;
+    overflow-y: auto;
+    background: ${COLORS.white};
+    border-right: 1px solid ${COLORS.border};
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px 18px;
+    z-index: 30;
+  }
+
+  .tc-brand {
+    padding: 0 12px 24px;
+    border-bottom: 1px solid #EDF2F6;
+  }
+
+  .tc-brand img {
+    display: block;
+    width: auto;
+    max-width: 176px;
+    max-height: 58px;
+    object-fit: contain;
+    object-position: left center;
+  }
+
+  .tc-brand-caption {
+    margin-top: 12px;
+    color: ${COLORS.mutedText};
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.45px;
+    text-transform: uppercase;
+  }
+
+  .tc-workspace-card {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 13px 11px;
+    margin: 18px 0 24px;
+    border: 1px solid #E5EDF3;
+    border-radius: 13px;
+    background: linear-gradient(135deg, #F3FAFE, #FFFFFF);
+  }
+
+  .tc-workspace-icon {
+    width: 39px;
+    height: 39px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    color: ${COLORS.white};
+    background: linear-gradient(145deg, ${COLORS.blue}, ${COLORS.teal});
+  }
+
+  .tc-workspace-name {
+    color: ${COLORS.darkBlue};
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .tc-workspace-subtitle {
+    color: ${COLORS.mutedText};
+    font-size: 10px;
+  }
+
+  .tc-nav-label {
+    padding: 0 12px;
+    margin: 0 0 9px;
+    color: #94A3B8;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+  }
+
+  .tc-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .tc-nav-button {
+    position: relative;
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 13px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: #64748B;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    transition:
+      background .18s ease,
+      color .18s ease,
+      border-color .18s ease;
+  }
+
+  .tc-nav-button:hover {
+    color: ${COLORS.teal};
+    background: #F5F9FC;
+  }
+
+  .tc-nav-button.active {
+    color: ${COLORS.teal};
+    background: #EAF5FB;
+    border-color: #D7EAF5;
+    font-weight: 800;
+  }
+
+  .tc-nav-button.active::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 50%;
+    width: 3px;
+    height: 21px;
+    transform: translateY(-50%);
+    border-radius: 0 4px 4px 0;
+    background: ${COLORS.blue};
+  }
+
+  .tc-nav-button.active svg {
+    color: ${COLORS.blue};
+  }
+
+  .tc-sidebar-bottom {
+    margin-top: auto;
+    padding-top: 22px;
+  }
+
+  .tc-help-card {
+    padding: 15px;
+    margin-bottom: 13px;
+    border-radius: 13px;
+    color: ${COLORS.white};
+    background: linear-gradient(145deg, ${COLORS.darkBlue}, ${COLORS.teal});
+  }
+
+  .tc-help-card > svg {
+    color: ${COLORS.orange};
+  }
+
+  .tc-help-title {
+    margin: 10px 0 5px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .tc-help-copy {
+    margin-bottom: 12px;
+    color: #D5E6F0;
+    font-size: 10px;
+    line-height: 1.65;
+  }
+
+  .tc-help-button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: ${COLORS.white};
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .tc-logout {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 12px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: #64748B;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .tc-logout:hover {
+    color: #B91C1C;
+    background: #FEF2F2;
+  }
+
+  /* TOP BAR */
+
+  .tc-main {
+    min-width: 0;
+  }
+
+  .tc-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 32px;
+    border-bottom: 1px solid ${COLORS.border};
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(14px);
+  }
+
+  .tc-topbar-left,
+  .tc-topbar-right {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+  }
+
+  .tc-mobile-menu {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 10px;
+    background: ${COLORS.white};
+    color: ${COLORS.teal};
+  }
+
+  .tc-breadcrumb {
+    margin-bottom: 4px;
+    color: ${COLORS.mutedText};
+    font-size: 10px;
+  }
+
+  .tc-topbar-title {
+    color: ${COLORS.darkBlue};
+    font-size: 15px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .tc-verified {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 11px;
+    border: 1px solid #D5EADF;
+    border-radius: 999px;
+    background: #F1FBF5;
+    color: #187347;
+    font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .tc-search {
+    width: 215px;
+    height: 39px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 10px;
+    background: #FAFCFE;
+    color: #94A3B8;
+  }
+
+  .tc-search input {
+    width: 100%;
+    min-width: 0;
+    outline: 0;
+    border: 0;
+    background: transparent;
+    color: ${COLORS.bodyText};
+    font-size: 10px;
+  }
+
+  .tc-icon-button {
+    position: relative;
+    width: 39px;
+    height: 39px;
+    display: grid;
+    place-items: center;
+    border: 1px solid ${COLORS.border};
+    border-radius: 10px;
+    background: ${COLORS.white};
+    color: #64748B;
+  }
+
+  .tc-icon-button:hover {
+    color: ${COLORS.teal};
+    background: #F5FAFD;
+  }
+
+  .tc-notification-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 7px;
+    height: 7px;
+    border: 1px solid ${COLORS.white};
+    border-radius: 50%;
+    background: ${COLORS.gold};
+  }
+
+  .tc-avatar {
+    width: 39px;
+    height: 39px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #D5EAF5;
+    border-radius: 11px;
+    background: #E6F3FA;
+    color: ${COLORS.teal};
+  }
+
+  /* MAIN CONTENT */
+
+  .tc-content {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  .tc-page-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 27px;
+  }
+
+  .tc-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    color: ${COLORS.blue};
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .tc-page-title {
+    margin: 0;
+    color: ${COLORS.darkBlue};
+    font-size: clamp(25px, 2.5vw, 33px);
+    font-weight: 900;
+    letter-spacing: -1px;
+    line-height: 1.2;
+  }
+
+  .tc-page-description {
+    max-width: 620px;
+    margin: 10px 0 0;
+    color: ${COLORS.mutedText};
+    font-size: 12px;
+    line-height: 1.75;
+  }
+
+  .tc-heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tc-button {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 0 15px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+    transition:
+      transform .18s ease,
+      box-shadow .18s ease,
+      background .18s ease;
+  }
+
+  .tc-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .tc-button-primary {
+    color: ${COLORS.white};
+    background: ${COLORS.teal};
+    box-shadow: 0 5px 13px rgba(0,70,109,.13);
+  }
+
+  .tc-button-primary:hover {
+    background: ${COLORS.darkBlue};
+    box-shadow: 0 7px 18px rgba(0,70,109,.18);
+  }
+
+  .tc-button-secondary {
+    color: ${COLORS.teal};
+    background: ${COLORS.white};
+    border-color: ${COLORS.border};
+  }
+
+  .tc-button-secondary:hover {
+    background: #F4FAFD;
+    border-color: #BDD7E5;
+  }
+
+  /* METRICS */
+
+  .tc-section-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 29px 0 15px;
+  }
+
+  .tc-section-title {
+    margin: 0;
+    color: ${COLORS.darkBlue};
+    font-size: 14px;
+    font-weight: 900;
+  }
+
+  .tc-section-subtitle {
+    margin: 5px 0 0;
+    color: ${COLORS.mutedText};
+    font-size: 11px;
+  }
+
+  .tc-live-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    background: #F0FDF4;
+    color: #15803D;
+    font-size: 9px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .tc-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22C55E;
+  }
+
+  .tc-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .tc-metric {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 15px;
+    background: ${COLORS.white};
+    box-shadow: 0 3px 12px rgba(15,42,62,.025);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+
+  .tc-metric:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 9px 24px rgba(15,42,62,.06);
+  }
+
+  .tc-metric-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 21px;
+  }
+
+  .tc-metric-icon {
+    width: 41px;
+    height: 41px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+  }
+
+  .tc-metric-icon.blue {
+    background: #EAF5FC;
+    color: ${COLORS.blue};
+  }
+
+  .tc-metric-icon.gold {
+    background: #FFF7E4;
+    color: #C18400;
+  }
+
+  .tc-metric-icon.green {
+    background: #ECFDF3;
+    color: #15803D;
+  }
+
+  .tc-metric-icon.purple {
+    background: ${COLORS.purpleBg};
+    color: ${COLORS.purple};
+  }
+
+  .tc-metric-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 5px 7px;
+    border-radius: 7px;
+    background: ${COLORS.successBg};
+    color: ${COLORS.success};
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .tc-metric-label {
+    margin-bottom: 8px;
+    color: ${COLORS.mutedText};
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .tc-metric-value {
+    color: ${COLORS.darkBlue};
+    font-size: clamp(25px, 2.4vw, 32px);
+    font-weight: 900;
+    letter-spacing: -1px;
+    line-height: 1;
+    overflow-wrap: anywhere;
+  }
+
+  .tc-metric-note {
+    margin-top: 11px;
+    color: #94A3B8;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  /* ACTIVITY AND QUICK ACTIONS */
+
+  .tc-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(290px, .85fr);
+    gap: 18px;
+    margin-top: 27px;
+  }
+
+  .tc-panel {
+    min-width: 0;
+    padding: 22px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 15px;
+    background: ${COLORS.white};
+    box-shadow: 0 3px 12px rgba(15,42,62,.025);
+  }
+
+  .tc-panel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .tc-panel-title {
+    margin: 0;
+    color: ${COLORS.darkBlue};
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .tc-panel-description {
+    margin: 5px 0 0;
+    color: ${COLORS.mutedText};
+    font-size: 10px;
+    line-height: 1.6;
+  }
+
+  .tc-activity-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tc-activity-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 15px 0;
+    border-bottom: 1px solid #EEF2F6;
+  }
+
+  .tc-activity-row:first-child {
+    padding-top: 0;
+  }
+
+  .tc-activity-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .tc-activity-icon {
+    width: 35px;
+    height: 35px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #EFF8FD;
+    color: ${COLORS.blue};
+  }
+
+  .tc-activity-title {
+    color: ${COLORS.darkBlue};
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .tc-activity-description {
+    margin-top: 4px;
+    color: ${COLORS.mutedText};
+    font-size: 10px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  .tc-activity-time {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-top: 3px;
+    color: #94A3B8;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .tc-quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tc-quick-action {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px;
+    border: 1px solid #E7EEF3;
+    border-radius: 11px;
+    background: ${COLORS.white};
+    text-align: left;
+    transition: border-color .18s ease, background .18s ease;
+  }
+
+  .tc-quick-action:hover {
+    border-color: #BDDCEC;
+    background: #F8FCFF;
+  }
+
+  .tc-quick-icon {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #EAF5FB;
+    color: ${COLORS.teal};
+  }
+
+  .tc-quick-action-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tc-quick-action-title {
+    display: block;
+    color: ${COLORS.darkBlue};
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .tc-quick-action-description {
+    display: block;
+    margin-top: 4px;
+    color: ${COLORS.mutedText};
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .tc-quick-arrow {
+    flex-shrink: 0;
+    color: #94A3B8;
+  }
+
+  .tc-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 18px;
+    padding: 15px;
+    border: 1px solid #F4E3B3;
+    border-radius: 12px;
+    background: #FFFBF0;
+  }
+
+  .tc-callout-icon {
+    flex-shrink: 0;
+    color: #B77900;
+  }
+
+  .tc-callout-title {
+    margin-bottom: 4px;
+    color: #754D00;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .tc-callout-copy {
+    color: #8A6B32;
+    font-size: 10px;
+    line-height: 1.65;
+  }
+
+  /* LOADING AND ERROR STATES */
+
+  .tc-state-card {
+    padding: 25px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 13px;
+    background: ${COLORS.white};
+    color: ${COLORS.mutedText};
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .tc-state-card strong {
+    display: block;
+    margin-bottom: 5px;
+    color: ${COLORS.darkBlue};
+    font-size: 13px;
+  }
+
+  .tc-state-card.error {
+    border-color: #FECACA;
+    background: #FFF7F7;
+    color: #991B1B;
+  }
+
+  .tc-skeleton {
+    height: 150px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 15px;
+    background: linear-gradient(
+      100deg,
+      #FFFFFF 20%,
+      #F1F6F9 40%,
+      #FFFFFF 60%
+    );
+    background-size: 200% 100%;
+    animation: tc-shimmer 1.5s ease infinite;
+  }
+
+  @keyframes tc-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+
+  /* PROFILE TABS */
+
+  .tc-profile-switch {
+    width: fit-content;
+    max-width: 100%;
+    display: flex;
+    gap: 5px;
+    padding: 5px;
+    margin-bottom: 20px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 11px;
+    background: ${COLORS.white};
+  }
+
+  .tc-profile-switch button {
+    padding: 10px 13px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: ${COLORS.mutedText};
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .tc-profile-switch button.active {
+    background: #EAF5FB;
+    color: ${COLORS.teal};
+  }
+
+  /* GUIDANCE HUB */
+
+  .tc-guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 17px;
+  }
+
+  .tc-guidance-card {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid ${COLORS.border};
+    border-radius: 14px;
+    background: ${COLORS.white};
+    transition: box-shadow .18s ease, transform .18s ease;
+  }
+
+  .tc-guidance-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 9px 24px rgba(15,42,62,.06);
+  }
+
+  .tc-guidance-category {
+    display: inline-flex;
+    padding: 6px 9px;
+    border-radius: 7px;
+    background: #EAF5FB;
+    color: ${COLORS.teal};
+    font-size: 9px;
+    font-weight: 800;
+  }
+
+  .tc-guidance-title {
+    margin: 13px 0 8px;
+    color: ${COLORS.darkBlue};
+    font-size: 15px;
+    font-weight: 900;
+    line-height: 1.45;
+  }
+
+  .tc-guidance-summary {
+    color: ${COLORS.mutedText};
+    font-size: 11px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+  }
+
+  .tc-guidance-date {
+    margin-top: 15px;
+    color: #94A3B8;
+    font-size: 10px;
+  }
+
+  .tc-guidance-media {
+    display: block;
+    max-width: 100%;
+    margin-top: 14px;
+    border-radius: 10px;
+  }
+
+  .tc-guidance-empty {
+    grid-column: 1 / -1;
+  }
+
+  .tc-mobile-overlay {
+    display: none;
+  }
+
+  /* RESPONSIVE */
+
+  @media (max-width: 1200px) {
+    .tc-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tc-search {
+      width: 175px;
+    }
+
+    .tc-content {
+      padding: 27px 24px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .tc-shell {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tc-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 258px;
+      height: 100dvh;
+      transform: translateX(-105%);
+      transition: transform .22s ease;
+      box-shadow: 12px 0 40px rgba(15,42,62,.08);
+    }
+
+    .tc-sidebar.open {
+      transform: translateX(0);
+    }
+
+    .tc-mobile-menu {
+      display: inline-flex;
+    }
+
+    .tc-mobile-overlay.visible {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+      background: rgba(0,24,40,.36);
+    }
+
+    .tc-topbar {
+      padding: 13px 20px;
+    }
+
+    .tc-overview-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tc-content {
+      padding: 25px 20px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .tc-topbar {
+      min-height: 66px;
+      gap: 8px;
+      padding: 11px 13px;
+    }
+
+    .tc-topbar-left,
+    .tc-topbar-right {
+      gap: 8px;
+    }
+
+    .tc-search,
+    .tc-verified {
+      display: none;
+    }
+
+    .tc-topbar-title {
+      font-size: 13px;
+    }
+
+    .tc-content {
+      padding: 23px 14px;
+    }
+
+    .tc-page-heading {
+      flex-direction: column;
+      margin-bottom: 22px;
+    }
+
+    .tc-page-title {
+      font-size: 26px;
+    }
+
+    .tc-heading-actions {
+      width: 100%;
+    }
+
+    .tc-heading-actions .tc-button {
+      flex: 1;
+    }
+
+    .tc-metrics {
+      gap: 10px;
+    }
+
+    .tc-metric {
+      padding: 14px;
+      border-radius: 12px;
+    }
+
+    .tc-metric-top {
+      margin-bottom: 16px;
+    }
+
+    .tc-metric-icon {
+      width: 35px;
+      height: 35px;
+    }
+
+    .tc-metric-trend {
+      padding: 4px 5px;
+      font-size: 9px;
+    }
+
+    .tc-metric-label {
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .tc-metric-value {
+      font-size: 25px;
+    }
+
+    .tc-panel {
+      padding: 16px;
+    }
+
+    .tc-activity-time {
+      display: none;
+    }
+
+    .tc-guidance-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tc-profile-switch {
+      width: 100%;
+    }
+
+    .tc-profile-switch button {
+      flex: 1;
+      padding: 10px 8px;
+    }
+  }
+`;
+
+/* =========================================================
+   GUIDANCE HUB NOTICES
+   Kept in this file, using the existing API endpoint.
+========================================================= */
+
+type GuidanceNotice = {
+  id: string | number;
+  title: string;
+  category: string;
+  summary: string;
+  description: string;
+  content: string;
+  body: string;
+  publishedAt: string;
+  createdAt: string;
+  mediaUrl: string;
+  featured: boolean;
+};
+
+function GuidanceHubNotices() {
+  const [notices, setNotices] = useState<GuidanceNotice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotices = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.get(
+          '/api/guidance?audience=COMPANY',
+        );
+
+        const responseData = response.data;
+
+        const rawItems = Array.isArray(responseData)
+          ? responseData
+          : Array.isArray(responseData?.content)
+            ? responseData.content
+            : [];
+
+        const mapped: GuidanceNotice[] = rawItems.map(
+          (item: Record<string, unknown>, index: number) => {
+            const title = displayValue(
+              getFirstValue(item, ['title', 'name']),
+              'Guidance update',
+            );
+
+            const content = displayValue(
+              getFirstValue(item, [
+                'content',
+                'body',
+                'description',
+                'summary',
+              ]),
+              '',
+            );
+
+            return {
+              id: displayValue(
+                getFirstValue(item, ['id']),
+                String(index),
+              ),
+              title,
+              category: displayValue(
+                getFirstValue(item, ['category', 'type']),
+                'Company guidance',
+              ),
+              summary: displayValue(
+                getFirstValue(item, ['summary', 'description']),
+                content,
+              ),
+              description: displayValue(
+                getFirstValue(item, ['description']),
+                '',
+              ),
+              content,
+              body: displayValue(
+                getFirstValue(item, ['body']),
+                '',
+              ),
+              publishedAt: displayValue(
+                getFirstValue(item, ['publishedAt']),
+                '',
+              ),
+              createdAt: displayValue(
+                getFirstValue(item, ['createdAt']),
+                '',
+              ),
+              mediaUrl: displayValue(
+                getFirstValue(item, [
+                  'mediaUrl',
+                  'imageUrl',
+                  'thumbnailUrl',
+                ]),
+                '',
+              ),
+              featured: Boolean(item.featured),
+            };
+          },
+        );
+
+        if (mounted) {
+          setNotices(mapped);
+        }
+      } catch (requestError) {
+        console.error(
+          'Failed to load company guidance notices:',
+          requestError,
+        );
+
+        if (mounted) {
+          setError(
+            'Guidance notices could not be loaded. Please try again.',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadNotices();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
-    <div style={styles.guidanceWrapper}>
-      <div style={styles.guidanceHeader}>
+    <section>
+      <div className="tc-page-heading">
         <div>
-          <p style={styles.eyebrow}>TRUCITY • RESOURCES</p>
+          <div className="tc-eyebrow">
+            <BookOpen size={13} />
+            KNOWLEDGE & SUPPORT
+          </div>
 
-          <h1 style={styles.guidanceTitle}>
-            Guidance Hub & Video Tutorials
-          </h1>
+          <h1 className="tc-page-title">Guidance Hub</h1>
 
-          <p style={styles.guidanceSubtitle}>
-            Resources, CIPC verification standards, video tutorials, and best
-            practices for hiring verified technical talent.
+          <p className="tc-page-description">
+            Explore company guidance, recruitment resources and
+            important platform updates to help your organisation
+            get the most out of TruCity.
           </p>
         </div>
       </div>
 
-      {/* Feature Banner */}
-      <div style={styles.guidanceBanner}>
-        <div>
-          <span style={styles.resourceBadge}>
-            Platform Resource
-          </span>
-
-          <h2 style={styles.bannerTitle}>
-            CIPC Verification & Compliance Standards
-          </h2>
-
-          <p style={styles.bannerText}>
-            Learn how TruCity integrates with direct business registry data to
-            validate candidate credentials safely.
-          </p>
+      {loading ? (
+        <div className="tc-state-card">
+          Loading company guidance…
         </div>
-
-        <button
-          type="button"
-          style={styles.bannerButton}
-          onClick={() => {
-            window.alert(
-              "Integration specifications will be available here."
-            );
-          }}
-        >
-          Read Integration Specs →
-        </button>
-      </div>
-
-      {/* Video Tutorials */}
-      <section style={styles.guidanceSection}>
-        <div style={styles.guidanceSectionHeader}>
-          <h2 style={styles.guidanceSectionTitle}>
-            Video Tutorials & Walkthroughs
-          </h2>
-
-          <button
-            type="button"
-            style={styles.viewAllButton}
-            onClick={() => {
-              window.alert("All video tutorials will be available here.");
-            }}
-          >
-            View all videos →
-          </button>
+      ) : error ? (
+        <div className="tc-state-card error">
+          <strong>Unable to load guidance</strong>
+          {error}
         </div>
+      ) : notices.length === 0 ? (
+        <div className="tc-state-card">
+          <strong>No guidance updates yet</strong>
+          New guidance articles and announcements for companies
+          will appear here when they are published.
+        </div>
+      ) : (
+        <div className="tc-guidance-grid">
+          {notices.map((notice) => (
+            <article
+              className="tc-guidance-card"
+              key={notice.id}
+            >
+              <span className="tc-guidance-category">
+                {notice.category}
+              </span>
 
-        <div style={styles.guidanceGrid}>
-          {videos.map((video) => (
-            <div key={video.id} style={styles.guidanceCard}>
-              <div style={styles.videoPreview}>
-                <button
-                  type="button"
-                  aria-label={`Play ${video.title}`}
-                  style={styles.playButton}
-                  onClick={() => {
-                    window.alert(`Playing: ${video.title}`);
+              <h2 className="tc-guidance-title">
+                {notice.title}
+              </h2>
+
+              <div className="tc-guidance-summary">
+                {notice.summary ||
+                  notice.description ||
+                  notice.content ||
+                  notice.body ||
+                  'Open this guidance item to review its details.'}
+              </div>
+
+              {notice.mediaUrl && (
+                <img
+                  className="tc-guidance-media"
+                  src={notice.mediaUrl}
+                  alt=""
+                  loading="lazy"
+                  style={{
+                    maxHeight: 230,
+                    objectFit: 'cover',
                   }}
-                >
-                  ▶
-                </button>
+                />
+              )}
 
-                <span style={styles.videoDuration}>
-                  {video.duration}
-                </span>
-              </div>
-
-              <div style={styles.guidanceCardContent}>
-                <div>
-                  <span style={styles.categoryLabel}>
-                    {video.category}
-                  </span>
-
-                  <h3 style={styles.guidanceCardTitle}>
-                    {video.title}
-                  </h3>
-
-                  <p style={styles.guidanceCardDescription}>
-                    {video.description}
-                  </p>
+              {(notice.publishedAt || notice.createdAt) && (
+                <div className="tc-guidance-date">
+                  {notice.publishedAt || notice.createdAt}
                 </div>
-
-                <div style={styles.guidanceCardFooter}>
-                  <button
-                    type="button"
-                    style={styles.cardLinkButton}
-                    onClick={() => {
-                      window.alert(`Opening: ${video.title}`);
-                    }}
-                  >
-                    Watch Video →
-                  </button>
-                </div>
-              </div>
-            </div>
+              )}
+            </article>
           ))}
         </div>
-      </section>
-
-      {/* Written Guides */}
-      <section style={styles.guidanceSection}>
-        <h2 style={styles.guidanceSectionTitle}>
-          Documentation & Guides
-        </h2>
-
-        <div style={styles.guidanceGrid}>
-          {guides.map((guide) => (
-            <div key={guide.id} style={styles.guidanceCardWritten}>
-              <div>
-                <div style={styles.guideMeta}>
-                  <span style={styles.categoryLabel}>
-                    {guide.category}
-                  </span>
-
-                  <span style={styles.readTime}>
-                    {guide.readTime}
-                  </span>
-                </div>
-
-                <h3 style={styles.guidanceCardTitle}>
-                  {guide.title}
-                </h3>
-
-                <p style={styles.guidanceCardDescription}>
-                  {guide.description}
-                </p>
-              </div>
-
-              <div style={styles.guideFooter}>
-                <span style={styles.guideBadge}>
-                  ✓ {guide.badge}
-                </span>
-
-                <button
-                  type="button"
-                  style={styles.cardLinkButton}
-                  onClick={() => {
-                    window.alert(`Opening: ${guide.title}`);
-                  }}
-                >
-                  View Guide →
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
+      )}
+    </section>
   );
 }
 
 /* =========================================================
    COMPANY DASHBOARD
-   ========================================================= */
+========================================================= */
 
 export default function CompanyDashboard() {
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] =
-    useState<CompanyTab>("overview");
+    useState<CompanyTab>('overview');
+
+  const [profileSection, setProfileSection] =
+    useState<ProfileSection>('details');
 
   const [dashboard, setDashboard] =
     useState<CompanyDashboardSummary | null>(null);
@@ -307,1527 +1554,874 @@ export default function CompanyDashboard() {
     useState(true);
 
   const [dashboardError, setDashboardError] =
-    useState("");
+    useState<string | null>(null);
 
-  const [showNotifications, setShowNotifications] =
-    useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const [hasNewAlerts, setHasNewAlerts] =
-    useState(true);
-
-  const notifications = [
-    {
-      id: 1,
-      text: "Jessica Taylor moved to Offered stage",
-      time: "10 mins ago",
-    },
-    {
-      id: 2,
-      text: "New job posted: Chartered Accountant (SAICA)",
-      time: "1 hour ago",
-    },
-    {
-      id: 3,
-      text: "Sipho Ndlovu sent a new message",
-      time: "3 hours ago",
-    },
-  ];
+  /* ---------------------------------------------------------
+     DASHBOARD API
+  --------------------------------------------------------- */
 
   useEffect(() => {
-    loadDashboard();
+    let mounted = true;
+
+    const loadDashboard = async () => {
+      setLoadingDashboard(true);
+      setDashboardError(null);
+
+      try {
+        const result =
+          await companyService.getDashboardSummary();
+
+        if (mounted) {
+          setDashboard(result);
+        }
+      } catch (error) {
+        console.error(
+          'Failed to load company dashboard:',
+          error,
+        );
+
+        if (mounted) {
+          setDashboardError(
+            'We could not load your recruitment overview. Please try again.',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoadingDashboard(false);
+        }
+      }
+    };
+
+    void loadDashboard();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const loadDashboard = async () => {
-    try {
-      setLoadingDashboard(true);
-      setDashboardError("");
+  /* ---------------------------------------------------------
+     DASHBOARD DATA
+  --------------------------------------------------------- */
 
-      const data =
+  const dashboardRecord = asRecord(dashboard);
+
+  const metrics = useMemo(() => {
+    const rawMetrics = dashboardRecord.metrics;
+
+    return Array.isArray(rawMetrics)
+      ? rawMetrics
+      : [];
+  }, [dashboardRecord.metrics]);
+
+  const recentActivity = useMemo(() => {
+    const rawActivity = dashboardRecord.recentActivity;
+
+    return Array.isArray(rawActivity)
+      ? rawActivity
+      : [];
+  }, [dashboardRecord.recentActivity]);
+
+  const visibleMetrics = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return metrics;
+    }
+
+    const term = searchTerm.toLowerCase();
+
+    return metrics.filter((item) => {
+      const metric = asRecord(item);
+
+      const label = displayValue(
+        getFirstValue(metric, [
+          'label',
+          'title',
+          'name',
+          'metric',
+        ]),
+        '',
+      );
+
+      return label.toLowerCase().includes(term);
+    });
+  }, [metrics, searchTerm]);
+
+  const currentPage = NAVIGATION.find(
+    (item) => item.id === activeTab,
+  );
+
+  /* ---------------------------------------------------------
+     NAVIGATION AND LOGOUT
+  --------------------------------------------------------- */
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+
+    navigate('/login');
+  };
+
+  const handleTabChange = (tab: CompanyTab) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+  };
+
+  const handlePostJob = () => {
+    handleTabChange('jobs');
+  };
+
+  const reloadDashboard = async () => {
+    setLoadingDashboard(true);
+    setDashboardError(null);
+
+    try {
+      const result =
         await companyService.getDashboardSummary();
 
-      setDashboard(data);
+      setDashboard(result);
     } catch (error) {
       console.error(
-        "Failed to load company dashboard:",
-        error
+        'Failed to reload company dashboard:',
+        error,
       );
 
       setDashboardError(
-        "Unable to load dashboard data."
+        'We could not load your recruitment overview. Please try again.',
       );
     } finally {
       setLoadingDashboard(false);
     }
   };
 
-  const handleOpenMessage = (_candidateName: string) => {
-    setActiveTab("messages");
-  };
+  /* ---------------------------------------------------------
+     OVERVIEW PAGE
+  --------------------------------------------------------- */
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("role");
+  const renderOverview = () => (
+    <>
+      <div className="tc-page-heading">
+        <div>
+          <div className="tc-eyebrow">
+            <Sparkles size={13} />
+            COMPANY WORKSPACE
+          </div>
 
-    window.location.href = "/login";
-  };
+          <h1 className="tc-page-title">
+            Executive Overview
+          </h1>
 
-  const metrics: CompanyDashboardMetric[] =
-    dashboard?.metrics ?? [];
+          <p className="tc-page-description">
+            Your recruitment command centre. Monitor hiring
+            activity, manage opportunities and keep your
+            talent pipeline moving.
+          </p>
+        </div>
 
-  const recentActivity: CompanyActivity[] =
-    dashboard?.recentActivity ?? [];
-
-  return (
-    <div style={styles.appLayout}>
-
-      {/* =================================================
-          BACKGROUND
-          ================================================= */}
-
-      <div
-        style={{
-          ...styles.bgLogoWatermark,
-          backgroundImage: `url(${logo})`,
-        }}
-        aria-hidden="true"
-      />
-
-      <div
-        style={styles.circleTopLeft}
-        aria-hidden="true"
-      />
-
-      <div
-        style={styles.circleTopRight}
-        aria-hidden="true"
-      />
-
-      <div
-        style={styles.circleBottomLeft}
-        aria-hidden="true"
-      />
-
-      <div
-        style={styles.circleBottomRight}
-        aria-hidden="true"
-      />
-
-      {/* =================================================
-          NAVBAR
-          ================================================= */}
-
-      <header style={styles.topNavbar}>
-
-        <div style={styles.navLeft}>
+        <div className="tc-heading-actions">
+          <button
+            type="button"
+            className="tc-button tc-button-secondary"
+            onClick={() => handleTabChange('pipeline')}
+          >
+            <Users size={15} />
+            View Pipeline
+          </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab("overview")}
-            style={styles.brandButton}
-            aria-label="Go to TruCity dashboard"
+            className="tc-button tc-button-primary"
+            onClick={handlePostJob}
           >
+            <Plus size={16} />
+            Post a Job
+          </button>
+        </div>
+      </div>
+
+      <div className="tc-section-heading">
+        <div>
+          <h2 className="tc-section-title">
+            Recruitment at a glance
+          </h2>
+
+          <p className="tc-section-subtitle">
+            A snapshot of your company’s recruitment activity.
+          </p>
+        </div>
+
+        <span className="tc-live-label">
+          <span className="tc-live-dot" />
+          Dashboard overview
+        </span>
+      </div>
+
+      {loadingDashboard ? (
+        <div className="tc-metrics">
+          {[0, 1, 2, 3].map((item) => (
+            <div
+              className="tc-skeleton"
+              key={item}
+            />
+          ))}
+        </div>
+      ) : dashboardError ? (
+        <div className="tc-state-card error">
+          <strong>Dashboard unavailable</strong>
+
+          {dashboardError}
+
+          <div style={{ marginTop: 14 }}>
+            <button
+              type="button"
+              className="tc-button tc-button-secondary"
+              onClick={() => void reloadDashboard()}
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="tc-metrics">
+          {visibleMetrics.length > 0 ? (
+            visibleMetrics.map((item, index) => {
+              const metric = asRecord(item);
+
+              const iconOptions = [
+                {
+                  icon: BriefcaseBusiness,
+                  color: 'blue',
+                },
+                {
+                  icon: Users,
+                  color: 'purple',
+                },
+                {
+                  icon: FileText,
+                  color: 'gold',
+                },
+                {
+                  icon: CheckCircle2,
+                  color: 'green',
+                },
+              ];
+
+              const iconOption =
+                iconOptions[index % iconOptions.length];
+
+              const MetricIcon = iconOption.icon;
+
+              const label = displayValue(
+                getFirstValue(metric, [
+                  'label',
+                  'title',
+                  'name',
+                  'metric',
+                ]),
+                `Metric ${index + 1}`,
+              );
+
+              const value = displayValue(
+                getFirstValue(metric, [
+                  'value',
+                  'count',
+                  'total',
+                  'amount',
+                ]),
+              );
+
+              const trend = getFirstValue(metric, [
+                'trend',
+                'change',
+                'percentageChange',
+              ]);
+
+              const note = displayValue(
+                getFirstValue(metric, [
+                  'description',
+                  'subtitle',
+                  'caption',
+                  'period',
+                ]),
+                'Based on your recruitment activity',
+              );
+
+              return (
+                <article
+                  className="tc-metric"
+                  key={`${label}-${index}`}
+                >
+                  <div className="tc-metric-top">
+                    <div
+                      className={`tc-metric-icon ${iconOption.color}`}
+                    >
+                      <MetricIcon size={19} />
+                    </div>
+
+                    {trend !== undefined && (
+                      <span className="tc-metric-trend">
+                        <ArrowUpRight size={12} />
+                        {String(trend)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="tc-metric-label">
+                    {label}
+                  </div>
+
+                  <div className="tc-metric-value">
+                    {value}
+                  </div>
+
+                  <div className="tc-metric-note">
+                    {note}
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            <div
+              className="tc-state-card"
+              style={{ gridColumn: '1 / -1' }}
+            >
+              <strong>No dashboard metrics available</strong>
+
+              {searchTerm
+                ? 'No metrics match your search. Try a different term.'
+                : 'Your recruitment metrics will appear here when dashboard data is available.'}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="tc-overview-grid">
+        <section className="tc-panel">
+          <div className="tc-panel-heading">
+            <div>
+              <h2 className="tc-panel-title">
+                Real-Time Recruitment Activity
+              </h2>
+
+              <p className="tc-panel-description">
+                Recent updates across your recruitment workspace.
+              </p>
+            </div>
+
+            <Activity
+              size={18}
+              color={COLORS.blue}
+            />
+          </div>
+
+          {loadingDashboard ? (
+            <div className="tc-state-card">
+              Loading recent activity…
+            </div>
+          ) : recentActivity.length > 0 ? (
+            <div className="tc-activity-list">
+              {recentActivity.map((item, index) => {
+                const activity = asRecord(item);
+
+                const activityId = getFirstValue(
+                  activity,
+                  ['id', 'activityId'],
+                );
+
+                return (
+                  <div
+                    className="tc-activity-row"
+                    key={String(activityId ?? index)}
+                  >
+                    <div className="tc-activity-icon">
+                      <Activity size={16} />
+                    </div>
+
+                    <div
+                      style={{
+                        minWidth: 0,
+                        flex: 1,
+                      }}
+                    >
+                      <div className="tc-activity-title">
+                        {getActivityTitle(activity)}
+                      </div>
+
+                      <div className="tc-activity-description">
+                        {getActivityDescription(activity)}
+                      </div>
+                    </div>
+
+                    <div className="tc-activity-time">
+                      {getActivityTime(activity)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="tc-state-card">
+              <strong>You’re all caught up</strong>
+
+              Your recent recruitment activity will appear here
+              as applications and other events come in.
+            </div>
+          )}
+        </section>
+
+        <section className="tc-panel">
+          <div className="tc-panel-heading">
+            <div>
+              <h2 className="tc-panel-title">
+                Quick Actions
+              </h2>
+
+              <p className="tc-panel-description">
+                Get straight to your next recruitment task.
+              </p>
+            </div>
+          </div>
+
+          <div className="tc-quick-actions">
+            <button
+              type="button"
+              className="tc-quick-action"
+              onClick={() => handleTabChange('jobs')}
+            >
+              <span className="tc-quick-icon">
+                <BriefcaseBusiness size={17} />
+              </span>
+
+              <span className="tc-quick-action-copy">
+                <span className="tc-quick-action-title">
+                  Manage Job Listings
+                </span>
+
+                <span className="tc-quick-action-description">
+                  Create and manage opportunities.
+                </span>
+              </span>
+
+              <ArrowRight
+                className="tc-quick-arrow"
+                size={15}
+              />
+            </button>
+
+            <button
+              type="button"
+              className="tc-quick-action"
+              onClick={() => handleTabChange('pipeline')}
+            >
+              <span className="tc-quick-icon">
+                <Users size={17} />
+              </span>
+
+              <span className="tc-quick-action-copy">
+                <span className="tc-quick-action-title">
+                  Review Talent Pipeline
+                </span>
+
+                <span className="tc-quick-action-description">
+                  Follow candidates through recruitment stages.
+                </span>
+              </span>
+
+              <ArrowRight
+                className="tc-quick-arrow"
+                size={15}
+              />
+            </button>
+
+            <button
+              type="button"
+              className="tc-quick-action"
+              onClick={() => handleTabChange('companyHub')}
+            >
+              <span className="tc-quick-icon">
+                <Building2 size={17} />
+              </span>
+
+              <span className="tc-quick-action-copy">
+                <span className="tc-quick-action-title">
+                  Company Hub
+                </span>
+
+                <span className="tc-quick-action-description">
+                  Access your company workspace.
+                </span>
+              </span>
+
+              <ArrowRight
+                className="tc-quick-arrow"
+                size={15}
+              />
+            </button>
+
+            <button
+              type="button"
+              className="tc-quick-action"
+              onClick={() => handleTabChange('profile')}
+            >
+              <span className="tc-quick-icon">
+                <ShieldCheck size={17} />
+              </span>
+
+              <span className="tc-quick-action-copy">
+                <span className="tc-quick-action-title">
+                  Company Profile & Plans
+                </span>
+
+                <span className="tc-quick-action-description">
+                  Review company details and subscription.
+                </span>
+              </span>
+
+              <ArrowRight
+                className="tc-quick-arrow"
+                size={15}
+              />
+            </button>
+          </div>
+
+          <div className="tc-callout">
+            <div className="tc-callout-icon">
+              <Sparkles size={18} />
+            </div>
+
+            <div>
+              <div className="tc-callout-title">
+                Build trust with candidates
+              </div>
+
+              <div className="tc-callout-copy">
+                Keep your company profile accurate and up to date
+                so candidates can learn more about your organisation.
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </>
+  );
+
+  /* ---------------------------------------------------------
+     PAGE ROUTING
+  --------------------------------------------------------- */
+
+  const renderActivePage = () => {
+    switch (activeTab) {
+      case 'overview':
+        return renderOverview();
+
+      case 'companyHub':
+        return <CompanyHub />;
+
+      case 'guidance':
+        return <GuidanceHubNotices />;
+
+      case 'pipeline':
+        return <Pipeline />;
+
+      case 'jobs':
+        return <JobListing />;
+
+      case 'messages':
+        return <Messages />;
+
+      case 'profile':
+        return (
+          <>
+            <div className="tc-page-heading">
+              <div>
+                <div className="tc-eyebrow">
+                  <Settings2 size={13} />
+                  ACCOUNT MANAGEMENT
+                </div>
+
+                <h1 className="tc-page-title">
+                  Profile & Settings
+                </h1>
+
+                <p className="tc-page-description">
+                  Manage your company information and subscription
+                  settings from one place.
+                </p>
+              </div>
+            </div>
+
+            <div className="tc-profile-switch">
+              <button
+                type="button"
+                className={
+                  profileSection === 'details' ? 'active' : ''
+                }
+                onClick={() => setProfileSection('details')}
+              >
+                Company Details
+              </button>
+
+              <button
+                type="button"
+                className={
+                  profileSection === 'billing' ? 'active' : ''
+                }
+                onClick={() => setProfileSection('billing')}
+              >
+                Subscription & Billing
+              </button>
+            </div>
+
+            {profileSection === 'details'
+              ? <CompanyProfile />
+              : <Plans />}
+          </>
+        );
+
+      default:
+        return renderOverview();
+    }
+  };
+
+  /* ---------------------------------------------------------
+     MAIN LAYOUT
+  --------------------------------------------------------- */
+
+  return (
+    <div className="tc-company">
+      <style>{STYLES}</style>
+
+      
+      <div
+        className={`tc-mobile-overlay ${
+          sidebarOpen ? 'visible' : ''
+        }`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
+      <div className="tc-shell">
+        {/* SIDEBAR */}
+
+        <aside
+          className={`tc-sidebar ${
+            sidebarOpen ? 'open' : ''
+          }`}
+        >
+          <div className="tc-brand">
             <img
               src={logo}
               alt="TruCity"
-              style={styles.logo}
             />
-          </button>
 
-          <div style={styles.companyBadge}>
-            <span style={styles.companyBadgeDot}>
-              ●
-            </span>
-
-            <span style={styles.companyBadgeText}>
-              Verified Workspace
-            </span>
+            <div className="tc-brand-caption">
+              VERIFY · CONNECT · PERSUE
+            </div>
           </div>
 
-        </div>
+          <div className="tc-workspace-card">
+            <div className="tc-workspace-icon">
+              <Building2 size={18} />
+            </div>
 
-        <nav
-          style={styles.navMenu}
-          aria-label="Company navigation"
-        >
-          {(
-            [
-              ["overview", "Dashboard"],
-              ["talent", "Talent Feed"],
-              ["pipeline", "Pipeline"],
-              ["jobs", "Job Listings"],
-              ["messages", "Messages"],
-              ["guidance", "Guidance Hub"],
-              ["plans", "Plans & Billing"],
-              ["profile", "Company Profile"],
-            ] as const
-          ).map(([tab, label]) => (
-            <button
-              key={tab}
-              type="button"
-              style={
-                activeTab === tab
-                  ? styles.activeNavItem
-                  : styles.navItem
-              }
-              onClick={() =>
-                setActiveTab(tab)
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+            <div>
+              <div className="tc-workspace-name">
+                Company Workspace
+              </div>
 
-        <div style={styles.navRight}>
+              <div className="tc-workspace-subtitle">
+                Recruitment & talent
+              </div>
+            </div>
+          </div>
 
-          {/* Notifications */}
-          <div style={styles.notificationWrapper}>
-            <button
-              type="button"
-              style={styles.notificationBtn}
-              onClick={() => {
-                setShowNotifications(
-                  !showNotifications
+          <div className="tc-nav-label">
+            Workspace
+          </div>
+
+          <nav
+            className="tc-nav"
+            aria-label="Workspace navigation"
+          >
+            {NAVIGATION
+              .filter((item) => item.group === 'workspace')
+              .map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={`tc-nav-button ${
+                      activeTab === item.id ? 'active' : ''
+                    }`}
+                    onClick={() => handleTabChange(item.id)}
+                  >
+                    <Icon
+                      size={17}
+                      strokeWidth={1.9}
+                    />
+
+                    <span>{item.label}</span>
+                  </button>
                 );
-                setHasNewAlerts(false);
-              }}
-              title="Notifications"
-              aria-label="Notifications"
+              })}
+          </nav>
+
+          <div
+            className="tc-nav-label"
+            style={{ marginTop: 26 }}
+          >
+            Recruitment
+          </div>
+
+          <nav
+            className="tc-nav"
+            aria-label="Recruitment navigation"
+          >
+            {NAVIGATION
+              .filter((item) => item.group === 'recruitment')
+              .map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={`tc-nav-button ${
+                      activeTab === item.id ? 'active' : ''
+                    }`}
+                    onClick={() => handleTabChange(item.id)}
+                  >
+                    <Icon
+                      size={17}
+                      strokeWidth={1.9}
+                    />
+
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+          </nav>
+
+          <div className="tc-sidebar-bottom">
+            <div className="tc-help-card">
+              <CircleHelp size={19} />
+
+              <div className="tc-help-title">
+                Need a hand?
+              </div>
+
+              <div className="tc-help-copy">
+                Explore guidance to make the most of your
+                TruCity recruitment workspace.
+              </div>
+
+              <button
+                type="button"
+                className="tc-help-button"
+                onClick={() => handleTabChange('guidance')}
+              >
+                Explore Guidance
+                <ArrowRight size={13} />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="tc-logout"
+              onClick={handleLogout}
             >
-              🔔
-
-              {hasNewAlerts && (
-                <span
-                  style={styles.notificationBadge}
-                />
-              )}
+              <LogOut size={17} />
+              Sign out
             </button>
+          </div>
+        </aside>
 
-            {showNotifications && (
-              <div
-                style={
-                  styles.notificationDropdown
+        {/* MAIN WORKSPACE */}
+
+        <main className="tc-main">
+          <header className="tc-topbar">
+            <div className="tc-topbar-left">
+              <button
+                type="button"
+                className="tc-mobile-menu"
+                onClick={() => {
+                  setSidebarOpen((open) => !open);
+                }}
+                aria-label={
+                  sidebarOpen
+                    ? 'Close navigation'
+                    : 'Open navigation'
                 }
               >
-                <div
-                  style={
-                    styles.notificationHeader
-                  }
-                >
-                  <span
-                    style={
-                      styles.notificationTitle
-                    }
-                  >
-                    Notifications
-                  </span>
+                {sidebarOpen
+                  ? <X size={19} />
+                  : <Menu size={19} />}
+              </button>
 
-                  <span
-                    style={
-                      styles.notificationCount
-                    }
-                  >
-                    {notifications.length} new
-                  </span>
+              <div>
+                <div className="tc-breadcrumb">
+                  TruCity / Company
                 </div>
 
-                <div
-                  style={
-                    styles.notificationList
-                  }
-                >
-                  {notifications.map(
-                    (notification) => (
-                      <div
-                        key={notification.id}
-                        style={
-                          styles.notificationItem
-                        }
-                      >
-                        <span
-                          style={
-                            styles.notificationText
-                          }
-                        >
-                          {notification.text}
-                        </span>
-
-                        <span
-                          style={
-                            styles.notificationTime
-                          }
-                        >
-                          {notification.time}
-                        </span>
-                      </div>
-                    )
-                  )}
+                <div className="tc-topbar-title">
+                  {currentPage?.label ?? 'Company Workspace'}
                 </div>
               </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            style={styles.logoutBtn}
-            onClick={handleLogout}
-          >
-            Log Out
-          </button>
-
-        </div>
-      </header>
-
-      {/* =================================================
-          MAIN
-          ================================================= */}
-
-      <main style={styles.mainWrapper}>
-        <div style={styles.mainContent}>
-
-          {/* ================= OVERVIEW ================= */}
-
-          {activeTab === "overview" && (
-            <div>
-
-              <div style={styles.headerArea}>
-
-                <div>
-                  <p style={styles.eyebrow}>
-                    TRUCITY • COMPANY WORKSPACE
-                  </p>
-
-                  <h1 style={styles.title}>
-                    Executive Overview
-                  </h1>
-
-                  <p style={styles.subtitle}>
-                    Track cross-department hiring
-                    velocity, active listings, and
-                    candidate activity streams.
-                  </p>
-                </div>
-
-                <div
-                  style={
-                    styles.quickActionRow
-                  }
-                >
-                  <button
-                    type="button"
-                    style={
-                      styles.primaryActionBtn
-                    }
-                    onClick={() =>
-                      setActiveTab("jobs")
-                    }
-                  >
-                    + Post New Job
-                  </button>
-
-                  <button
-                    type="button"
-                    style={
-                      styles.secondaryActionBtn
-                    }
-                    onClick={() =>
-                      setActiveTab("talent")
-                    }
-                  >
-                    Explore Talent Feed
-                  </button>
-                </div>
-
-              </div>
-
-              {/* Loading */}
-
-              {loadingDashboard && (
-                <div
-                  style={styles.statusCard}
-                >
-                  <span
-                    style={styles.statusText}
-                  >
-                    Loading dashboard data...
-                  </span>
-                </div>
-              )}
-
-              {/* Error */}
-
-              {!loadingDashboard &&
-                dashboardError && (
-                  <div
-                    style={styles.errorCard}
-                  >
-                    <span>
-                      {dashboardError}
-                    </span>
-
-                    <button
-                      type="button"
-                      style={
-                        styles.retryButton
-                      }
-                      onClick={loadDashboard}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-
-              {/* Dashboard */}
-
-              {!loadingDashboard &&
-                !dashboardError && (
-                  <>
-                    <div
-                      style={
-                        styles.metricsGrid
-                      }
-                    >
-                      {metrics.length > 0 ? (
-                        metrics.map(
-                          (metric, index) => (
-                            <div
-                              key={`${metric.title}-${index}`}
-                              style={
-                                styles.metricCard
-                              }
-                            >
-                              <div
-                                style={
-                                  styles.metricHeader
-                                }
-                              >
-                                <span
-                                  style={
-                                    styles.metricTitle
-                                  }
-                                >
-                                  {metric.title}
-                                </span>
-
-                                <div
-                                  style={
-                                    styles.metricIconDot
-                                  }
-                                />
-                              </div>
-
-                              <div
-                                style={
-                                  styles.metricValueRow
-                                }
-                              >
-                                <span
-                                  style={
-                                    styles.metricValue
-                                  }
-                                >
-                                  {metric.value}
-                                </span>
-
-                                <span
-                                  style={{
-                                    ...styles.metricChange,
-                                    color:
-                                      metric.color ??
-                                      COLORS.teal,
-                                  }}
-                                >
-                                  {metric.change}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        )
-                      ) : (
-                        <div
-                          style={
-                            styles.emptyCard
-                          }
-                        >
-                          No dashboard metrics
-                          available.
-                        </div>
-                      )}
-                    </div>
-
-                    <div
-                      style={
-                        styles.sectionCard
-                      }
-                    >
-                      <div
-                        style={
-                          styles.sectionHeader
-                        }
-                      >
-                        <h3
-                          style={
-                            styles.sectionTitle
-                          }
-                        >
-                          Real-Time Recruitment
-                          Activity
-                        </h3>
-
-                        <span
-                          style={
-                            styles.liveBadge
-                          }
-                        >
-                          <span
-                            style={
-                              styles.liveDot
-                            }
-                          >
-                            ●
-                          </span>
-
-                          LIVE STREAM
-                        </span>
-                      </div>
-
-                      <div
-                        style={
-                          styles.activityList
-                        }
-                      >
-                        {recentActivity.length >
-                        0 ? (
-                          recentActivity.map(
-                            (activity) => (
-                              <div
-                                key={activity.id}
-                                style={
-                                  styles.activityItem
-                                }
-                              >
-                                <div
-                                  style={
-                                    styles.activityMain
-                                  }
-                                >
-                                  <span
-                                    style={
-                                      styles.activityCategoryTag
-                                    }
-                                  >
-                                    {
-                                      activity.category
-                                    }
-                                  </span>
-
-                                  <span
-                                    style={
-                                      styles.activityText
-                                    }
-                                  >
-                                    {activity.text}
-                                  </span>
-                                </div>
-
-                                <span
-                                  style={
-                                    styles.activityTime
-                                  }
-                                >
-                                  {activity.time}
-                                </span>
-                              </div>
-                            )
-                          )
-                        ) : (
-                          <div
-                            style={
-                              styles.emptyActivity
-                            }
-                          >
-                            No recent recruitment
-                            activity.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
             </div>
-          )}
 
-          {/* ================= OTHER TABS ================= */}
+            <div className="tc-topbar-right">
+              <label className="tc-search">
+                <Search size={15} />
 
-          {activeTab === "talent" && (
-            <TalentFeed
-              onOpenMessage={
-                handleOpenMessage
-              }
-            />
-          )}
+                <input
+                  type="search"
+                  placeholder="Search dashboard metrics"
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                  }}
+                  aria-label="Search dashboard metrics"
+                />
+              </label>
 
-          {activeTab === "pipeline" && (
-            <Pipeline />
-          )}
+              <span className="tc-verified">
+                <ShieldCheck size={14} />
+                Verified Workspace
+              </span>
 
-          {activeTab === "jobs" && (
-            <JobListing />
-          )}
+              <button
+                type="button"
+                className="tc-icon-button"
+                aria-label="Open Guidance Hub"
+                title="Guidance Hub"
+                onClick={() => handleTabChange('guidance')}
+              >
+                <Bell size={17} />
+                <span className="tc-notification-dot" />
+              </button>
 
-          {activeTab === "messages" && (
-            <Messages />
-          )}
+              <button
+                type="button"
+                className="tc-avatar"
+                aria-label="Open profile settings"
+                title="Profile & Settings"
+                onClick={() => handleTabChange('profile')}
+              >
+                <Building2 size={17} />
+              </button>
+            </div>
+          </header>
 
-          {activeTab === "guidance" && (
-            <GuidanceHubContent />
-          )}
-
-          {activeTab === "plans" && (
-            <Plans />
-          )}
-
-          {activeTab === "profile" && (
-            <CompanyProfile />
-          )}
-
-        </div>
-      </main>
-
-      {/* =================================================
-          FOOTER
-          ================================================= */}
-
-      <footer style={styles.footer}>
-        <span>
-          TruCity © 2026
-        </span>
-
-        <span>•</span>
-
-        <a
-          href="#"
-          style={styles.footerLink}
-        >
-          User Agreement
-        </a>
-
-        <span>•</span>
-
-        <a
-          href="#"
-          style={styles.footerLink}
-        >
-          Privacy Policy
-        </a>
-
-        <span>•</span>
-
-        <a
-          href="#"
-          style={styles.footerLink}
-        >
-          Cookie Policy
-        </a>
-      </footer>
-
+          <div className="tc-content">
+            {renderActivePage()}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
-
-/* =========================================================
-   STYLES
-   ========================================================= */
-
-const styles: {
-  [key: string]: React.CSSProperties;
-} = {
-  appLayout: {
-    display: "flex",
-    flexDirection: "column",
-    minHeight: "100vh",
-    backgroundColor: COLORS.page,
-    fontFamily: "Helvetica, Arial, sans-serif",
-    position: "relative",
-    overflowX: "hidden",
-    boxSizing: "border-box",
-  },
-
-  
-
-  circleTopLeft: {
-    position: "absolute",
-    top: "90px",
-    left: "-180px",
-    width: "360px",
-    height: "360px",
-    borderRadius: "50%",
-    backgroundColor: "rgba(30, 146, 210, 0.08)",
-    filter: "blur(42px)",
-    zIndex: 0,
-    pointerEvents: "none",
-  },
-
-  circleTopRight: {
-    position: "absolute",
-    top: "170px",
-    right: "-170px",
-    width: "350px",
-    height: "350px",
-    borderRadius: "50%",
-    backgroundColor: "rgba(255, 173, 1, 0.09)",
-    filter: "blur(42px)",
-    zIndex: 0,
-    pointerEvents: "none",
-  },
-
-  circleBottomLeft: {
-    position: "absolute",
-    bottom: "-180px",
-    left: "8%",
-    width: "370px",
-    height: "370px",
-    borderRadius: "50%",
-    backgroundColor: "rgba(255, 215, 132, 0.1)",
-    filter: "blur(44px)",
-    zIndex: 0,
-    pointerEvents: "none",
-  },
-
-  circleBottomRight: {
-    position: "absolute",
-    bottom: "-170px",
-    right: "8%",
-    width: "380px",
-    height: "380px",
-    borderRadius: "50%",
-    backgroundColor: "rgba(30, 146, 210, 0.07)",
-    filter: "blur(44px)",
-    zIndex: 0,
-    pointerEvents: "none",
-  },
-
-  brandButton: {
-    border: "none",
-    background: "transparent",
-    padding: 0,
-    margin: 0,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-  },
-
-  logo: {
-    width: "150px",
-    height: "auto",
-    maxHeight: "48px",
-    objectFit: "contain",
-    objectPosition: "left center",
-    display: "block",
-  },
-
-  companyBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "6px",
-    padding: "7px 11px",
-    backgroundColor: COLORS.white,
-    borderRadius: "8px",
-    border: `1px solid ${COLORS.orange}`,
-  },
-
-  companyBadgeDot: {
-    color: COLORS.gold,
-    fontSize: "10px",
-    lineHeight: 1,
-  },
-
-  companyBadgeText: {
-    color: COLORS.teal,
-    fontWeight: 700,
-    fontSize: "11px",
-    lineHeight: 1.2,
-  },
-
-  topNavbar: {
-    backgroundColor: "rgba(255, 255, 255, 0.97)",
-    backdropFilter: "blur(14px)",
-    WebkitBackdropFilter: "blur(14px)",
-    borderBottom: `1px solid ${COLORS.border}`,
-    padding: "0 42px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    minHeight: "76px",
-    position: "sticky",
-    top: 0,
-    zIndex: 1000,
-    boxShadow:
-      "0 4px 14px rgba(0, 39, 61, 0.05)",
-    gap: "18px",
-  },
-
-  navLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: "18px",
-    zIndex: 1,
-    flexShrink: 0,
-  },
-
-  navMenu: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "3px",
-    zIndex: 1,
-    overflowX: "auto",
-    flex: 1,
-    scrollbarWidth: "none",
-  },
-
-  navItem: {
-    padding: "9px 12px",
-    borderRadius: "8px",
-    border: "1px solid transparent",
-    backgroundColor: "transparent",
-    cursor: "pointer",
-    fontSize: "13px",
-    fontWeight: 500,
-    color: COLORS.mutedText,
-    transition: "all 0.2s ease",
-    whiteSpace: "nowrap",
-    fontFamily: "inherit",
-  },
-
-  activeNavItem: {
-    padding: "9px 12px",
-    borderRadius: "8px",
-    border: `1px solid ${COLORS.orange}`,
-    backgroundColor:
-      "rgba(255, 215, 132, 0.25)",
-    cursor: "pointer",
-    fontSize: "13px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    boxShadow:
-      "0 2px 6px rgba(255, 173, 1, 0.12)",
-    whiteSpace: "nowrap",
-    fontFamily: "inherit",
-  },
-
-  navRight: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    zIndex: 1,
-    flexShrink: 0,
-  },
-
-  notificationWrapper: {
-    position: "relative",
-  },
-
-  notificationBtn: {
-    backgroundColor: COLORS.white,
-    border: `1px solid ${COLORS.border}`,
-    padding: "8px 11px",
-    borderRadius: "8px",
-    fontSize: "17px",
-    cursor: "pointer",
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  notificationBadge: {
-    position: "absolute",
-    top: "5px",
-    right: "5px",
-    width: "8px",
-    height: "8px",
-    backgroundColor: "#DC2626",
-    borderRadius: "50%",
-    border: "2px solid #FFFFFF",
-  },
-
-  notificationDropdown: {
-    position: "absolute",
-    top: "48px",
-    right: 0,
-    width: "320px",
-    backgroundColor:
-      "rgba(255, 255, 255, 0.98)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    borderRadius: "12px",
-    boxShadow:
-      "0 20px 40px rgba(0, 39, 61, 0.15)",
-    border: `1px solid ${COLORS.border}`,
-    zIndex: 1100,
-    overflow: "hidden",
-  },
-
-  notificationHeader: {
-    padding: "14px 18px",
-    borderBottom:
-      "1px solid rgba(226, 232, 240, 0.8)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  notificationTitle: {
-    fontWeight: 800,
-    fontSize: "14px",
-    color: COLORS.teal,
-  },
-
-  notificationCount: {
-    fontSize: "12px",
-    color: COLORS.mutedText,
-    fontWeight: 600,
-  },
-
-  notificationList: {
-    display: "flex",
-    flexDirection: "column",
-    maxHeight: "280px",
-    overflowY: "auto",
-  },
-
-  notificationItem: {
-    padding: "12px 18px",
-    borderBottom:
-      "1px solid rgba(241, 245, 249, 0.8)",
-    display: "flex",
-    flexDirection: "column",
-  },
-
-  notificationText: {
-    fontSize: "13px",
-    fontWeight: 700,
-    color: "#1E293B",
-  },
-
-  notificationTime: {
-    fontSize: "11px",
-    color: COLORS.mutedText,
-    marginTop: "3px",
-    fontWeight: 500,
-  },
-
-  logoutBtn: {
-    backgroundColor: COLORS.white,
-    color: COLORS.teal,
-    border: `1px solid ${COLORS.teal}`,
-    padding: "8px 15px",
-    borderRadius: "8px",
-    fontSize: "12px",
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-    whiteSpace: "nowrap",
-    fontFamily: "inherit",
-  },
-
-  mainWrapper: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    maxWidth: "100%",
-    width: "100%",
-    margin: "0 auto",
-    zIndex: 1,
-  },
-
-  mainContent: {
-    flex: 1,
-    padding: "38px 48px 48px",
-    backgroundColor: "transparent",
-  },
-
-  headerArea: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "30px",
-    gap: "24px",
-  },
-
-  eyebrow: {
-    margin: "0 0 8px",
-    fontSize: "11px",
-    fontWeight: 700,
-    color: COLORS.gold,
-    letterSpacing: "0.08em",
-  },
-
-  title: {
-    fontSize: "36px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    margin: "0 0 6px",
-    lineHeight: 1.15,
-    letterSpacing: "-0.02em",
-  },
-
-  subtitle: {
-    fontSize: "15px",
-    lineHeight: 1.6,
-    color: COLORS.mutedText,
-    fontWeight: 400,
-    margin: 0,
-    maxWidth: "760px",
-  },
-
-  quickActionRow: {
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-
-  primaryActionBtn: {
-    padding: "11px 18px",
-    backgroundColor: COLORS.teal,
-    color: COLORS.white,
-    border: `1px solid ${COLORS.teal}`,
-    borderRadius: "8px",
-    fontWeight: 700,
-    fontSize: "13px",
-    cursor: "pointer",
-    boxShadow:
-      "0 4px 10px rgba(0, 70, 109, 0.16)",
-    fontFamily: "inherit",
-  },
-
-  secondaryActionBtn: {
-    padding: "11px 18px",
-    backgroundColor: COLORS.white,
-    color: COLORS.teal,
-    border: `1px solid ${COLORS.teal}`,
-    borderRadius: "8px",
-    fontWeight: 700,
-    fontSize: "13px",
-    cursor: "pointer",
-    fontFamily: "inherit",
-  },
-
-  metricsGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: "18px",
-    marginBottom: "26px",
-  },
-
-  metricCard: {
-    backgroundColor:
-      "rgba(255, 255, 255, 0.97)",
-    borderRadius: "12px",
-    padding: "22px",
-    border: `1px solid ${COLORS.border}`,
-    boxShadow:
-      "0 8px 22px rgba(0, 39, 61, 0.055)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-
-  metricHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  metricTitle: {
-    fontSize: "11px",
-    fontWeight: 700,
-    color: COLORS.mutedText,
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-  },
-
-  metricIconDot: {
-    width: "9px",
-    height: "9px",
-    backgroundColor: COLORS.orange,
-    borderRadius: "50%",
-    border: `2px solid ${COLORS.gold}`,
-    flexShrink: 0,
-  },
-
-  metricValueRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    gap: "12px",
-  },
-
-  metricValue: {
-    fontSize: "32px",
-    fontWeight: 700,
-    color: COLORS.darkBlue,
-    lineHeight: 1,
-  },
-
-  metricChange: {
-    fontSize: "12px",
-    fontWeight: 700,
-    textAlign: "right",
-  },
-
-  sectionCard: {
-    backgroundColor:
-      "rgba(255, 255, 255, 0.97)",
-    borderRadius: "12px",
-    padding: "26px",
-    border: `1px solid ${COLORS.border}`,
-    boxShadow:
-      "0 8px 22px rgba(0, 39, 61, 0.055)",
-  },
-
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "20px",
-    gap: "16px",
-  },
-
-  sectionTitle: {
-    fontSize: "18px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    margin: 0,
-  },
-
-  liveBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "6px",
-    fontSize: "12px",
-    color: COLORS.teal,
-    fontWeight: 700,
-    whiteSpace: "nowrap",
-  },
-
-  liveDot: {
-    color: COLORS.success,
-    fontSize: "11px",
-  },
-
-  activityList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  },
-
-  activityItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "18px",
-    padding: "14px 16px",
-    backgroundColor: "#F4F3FA",
-    borderRadius: "9px",
-    border: `1px solid ${COLORS.border}`,
-  },
-
-  activityMain: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    minWidth: 0,
-  },
-
-  activityCategoryTag: {
-    flexShrink: 0,
-    fontSize: "10px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    backgroundColor:
-      "rgba(255, 215, 132, 0.45)",
-    padding: "4px 8px",
-    borderRadius: "6px",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-  },
-
-  activityText: {
-    fontSize: "13px",
-    fontWeight: 500,
-    color: COLORS.bodyText,
-  },
-
-  activityTime: {
-    flexShrink: 0,
-    fontSize: "12px",
-    color: COLORS.mutedText,
-    fontWeight: 400,
-  },
-
-  statusCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: "12px",
-    padding: "28px",
-    marginBottom: "26px",
-    border: `1px solid ${COLORS.border}`,
-    boxShadow:
-      "0 8px 22px rgba(0, 39, 61, 0.05)",
-    textAlign: "center",
-  },
-
-  statusText: {
-    fontSize: "14px",
-    color: COLORS.mutedText,
-    fontWeight: 500,
-  },
-
-  errorCard: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "18px",
-    backgroundColor: COLORS.errorBg,
-    border: `1px solid ${COLORS.errorBorder}`,
-    color: COLORS.errorText,
-    borderRadius: "10px",
-    padding: "15px 18px",
-    marginBottom: "26px",
-    fontSize: "13px",
-    fontWeight: 600,
-  },
-
-  retryButton: {
-    border: `1px solid ${COLORS.errorBorder}`,
-    backgroundColor: COLORS.white,
-    color: COLORS.errorText,
-    borderRadius: "8px",
-    padding: "7px 14px",
-    fontSize: "12px",
-    fontWeight: 700,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  },
-
-  emptyCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: "12px",
-    padding: "28px",
-    border: `1px solid ${COLORS.border}`,
-    color: COLORS.mutedText,
-    fontSize: "13px",
-    fontWeight: 500,
-    textAlign: "center",
-    gridColumn: "1 / -1",
-  },
-
-  emptyActivity: {
-    padding: "28px",
-    textAlign: "center",
-    color: COLORS.mutedText,
-    fontSize: "13px",
-    fontWeight: 500,
-    backgroundColor: "#F4F3FA",
-    borderRadius: "9px",
-    border: `1px solid ${COLORS.border}`,
-  },
-
-  /* =====================================================
-     GUIDANCE
-     ===================================================== */
-
-  guidanceWrapper: {
-    width: "100%",
-    boxSizing: "border-box",
-  },
-
-  guidanceHeader: {
-    marginBottom: "30px",
-  },
-
-  guidanceTitle: {
-    fontSize: "36px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    margin: "0 0 8px",
-    lineHeight: 1.15,
-  },
-
-  guidanceSubtitle: {
-    color: COLORS.mutedText,
-    fontSize: "15px",
-    lineHeight: 1.6,
-    margin: 0,
-    maxWidth: "850px",
-  },
-
-  guidanceBanner: {
-    backgroundColor:
-      "rgba(255, 255, 255, 0.92)",
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: "14px",
-    padding: "28px",
-    marginBottom: "36px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "28px",
-    boxShadow:
-      "0 12px 28px rgba(0, 70, 109, 0.06)",
-  },
-
-  resourceBadge: {
-    display: "inline-block",
-    backgroundColor:
-      "rgba(255, 215, 132, 0.35)",
-    color: COLORS.teal,
-    fontSize: "11px",
-    fontWeight: 700,
-    padding: "6px 11px",
-    borderRadius: "7px",
-    textTransform: "uppercase",
-    border: `1px solid ${COLORS.orange}`,
-  },
-
-  bannerTitle: {
-    fontSize: "23px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    margin: "12px 0 8px",
-  },
-
-  bannerText: {
-    color: COLORS.mutedText,
-    fontSize: "14px",
-    margin: 0,
-    lineHeight: 1.6,
-  },
-
-  bannerButton: {
-    flexShrink: 0,
-    backgroundColor: COLORS.teal,
-    color: COLORS.white,
-    border: "none",
-    padding: "12px 20px",
-    borderRadius: "8px",
-    fontWeight: 700,
-    fontSize: "13px",
-    cursor: "pointer",
-    boxShadow:
-      "0 4px 12px rgba(0, 70, 109, 0.18)",
-  },
-
-  guidanceSection: {
-    marginBottom: "38px",
-  },
-
-  guidanceSectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "18px",
-  },
-
-  guidanceSectionTitle: {
-    fontSize: "21px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    margin: 0,
-  },
-
-  viewAllButton: {
-    border: "none",
-    background: "transparent",
-    color: COLORS.blue,
-    fontSize: "13px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  guidanceGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "20px",
-  },
-
-  guidanceCard: {
-    backgroundColor:
-      "rgba(255, 255, 255, 0.96)",
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: "14px",
-    overflow: "hidden",
-    display: "flex",
-    flexDirection: "column",
-    boxShadow:
-      "0 10px 24px rgba(0, 70, 109, 0.055)",
-  },
-
-  videoPreview: {
-    height: "150px",
-    backgroundColor: "#F4F7FA",
-    backgroundImage:
-      "radial-gradient(circle, rgba(203, 213, 225, 0.6) 1px, transparent 1px)",
-    backgroundSize: "16px 16px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-
-  playButton: {
-    width: "48px",
-    height: "48px",
-    borderRadius: "50%",
-    border: "none",
-    backgroundColor: COLORS.teal,
-    color: COLORS.white,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "16px",
-    cursor: "pointer",
-    boxShadow:
-      "0 6px 16px rgba(0, 70, 109, 0.25)",
-  },
-
-  videoDuration: {
-    position: "absolute",
-    bottom: "10px",
-    right: "10px",
-    backgroundColor: COLORS.teal,
-    color: COLORS.white,
-    fontSize: "11px",
-    fontWeight: 700,
-    padding: "3px 7px",
-    borderRadius: "5px",
-  },
-
-  guidanceCardContent: {
-    padding: "20px",
-    display: "flex",
-    flexDirection: "column",
-    flex: 1,
-    justifyContent: "space-between",
-  },
-
-  categoryLabel: {
-    color: COLORS.blue,
-    fontSize: "11px",
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-  },
-
-  guidanceCardTitle: {
-    fontSize: "17px",
-    fontWeight: 700,
-    color: COLORS.teal,
-    margin: "7px 0 9px",
-    lineHeight: 1.4,
-  },
-
-  guidanceCardDescription: {
-    color: COLORS.mutedText,
-    fontSize: "13px",
-    lineHeight: 1.55,
-    margin: 0,
-  },
-
-  guidanceCardFooter: {
-    marginTop: "18px",
-    paddingTop: "13px",
-    borderTop:
-      "1px solid rgba(226, 232, 240, 0.8)",
-  },
-
-  cardLinkButton: {
-    border: "none",
-    background: "transparent",
-    padding: 0,
-    color: COLORS.blue,
-    fontSize: "13px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  guidanceCardWritten: {
-    backgroundColor:
-      "rgba(255, 255, 255, 0.96)",
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: "14px",
-    padding: "21px",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    minHeight: "230px",
-    boxShadow:
-      "0 10px 24px rgba(0, 70, 109, 0.055)",
-  },
-
-  guideMeta: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "12px",
-  },
-
-  readTime: {
-    backgroundColor: "#F4F7FA",
-    border: `1px solid ${COLORS.border}`,
-    color: COLORS.mutedText,
-    fontSize: "11px",
-    padding: "3px 8px",
-    borderRadius: "10px",
-    fontWeight: 600,
-  },
-
-  guideFooter: {
-    marginTop: "20px",
-    paddingTop: "13px",
-    borderTop:
-      "1px solid rgba(226, 232, 240, 0.8)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "10px",
-  },
-
-  guideBadge: {
-    color: "#059669",
-    fontSize: "11px",
-    fontWeight: 700,
-  },
-
-  footer: {
-    position: "relative",
-    zIndex: 10,
-    backgroundColor:
-      "rgba(255, 255, 255, 0.92)",
-    backdropFilter: "blur(8px)",
-    padding: "18px 24px",
-    textAlign: "center",
-    fontSize: "11px",
-    fontWeight: 400,
-    borderTop: `1px solid ${COLORS.border}`,
-    color: COLORS.mutedText,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "8px",
-    flexWrap: "wrap",
-  },
-
-  footerLink: {
-    textDecoration: "none",
-    color: COLORS.mutedText,
-  },
-};

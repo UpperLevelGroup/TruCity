@@ -20,17 +20,6 @@ import type {
 |--------------------------------------------------------------------------
 | BACKEND CANDIDATE RESPONSE
 |--------------------------------------------------------------------------
-|
-| Lightweight candidate response.
-|
-| IMPORTANT:
-| This endpoint is intentionally lightweight and is used for candidate
-| lists such as Talent Feed.
-|
-| Full candidate profiles are loaded separately through:
-|
-| /api/company/candidate-details/{candidateId}
-|
 */
 
 interface BackendCandidateResponse {
@@ -49,6 +38,33 @@ interface BackendCandidateResponse {
   skills: string[];
   status: string;
 }
+
+/*
+|--------------------------------------------------------------------------
+| BACKEND APPLICATION ANSWERS
+|--------------------------------------------------------------------------
+*/
+
+export interface CompanyApplicationAnswer {
+  id: string;
+  questionId: string | null;
+  questionText: string | null;
+  questionType: string | null;
+  answerText: string | null;
+  answerJson: string | null;
+  submittedAt: string | null;
+}
+
+
+
+export interface CompanyApplicationResume {
+  applicationId: string;
+  candidateId: string;
+  resumeId: string | null;
+  resume: Record<string, unknown> | null;
+}
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -153,6 +169,7 @@ interface BackendConversationResponse {
 
   messages?: BackendMessageResponse[];
 }
+
 
 /*
 |--------------------------------------------------------------------------
@@ -697,16 +714,6 @@ export const companyService = {
   |--------------------------------------------------------------------------
   | REAL BACKEND — CANDIDATES
   |--------------------------------------------------------------------------
-  |
-  | Lightweight candidate listing.
-  |
-  | This endpoint is appropriate for Talent Feed because it does not load
-  | large profile media, documents, projects, or videos.
-  |
-  | Detailed candidate information is loaded separately by:
-  |
-  | candidateDetails.service.ts
-  |
   */
 
   async getCandidates(): Promise<
@@ -823,6 +830,28 @@ export const companyService = {
       throw error;
     }
   },
+
+  
+
+
+
+
+  async getApplicationResume(
+  applicationId: string
+): Promise<CompanyApplicationResume> {
+  if (!applicationId?.trim()) {
+    throw new Error("Application ID is required.");
+  }
+
+  const response = await api.get<CompanyApplicationResume>(
+    `/api/applications/company-pipeline/${encodeURIComponent(
+      applicationId
+    )}/resume`
+  );
+
+  return response.data;
+},
+
 
   /*
   |--------------------------------------------------------------------------
@@ -1675,6 +1704,46 @@ export const companyService = {
 
   return response.data;
 },
+
+  /*
+  |--------------------------------------------------------------------------
+  | REAL BACKEND — APPLICATION RESPONSES
+  |--------------------------------------------------------------------------
+  */
+
+  async getApplicationResponses(
+    applicationId: string
+  ): Promise<CompanyApplicationAnswer[]> {
+    if (!applicationId?.trim()) {
+      throw new Error("Application ID is required.");
+    }
+
+    try {
+      const response = await api.get<
+        CompanyApplicationAnswer[]
+      >(
+        `/api/applications/company-pipeline/${applicationId}/responses`
+      );
+
+      if (!Array.isArray(response.data)) {
+        console.error(
+          "Unexpected application responses response:",
+          response.data
+        );
+
+        return [];
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error(
+        "Failed to load application responses:",
+        error
+      );
+
+      throw error;
+    }
+  },
 
   /*
   |--------------------------------------------------------------------------

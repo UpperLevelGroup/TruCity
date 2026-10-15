@@ -5,6 +5,12 @@ import React, {
 } from "react";
 
 import { companyService } from "../company.service";
+import {
+  jobApplicationQuestionsService,
+  type ApplicationQuestionType,
+  type JobApplicationQuestion,
+  type JobApplicationQuestionRequest,
+} from "../jobApplicationQuestions.service";
 
 import type {
   CompanyJob,
@@ -256,6 +262,35 @@ function formatSalary(
 }
 
 
+type QuestionEditorItem = {
+  id?: string;
+  questionText: string;
+  questionType: ApplicationQuestionType;
+  required: boolean;
+  options: string[];
+  optionsInput: string;
+};
+
+const QUESTION_TYPES: Array<{ value: ApplicationQuestionType; label: string }> = [
+  { value: "TEXT", label: "Short text" },
+  { value: "TEXTAREA", label: "Long text" },
+  { value: "YES_NO", label: "Yes / No" },
+  { value: "SINGLE_SELECT", label: "Choose one" },
+  { value: "MULTI_SELECT", label: "Choose multiple" },
+  { value: "NUMBER", label: "Number" },
+];
+
+function toQuestionEditorItem(question?: JobApplicationQuestion): QuestionEditorItem {
+  return {
+    id: question?.id,
+    questionText: question?.questionText ?? "",
+    questionType: question?.questionType ?? "TEXT",
+    required: question?.required ?? true,
+    options: question?.options ?? [],
+    optionsInput: (question?.options ?? []).join(", "),
+  };
+}
+
 /*
 |--------------------------------------------------------------------------
 | Main component
@@ -301,6 +336,24 @@ export default function JobListing() {
 
   const [skillInput, setSkillInput] =
     useState("");
+
+  const [questionsJob, setQuestionsJob] =
+    useState<CompanyJob | null>(null);
+
+  const [questionDrafts, setQuestionDrafts] =
+    useState<QuestionEditorItem[]>([]);
+
+  const [questionsLoading, setQuestionsLoading] =
+    useState(false);
+
+  const [questionsSaving, setQuestionsSaving] =
+    useState(false);
+
+  const [questionsError, setQuestionsError] =
+    useState<string | null>(null);
+
+  const [questionsNotice, setQuestionsNotice] =
+    useState<string | null>(null);
 
 
   /*
@@ -743,6 +796,116 @@ export default function JobListing() {
       }
     };
 
+
+  /*
+  |--------------------------------------------------------------------------
+  | Application questions
+  |--------------------------------------------------------------------------
+  */
+
+  const handleOpenQuestions = async (job: CompanyJob) => {
+    setQuestionsJob(job);
+    setQuestionsLoading(true);
+    setQuestionsError(null);
+    setQuestionsNotice(null);
+    setQuestionDrafts([]);
+
+    try {
+      const questions = await jobApplicationQuestionsService.getQuestions(job.id);
+      setQuestionDrafts(questions.map(toQuestionEditorItem));
+    } catch (err) {
+      console.error("Failed to load application questions:", err);
+      setQuestionsError("Unable to load application questions. You can retry below.");
+    } finally {
+      setQuestionsLoading(false);
+    }
+  };
+
+  const handleAddQuestion = () => {
+    setQuestionDrafts(current => [
+      ...current,
+      toQuestionEditorItem(),
+    ]);
+    setQuestionsError(null);
+    setQuestionsNotice(null);
+  };
+
+  const updateQuestion = <K extends keyof QuestionEditorItem>(
+    index: number,
+    key: K,
+    value: QuestionEditorItem[K],
+  ) => {
+    setQuestionDrafts(current => current.map((question, currentIndex) =>
+      currentIndex === index ? { ...question, [key]: value } : question
+    ));
+    setQuestionsError(null);
+    setQuestionsNotice(null);
+  };
+
+  const handleRemoveQuestion = (index: number) => {
+    setQuestionDrafts(current => current.filter((_, currentIndex) => currentIndex !== index));
+    setQuestionsError(null);
+    setQuestionsNotice(null);
+  };
+
+  const handleSaveQuestions = async () => {
+    if (!questionsJob) return;
+
+    if (questionDrafts.length > 30) {
+      setQuestionsError("A job can have at most 30 application questions.");
+      return;
+    }
+
+    for (const [index, question] of questionDrafts.entries()) {
+      if (!question.questionText.trim()) {
+        setQuestionsError(`Please enter the text for question ${index + 1}.`);
+        return;
+      }
+
+      if (["SINGLE_SELECT", "MULTI_SELECT"].includes(question.questionType)) {
+        const options = question.optionsInput
+          .split(",")
+          .map(option => option.trim())
+          .filter(Boolean);
+        if (new Set(options.map(option => option.toLowerCase())).size < 2) {
+          setQuestionsError(`Question ${index + 1} needs at least two different options, separated by commas.`);
+          return;
+        }
+      }
+    }
+
+    const payload: JobApplicationQuestionRequest[] = questionDrafts.map(question => ({
+      ...(question.id ? { id: question.id } : {}),
+      questionText: question.questionText.trim(),
+      questionType: question.questionType,
+      required: question.required,
+      options: ["SINGLE_SELECT", "MULTI_SELECT"].includes(question.questionType)
+        ? Array.from(new Set(question.optionsInput.split(",").map(option => option.trim()).filter(Boolean)))
+        : [],
+    }));
+
+    try {
+      setQuestionsSaving(true);
+      setQuestionsError(null);
+      setQuestionsNotice(null);
+      const saved = await jobApplicationQuestionsService.saveQuestions(questionsJob.id, payload);
+      setQuestionDrafts(saved.map(toQuestionEditorItem));
+      setQuestionsNotice("Application questions saved successfully.");
+    } catch (err) {
+      console.error("Failed to save application questions:", err);
+      setQuestionsError("Unable to save application questions. Check your connection and try again.");
+    } finally {
+      setQuestionsSaving(false);
+    }
+  };
+
+  const handleCloseQuestions = () => {
+    if (questionsSaving) return;
+    setQuestionsJob(null);
+    setQuestionDrafts([]);
+    setQuestionsError(null);
+    setQuestionsNotice(null);
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -1960,6 +2123,15 @@ export default function JobListing() {
 
                       <button
                         type="button"
+                        onClick={() => void handleOpenQuestions(job)}
+                        style={styles.btnQuestions}
+                        disabled={questionsSaving || questionsLoading}
+                      >
+                        Application Questions
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() =>
                           void handleViewJob(
                             job
@@ -2352,6 +2524,120 @@ export default function JobListing() {
         </div>
       )}
 
+
+      {/* --------------------------------------------------------------- */}
+      {/* Application questions manager                                   */}
+      {/* --------------------------------------------------------------- */}
+
+      {questionsJob && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="application-questions-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(0, 39, 61, 0.62)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 18,
+          }}
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) handleCloseQuestions();
+          }}
+        >
+          <section style={{
+            width: "100%",
+            maxWidth: 850,
+            maxHeight: "90vh",
+            overflowY: "auto",
+            background: "#FFFFFF",
+            border: "1px solid #D4D2E6",
+            borderRadius: 18,
+            boxShadow: "0 24px 80px rgba(0, 39, 61, 0.28)",
+            padding: 26,
+            boxSizing: "border-box",
+            fontFamily: "Helvetica, Arial, sans-serif",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 8 }}>
+              <div>
+                <div style={{ color: "#1E92D2", fontSize: 11, fontWeight: 900, letterSpacing: ".12em", marginBottom: 8 }}>CANDIDATE APPLICATION</div>
+                <h2 id="application-questions-title" style={{ margin: 0, color: "#00466D", fontSize: 25, fontWeight: 900 }}>Application Questions</h2>
+                <p style={{ color: "#476779", lineHeight: 1.6, margin: "8px 0 0" }}>
+                  {questionsJob.title} · Add questions candidates must answer before submitting.
+                </p>
+              </div>
+              <button type="button" onClick={handleCloseQuestions} disabled={questionsSaving} aria-label="Close application questions" style={{ border: "1px solid #D4D2E6", background: "#F8FCFF", borderRadius: 10, padding: "8px 12px", color: "#00466D", cursor: "pointer", fontWeight: 800 }}>✕</button>
+            </div>
+
+            <div style={{ background: "#F8FCFF", border: "1px solid #DCEAF1", borderRadius: 12, padding: 13, margin: "18px 0", color: "#476779", fontSize: 13, lineHeight: 1.55 }}>
+              Candidates will see these in order. Required questions must be answered. Choice options should be separated by commas. You can save an empty list if you do not need additional questions.
+            </div>
+
+            {questionsError && <div role="alert" style={{ background: "#FFF5F5", border: "1px solid #FEB2B2", borderRadius: 10, color: "#9B2C2C", padding: 12, marginBottom: 14 }}>{questionsError}</div>}
+            {questionsNotice && <div role="status" style={{ background: "#F0FFF4", border: "1px solid #9AE6B4", borderRadius: 10, color: "#276749", padding: 12, marginBottom: 14 }}>{questionsNotice}</div>}
+
+            {questionsLoading ? (
+              <div style={{ padding: 38, textAlign: "center", color: "#476779" }}>Loading application questions…</div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+                {questionDrafts.length === 0 && (
+                  <div style={{ border: "1px dashed #B9D9E8", borderRadius: 12, padding: 25, textAlign: "center", color: "#476779" }}>
+                    <strong style={{ display: "block", color: "#00466D", marginBottom: 6 }}>No additional questions yet</strong>
+                    Add a question if you need candidates to provide information beyond their CV.
+                  </div>
+                )}
+
+                {questionDrafts.map((question, index) => {
+                  const hasOptions = question.questionType === "SINGLE_SELECT" || question.questionType === "MULTI_SELECT";
+                  return (
+                    <article key={question.id ?? `new-${index}`} style={{ border: "1px solid #D4D2E6", borderRadius: 13, padding: 16, background: "#FFFFFF" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                        <strong style={{ color: "#00466D", fontSize: 13 }}>QUESTION {index + 1}</strong>
+                        <button type="button" onClick={() => handleRemoveQuestion(index)} disabled={questionsSaving || questionsLoading} style={{ border: "1px solid #FEB2B2", background: "#FFF5F5", color: "#C53030", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Remove</button>
+                      </div>
+
+                      <label style={{ display: "grid", gap: 6, color: "#334155", fontSize: 12, fontWeight: 800, marginBottom: 12 }}>
+                        Question text
+                        <textarea value={question.questionText} onChange={event => updateQuestion(index, "questionText", event.target.value)} rows={2} maxLength={2000} disabled={questionsSaving} placeholder="e.g. Do you have the right to work in South Africa?" style={{ width: "100%", boxSizing: "border-box", padding: 11, border: "1px solid #B9D9E8", borderRadius: 9, resize: "vertical", font: "inherit", fontWeight: 500, color: "#00273D" }} />
+                      </label>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 14, alignItems: "end" }}>
+                        <label style={{ display: "grid", gap: 6, color: "#334155", fontSize: 12, fontWeight: 800 }}>
+                          Answer type
+                          <select value={question.questionType} onChange={event => updateQuestion(index, "questionType", event.target.value as ApplicationQuestionType)} disabled={questionsSaving} style={{ width: "100%", boxSizing: "border-box", padding: 11, border: "1px solid #B9D9E8", borderRadius: 9, background: "#FFFFFF", color: "#00273D", font: "inherit" }}>
+                            {QUESTION_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+                          </select>
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 0", color: "#334155", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>
+                          <input type="checkbox" checked={question.required} onChange={event => updateQuestion(index, "required", event.target.checked)} disabled={questionsSaving} /> Required
+                        </label>
+                      </div>
+
+                      {hasOptions && (
+                        <label style={{ display: "grid", gap: 6, color: "#334155", fontSize: 12, fontWeight: 800, marginTop: 12 }}>
+                          Options (comma-separated)
+                          <input value={question.optionsInput} onChange={event => updateQuestion(index, "optionsInput", event.target.value)} disabled={questionsSaving} placeholder="Yes, No, Not sure" style={{ width: "100%", boxSizing: "border-box", padding: 11, border: "1px solid #B9D9E8", borderRadius: 9, font: "inherit", fontWeight: 500, color: "#00273D" }} />
+                        </label>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginTop: 20, paddingTop: 18, borderTop: "1px solid #E2E8F0" }}>
+              <button type="button" onClick={handleAddQuestion} disabled={questionsSaving || questionsLoading || questionDrafts.length >= 30} style={{ border: "1px solid #B9D9E8", background: "#EAF6FD", color: "#00466D", borderRadius: 10, padding: "11px 15px", fontSize: 12, fontWeight: 900, cursor: "pointer" }}>+ Add Question</button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={handleCloseQuestions} disabled={questionsSaving} style={{ border: "1px solid #B9D9E8", background: "#F8FCFF", color: "#00273D", borderRadius: 10, padding: "11px 15px", fontSize: 12, fontWeight: 900, cursor: "pointer" }}>Cancel</button>
+                <button type="button" onClick={() => void handleSaveQuestions()} disabled={questionsSaving || questionsLoading} style={{ border: "2px solid #FFAD01", background: "#00466D", color: "#FFD784", borderRadius: 10, padding: "11px 18px", fontSize: 12, fontWeight: 900, cursor: "pointer" }}>{questionsSaving ? "Saving Questions…" : "Save Questions"}</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* --------------------------------------------------------------- */}
       {/* Footer                                                           */}
@@ -2823,6 +3109,18 @@ const styles: Record<
       "1px solid #B9D9E8",
     borderRadius: "10px",
     fontWeight: 800,
+    fontSize: "12px",
+    cursor: "pointer",
+  },
+
+
+  btnQuestions: {
+    padding: "10px 13px",
+    backgroundColor: "#FFF9E8",
+    color: "#00466D",
+    border: "1px solid #FFD784",
+    borderRadius: "10px",
+    fontWeight: 900,
     fontSize: "12px",
     cursor: "pointer",
   },

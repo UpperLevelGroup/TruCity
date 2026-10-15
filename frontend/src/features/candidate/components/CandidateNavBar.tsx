@@ -1,3 +1,4 @@
+
 import {
   useEffect,
   useRef,
@@ -13,6 +14,7 @@ import {
   Bell,
   BookOpenCheck,
   BriefcaseBusiness,
+  Building2,
   Check,
   FileCheck2,
   FileText,
@@ -32,7 +34,6 @@ import {
   type CandidateNotification,
   type NotificationType,
 } from '../../../context/NotificationsContext';
-
 
 /* =========================================================
    TYPES
@@ -55,6 +56,11 @@ type CandidateNavBarProps = {
    DEFAULT NAVIGATION
 ========================================================= */
 
+const COMPANY_HUB_TAB: CandidateNavTab = {
+  to: '/candidate/companyhubfeed',
+  label: 'Company Hub',
+};
+
 const DEFAULT_TABS: CandidateNavTab[] = [
   {
     to: '/candidate',
@@ -68,6 +74,7 @@ const DEFAULT_TABS: CandidateNavTab[] = [
     to: '/candidate/hub',
     label: 'Guidance Hub',
   },
+ 
   {
     to: '/candidate/cv',
     label: 'CV',
@@ -80,15 +87,13 @@ const DEFAULT_TABS: CandidateNavTab[] = [
 
 /* =========================================================
    NAVIGATION ICONS
-
-   Route-based mapping ensures icons still render when
-   CandidateLayout passes its own tabs into CandidateNavBar.
 ========================================================= */
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   '/candidate': Home,
   '/candidate/messages': MessageSquare,
   '/candidate/hub': BookOpenCheck,
+  '/candidate/companyhubfeed': Building2,
   '/candidate/cv': FileText,
   '/candidate/profile': UserRound,
 };
@@ -110,29 +115,34 @@ export function CandidateNavBar({
   tabs = DEFAULT_TABS,
   onSignOut,
 }: CandidateNavBarProps) {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const handleSignOut =
-    async () => {
-      try {
-        if (onSignOut) {
-          await onSignOut();
-        }
+  /*
+   * Keep all caller-provided navigation tabs and append
+   * Company Hub only when it is not already present.
+   */
+  const visibleTabs = tabs.some(
+    (tab) => tab.to === COMPANY_HUB_TAB.to,
+  )
+    ? tabs
+    : [...tabs, COMPANY_HUB_TAB];
 
-        navigate(
-          '/login',
-          {
-            replace: true,
-          },
-        );
-      } catch (error) {
-        console.error(
-          'Unable to sign out:',
-          error,
-        );
+  const handleSignOut = async () => {
+    try {
+      if (onSignOut) {
+        await onSignOut();
       }
-    };
+
+      navigate('/login', {
+        replace: true,
+      });
+    } catch (error) {
+      console.error(
+        'Unable to sign out:',
+        error,
+      );
+    }
+  };
 
   return (
     <header
@@ -227,14 +237,12 @@ export function CandidateNavBar({
             lg:flex
           "
         >
-          {tabs.map(
-            (tab) => (
-              <CandidateDesktopNavLink
-                key={tab.to}
-                tab={tab}
-              />
-            ),
-          )}
+          {visibleTabs.map((tab) => (
+            <CandidateDesktopNavLink
+              key={tab.to}
+              tab={tab}
+            />
+          ))}
         </nav>
 
         {/* =================================================
@@ -255,14 +263,12 @@ export function CandidateNavBar({
             lg:hidden
           "
         >
-          {tabs.map(
-            (tab) => (
-              <CandidateMobileNavLink
-                key={tab.to}
-                tab={tab}
-              />
-            ),
-          )}
+          {visibleTabs.map((tab) => (
+            <CandidateMobileNavLink
+              key={tab.to}
+              tab={tab}
+            />
+          ))}
         </nav>
 
         {/* =================================================
@@ -281,9 +287,7 @@ export function CandidateNavBar({
 
           <button
             type="button"
-            onClick={
-              handleSignOut
-            }
+            onClick={handleSignOut}
             aria-label="Sign out"
             title="Sign out"
             className="
@@ -342,21 +346,13 @@ function CandidateDesktopNavLink({
 }: {
   tab: CandidateNavTab;
 }) {
-  const Icon =
-    getNavIcon(
-      tab.to,
-    );
+  const Icon = getNavIcon(tab.to);
 
   return (
     <NavLink
       to={tab.to}
-      end={
-        tab.to ===
-        '/candidate'
-      }
-      className={({
-        isActive,
-      }) => `
+      end={tab.to === '/candidate'}
+      className={({ isActive }) => `
         group
         relative
         flex
@@ -422,9 +418,7 @@ function CandidateDesktopNavLink({
         />
       </span>
 
-      <span>
-        {tab.label}
-      </span>
+      <span>{tab.label}</span>
     </NavLink>
   );
 }
@@ -438,27 +432,15 @@ function CandidateMobileNavLink({
 }: {
   tab: CandidateNavTab;
 }) {
-  const Icon =
-    getNavIcon(
-      tab.to,
-    );
+  const Icon = getNavIcon(tab.to);
 
   return (
     <NavLink
       to={tab.to}
-      end={
-        tab.to ===
-        '/candidate'
-      }
-      aria-label={
-        tab.label
-      }
-      title={
-        tab.label
-      }
-      className={({
-        isActive,
-      }) => `
+      end={tab.to === '/candidate'}
+      aria-label={tab.label}
+      title={tab.label}
+      className={({ isActive }) => `
         group
         relative
         flex
@@ -521,161 +503,115 @@ function CandidateMobileNavLink({
 ========================================================= */
 
 function NotificationsMenu() {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
   const containerRef =
-    useRef<HTMLDivElement | null>(
-      null,
-    );
+    useRef<HTMLDivElement | null>(null);
 
-  const [
-    isOpen,
-    setIsOpen,
-  ] =
-    useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const {
     notifications,
     unreadCount,
     markAsRead,
     markAllAsRead,
-  } =
-    useNotifications();
+  } = useNotifications();
 
   /* ---------------------------------------------------------
      CLOSE WHEN CLICKING OUTSIDE
   --------------------------------------------------------- */
 
-  useEffect(
-    () => {
-      if (!isOpen) {
-        return;
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleOutsideClick = (
+      event: MouseEvent,
+    ) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(
+          event.target as Node,
+        )
+      ) {
+        setIsOpen(false);
       }
+    };
 
-      const handleOutsideClick = (
-        event: MouseEvent,
-      ) => {
-        if (
-          containerRef.current &&
-          !containerRef.current.contains(
-            event.target as Node,
-          )
-        ) {
-          setIsOpen(
-            false,
-          );
-        }
-      };
+    const handleEscape = (
+      event: KeyboardEvent,
+    ) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
 
-      const handleEscape = (
-        event: KeyboardEvent,
-      ) => {
-        if (
-          event.key ===
-          'Escape'
-        ) {
-          setIsOpen(
-            false,
-          );
-        }
-      };
+    document.addEventListener(
+      'mousedown',
+      handleOutsideClick,
+    );
 
-      document.addEventListener(
+    document.addEventListener(
+      'keydown',
+      handleEscape,
+    );
+
+    return () => {
+      document.removeEventListener(
         'mousedown',
         handleOutsideClick,
       );
 
-      document.addEventListener(
+      document.removeEventListener(
         'keydown',
         handleEscape,
       );
-
-      return () => {
-        document.removeEventListener(
-          'mousedown',
-          handleOutsideClick,
-        );
-
-        document.removeEventListener(
-          'keydown',
-          handleEscape,
-        );
-      };
-    },
-    [
-      isOpen,
-    ],
-  );
+    };
+  }, [isOpen]);
 
   /* ---------------------------------------------------------
      OPEN NOTIFICATION
   --------------------------------------------------------- */
 
   const handleNotificationClick = (
-    notification:
-      CandidateNotification,
+    notification: CandidateNotification,
   ) => {
-    markAsRead(
-      notification.id,
-    );
+    markAsRead(notification.id);
+    setIsOpen(false);
 
-    setIsOpen(
-      false,
-    );
-
-    if (
-      notification.destination
-    ) {
-      navigate(
-        notification.destination,
-      );
-
+    if (notification.destination) {
+      navigate(notification.destination);
       return;
     }
 
-    switch (
-      notification.type
-    ) {
+    switch (notification.type) {
       case 'message':
-        navigate(
-          '/candidate/messages',
-        );
+        navigate('/candidate/messages');
         break;
 
       case 'application':
-        navigate(
-          '/candidate/feed',
-        );
+        navigate('/candidate/feed');
         break;
 
       case 'profile':
       case 'verification':
-        navigate(
-          '/candidate/profile',
-        );
+        navigate('/candidate/profile');
         break;
 
       case 'system':
       default:
-        navigate(
-          '/candidate/notifications',
-        );
+        navigate('/candidate/notifications');
         break;
     }
   };
 
   const recentNotifications =
-    notifications.slice(
-      0,
-      5,
-    );
+    notifications.slice(0, 5);
 
   return (
     <div
-      ref={
-        containerRef
-      }
+      ref={containerRef}
       className="relative"
     >
       {/* ===================================================
@@ -685,18 +621,11 @@ function NotificationsMenu() {
       <button
         type="button"
         aria-label="Notifications"
-        aria-expanded={
-          isOpen
-        }
+        aria-expanded={isOpen}
         aria-haspopup="dialog"
         title="Notifications"
         onClick={() =>
-          setIsOpen(
-            (
-              current,
-            ) =>
-              !current,
-          )
+          setIsOpen((current) => !current)
         }
         className={`
           relative
@@ -740,8 +669,7 @@ function NotificationsMenu() {
           strokeWidth={2}
         />
 
-        {unreadCount >
-          0 && (
+        {unreadCount > 0 && (
           <span
             aria-hidden="true"
             className="
@@ -821,8 +749,7 @@ function NotificationsMenu() {
                   text-brand-textMuted
                 "
               >
-                {unreadCount >
-                0
+                {unreadCount > 0
                   ? 'You have new notifications'
                   : 'You are all caught up'}
               </p>
@@ -831,11 +758,7 @@ function NotificationsMenu() {
             <button
               type="button"
               aria-label="Close notifications"
-              onClick={() =>
-                setIsOpen(
-                  false,
-                )
-              }
+              onClick={() => setIsOpen(false)}
               className="
                 grid
                 h-9
@@ -859,8 +782,7 @@ function NotificationsMenu() {
 
           {/* MARK ALL */}
 
-          {unreadCount >
-            0 && (
+          {unreadCount > 0 && (
             <div
               className="
                 flex
@@ -874,9 +796,7 @@ function NotificationsMenu() {
             >
               <button
                 type="button"
-                onClick={
-                  markAllAsRead
-                }
+                onClick={markAllAsRead}
                 className="
                   inline-flex
                   items-center
@@ -909,19 +829,12 @@ function NotificationsMenu() {
               overflow-y-auto
             "
           >
-            {recentNotifications.length >
-            0 ? (
+            {recentNotifications.length > 0 ? (
               recentNotifications.map(
-                (
-                  notification,
-                ) => (
+                (notification) => (
                   <NotificationItem
-                    key={
-                      notification.id
-                    }
-                    notification={
-                      notification
-                    }
+                    key={notification.id}
+                    notification={notification}
                     onClick={() =>
                       handleNotificationClick(
                         notification,
@@ -948,9 +861,7 @@ function NotificationsMenu() {
             <button
               type="button"
               onClick={() => {
-                setIsOpen(
-                  false,
-                );
+                setIsOpen(false);
 
                 navigate(
                   '/candidate/notifications',
@@ -989,9 +900,7 @@ function NotificationsMenu() {
 ========================================================= */
 
 type NotificationItemProps = {
-  notification:
-    CandidateNotification;
-
+  notification: CandidateNotification;
   onClick: () => void;
 };
 
@@ -1002,9 +911,7 @@ function NotificationItem({
   return (
     <button
       type="button"
-      onClick={
-        onClick
-      }
+      onClick={onClick}
       className={`
         relative
         flex
@@ -1052,9 +959,7 @@ function NotificationItem({
       )}
 
       <NotificationIcon
-        type={
-          notification.type
-        }
+        type={notification.type}
       />
 
       <div
@@ -1123,11 +1028,9 @@ function NotificationItem({
 function NotificationIcon({
   type,
 }: {
-  type:
-    NotificationType;
+  type: NotificationType;
 }) {
-  const iconClass =
-    'h-[17px] w-[17px]';
+  const iconClass = 'h-[17px] w-[17px]';
 
   const wrapperClass = `
     grid
@@ -1148,11 +1051,7 @@ function NotificationIcon({
             text-brand-accent
           `}
         >
-          <MessageSquare
-            className={
-              iconClass
-            }
-          />
+          <MessageSquare className={iconClass} />
         </span>
       );
 
@@ -1165,11 +1064,7 @@ function NotificationIcon({
             text-brand-primary
           `}
         >
-          <FileCheck2
-            className={
-              iconClass
-            }
-          />
+          <FileCheck2 className={iconClass} />
         </span>
       );
 
@@ -1200,11 +1095,7 @@ function NotificationIcon({
             text-brand-primary
           `}
         >
-          <Bell
-            className={
-              iconClass
-            }
-          />
+          <Bell className={iconClass} />
         </span>
       );
 
@@ -1218,11 +1109,7 @@ function NotificationIcon({
             text-brand-primary
           `}
         >
-          <BriefcaseBusiness
-            className={
-              iconClass
-            }
-          />
+          <BriefcaseBusiness className={iconClass} />
         </span>
       );
   }

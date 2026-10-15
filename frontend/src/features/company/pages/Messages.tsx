@@ -1,163 +1,132 @@
 import React, { useEffect, useRef, useState } from 'react';
-
-interface Message {
-  id: number;
-  sender: 'me' | 'them';
-  text: string;
-  timestamp: string;
-}
-
-interface ChatThread {
-  id: number;
-  name: string;
-  role: string;
-  messages: Message[];
-}
-
-const INITIAL_THREADS: ChatThread[] = [
-  {
-    id: 1,
-    name: 'Sarah Jenkins',
-    role: 'Senior React Developer',
-    messages: [
-      {
-        id: 1,
-        sender: 'them',
-        text: 'Hi! I saw your post regarding the React position.',
-        timestamp: '10:32',
-      },
-      {
-        id: 2,
-        sender: 'me',
-        text: 'Great to connect! Are you available for an interview this week?',
-        timestamp: '10:35',
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: 'TruCity Verification Bot',
-    role: 'System',
-    messages: [
-      {
-        id: 3,
-        sender: 'them',
-        text: 'Your CIPC registry details and domain have been successfully verified.',
-        timestamp: '09:15',
-      },
-    ],
-  },
-];
-
-const STORAGE_KEY = 'trucity_company_messages';
-
-function loadThreads(): ChatThread[] {
-  try {
-    const savedThreads = localStorage.getItem(STORAGE_KEY);
-
-    if (!savedThreads) {
-      return INITIAL_THREADS;
-    }
-
-    const parsedThreads = JSON.parse(savedThreads);
-
-    if (!Array.isArray(parsedThreads)) {
-      return INITIAL_THREADS;
-    }
-
-    return parsedThreads;
-  } catch {
-    return INITIAL_THREADS;
-  }
-}
+import { companyService } from '../company.service';
+import type { CompanyChatThread } from '../company.types';
 
 export default function Messages() {
-  const [selectedChat, setSelectedChat] = useState<number>(1);
+  const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [chatThreads, setChatThreads] =
-    useState<ChatThread[]>(loadThreads);
+  const [chatThreads, setChatThreads] = useState<CompanyChatThread[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [sendError, setSendError] = useState('');
 
   const messageBoxRef = useRef<HTMLDivElement | null>(null);
 
-  /*
-   * Persist messages locally for now.
-   *
-   * Later this storage layer can be replaced with:
-   *
-   * companyService.getMessages()
-   * companyService.sendMessage()
-   *
-   * without changing the visual structure of this page.
-   */
+  /* Load real conversations from the authenticated backend. */
   useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(chatThreads)
-      );
-    } catch (error) {
-      console.error('Failed to save messages:', error);
-    }
-  }, [chatThreads]);
+    let active = true;
 
-  /*
-   * Automatically scroll to the latest message.
-   */
+    const loadConversations = async () => {
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const threads = await companyService.getMessages();
+        if (!active) return;
+
+        setChatThreads(threads);
+        setSelectedChat((current) => {
+          if (current && threads.some((thread) => thread.id === current)) {
+            return current;
+          }
+          return threads[0]?.id ?? null;
+        });
+      } catch (error) {
+        console.error('Failed to load conversations:', error);
+        if (active) {
+          setLoadError(
+            'Unable to load conversations. Please check your connection and try again.'
+          );
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    void loadConversations();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /* Mark the selected conversation as read and refresh its messages. */
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    let active = true;
+
+    const refreshSelectedConversation = async () => {
+      try {
+        await companyService.markConversationRead(selectedChat);
+        const latestThread = await companyService.getConversation(selectedChat);
+
+        if (!active || !latestThread) return;
+
+        setChatThreads((previousThreads) =>
+          previousThreads.map((thread) =>
+            thread.id === latestThread.id
+              ? { ...latestThread, unread: 0 }
+              : thread
+          )
+        );
+      } catch (error) {
+        console.error('Failed to refresh selected conversation:', error);
+      }
+    };
+
+    void refreshSelectedConversation();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedChat]);
+
+  /* Automatically scroll to the latest message. */
   useEffect(() => {
     const messageBox = messageBoxRef.current;
-
-    if (messageBox) {
-      messageBox.scrollTop = messageBox.scrollHeight;
-    }
+    if (messageBox) messageBox.scrollTop = messageBox.scrollHeight;
   }, [selectedChat, chatThreads]);
 
   const selectedThread = chatThreads.find(
     (thread) => thread.id === selectedChat
   );
 
-  const handleSelectChat = (threadId: number) => {
+  const handleSelectChat = (threadId: string) => {
     setSelectedChat(threadId);
     setNewMessage('');
+    setSendError('');
   };
 
-  const handleSendMessage = (
+  const handleSendMessage = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
     const messageText = newMessage.trim();
+    if (!messageText || !selectedThread || isSending) return;
 
-    if (!messageText || !selectedThread) {
-      return;
+    setIsSending(true);
+    setSendError('');
+
+    try {
+      const refreshedThreads = await companyService.sendMessage({
+        threadId: selectedThread.id,
+        text: messageText,
+      });
+
+      setChatThreads(refreshedThreads);
+      setNewMessage('');
+
+      // Keep the selected conversation open after the service refreshes the list.
+      setSelectedChat(selectedThread.id);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setSendError('Your message could not be sent. Please try again.');
+    } finally {
+      setIsSending(false);
     }
-
-    const newMessageObject: Message = {
-      id: Date.now(),
-      sender: 'me',
-      text: messageText,
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-    };
-
-    setChatThreads((previousThreads) =>
-      previousThreads.map((thread) => {
-        if (thread.id !== selectedChat) {
-          return thread;
-        }
-
-        return {
-          ...thread,
-          messages: [
-            ...thread.messages,
-            newMessageObject,
-          ],
-        };
-      })
-    );
-
-    setNewMessage('');
   };
 
   const handleKeyDown = (
@@ -165,12 +134,29 @@ export default function Messages() {
   ) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  };
 
-      const form = event.currentTarget.form;
+  const handleRetry = async () => {
+    setIsLoading(true);
+    setLoadError('');
 
-      if (form) {
-        form.requestSubmit();
-      }
+    try {
+      const threads = await companyService.getMessages();
+      setChatThreads(threads);
+      setSelectedChat((current) =>
+        current && threads.some((thread) => thread.id === current)
+          ? current
+          : threads[0]?.id ?? null
+      );
+    } catch (error) {
+      console.error('Failed to reload conversations:', error);
+      setLoadError(
+        'Unable to load conversations. Please check your connection and try again.'
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -195,7 +181,6 @@ export default function Messages() {
         {/* Header */}
         <header style={styles.header}>
           <h1 style={styles.title}>Messages</h1>
-
           <p style={styles.subtitle}>
             Communicate directly with candidate leads.
           </p>
@@ -206,23 +191,26 @@ export default function Messages() {
           {/* Thread Sidebar */}
           <div style={styles.threadList}>
             <div style={styles.threadHeader}>
-              <span style={styles.threadHeaderTitle}>
-                Conversations
-              </span>
-
-              <span style={styles.threadCount}>
-                {chatThreads.length}
-              </span>
+              <span style={styles.threadHeaderTitle}>Conversations</span>
+              <span style={styles.threadCount}>{chatThreads.length}</span>
             </div>
 
-            {chatThreads.length === 0 ? (
-              <div style={styles.emptyThreads}>
-                No conversations yet.
+            {isLoading ? (
+              <div style={styles.emptyThreads} role="status">
+                Loading conversations...
               </div>
+            ) : loadError ? (
+              <div style={styles.emptyThreads}>
+                <p>{loadError}</p>
+                <button type="button" onClick={handleRetry} style={styles.retryBtn}>
+                  Try again
+                </button>
+              </div>
+            ) : chatThreads.length === 0 ? (
+              <div style={styles.emptyThreads}>No conversations yet.</div>
             ) : (
               chatThreads.map((thread) => {
-                const lastMessage =
-                  thread.messages[thread.messages.length - 1];
+                const lastMessage = thread.messages[thread.messages.length - 1];
 
                 return (
                   <button
@@ -234,18 +222,16 @@ export default function Messages() {
                         ? styles.activeThread
                         : styles.threadItem
                     }
+                    aria-current={selectedChat === thread.id ? 'true' : undefined}
                   >
-                    <strong style={styles.threadName}>
-                      {thread.name}
-                    </strong>
-
-                    <span style={styles.threadRole}>
-                      {thread.role}
-                    </span>
-
+                    <span style={styles.threadName}>{thread.name}</span>
+                    <span style={styles.threadRole}>{thread.role}</span>
                     {lastMessage && (
-                      <span style={styles.threadPreview}>
-                        {lastMessage.text}
+                      <span style={styles.threadPreview}>{lastMessage.text}</span>
+                    )}
+                    {(thread.unread ?? 0) > 0 && (
+                      <span style={styles.unreadBadge}>
+                        {thread.unread! > 99 ? '99+' : thread.unread}
                       </span>
                     )}
                   </button>
@@ -261,31 +247,17 @@ export default function Messages() {
                 {/* Chat Header */}
                 <div style={styles.chatHeader}>
                   <div>
-                    <h2 style={styles.chatName}>
-                      {selectedThread.name}
-                    </h2>
-
-                    <p style={styles.chatRole}>
-                      {selectedThread.role}
-                    </p>
+                    <h2 style={styles.chatName}>{selectedThread.name}</h2>
+                    <p style={styles.chatRole}>{selectedThread.role}</p>
                   </div>
-
-                  <span style={styles.onlineBadge}>
-                    ● Active
-                  </span>
+                  <span style={styles.onlineBadge}>● Conversation</span>
                 </div>
 
                 {/* Messages */}
-                <div
-                  ref={messageBoxRef}
-                  style={styles.messageBox}
-                >
+                <div ref={messageBoxRef} style={styles.messageBox} aria-live="polite">
                   {selectedThread.messages.length === 0 ? (
                     <div style={styles.emptyMessages}>
-                      <p style={styles.emptyMessagesTitle}>
-                        No messages yet
-                      </p>
-
+                      <p style={styles.emptyMessagesTitle}>No messages yet</p>
                       <p style={styles.emptyMessagesText}>
                         Start the conversation below.
                       </p>
@@ -296,27 +268,15 @@ export default function Messages() {
                         key={message.id}
                         style={{
                           ...styles.messageWrapper,
-                          alignItems:
-                            message.sender === 'me'
-                              ? 'flex-end'
-                              : 'flex-start',
+                          alignItems: message.sender === 'me' ? 'flex-end' : 'flex-start',
                         }}
                       >
                         <div
                           style={{
                             ...styles.messageBubble,
-                            backgroundColor:
-                              message.sender === 'me'
-                                ? '#003366'
-                                : '#f8fafc',
-                            color:
-                              message.sender === 'me'
-                                ? '#ffffff'
-                                : '#003366',
-                            border:
-                              message.sender === 'me'
-                                ? 'none'
-                                : '1px solid #e2e8f0',
+                            backgroundColor: message.sender === 'me' ? '#003366' : '#f8fafc',
+                            color: message.sender === 'me' ? '#ffffff' : '#003366',
+                            border: message.sender === 'me' ? 'none' : '1px solid #e2e8f0',
                             boxShadow:
                               message.sender === 'me'
                                 ? '0 2px 4px rgba(0, 51, 102, 0.2)'
@@ -325,14 +285,10 @@ export default function Messages() {
                         >
                           {message.text}
                         </div>
-
                         <span
                           style={{
                             ...styles.messageTime,
-                            alignSelf:
-                              message.sender === 'me'
-                                ? 'flex-end'
-                                : 'flex-start',
+                            alignSelf: message.sender === 'me' ? 'flex-end' : 'flex-start',
                           }}
                         >
                           {message.timestamp}
@@ -342,47 +298,46 @@ export default function Messages() {
                   )}
                 </div>
 
+                {sendError && (
+                  <p style={styles.errorText} role="alert">{sendError}</p>
+                )}
+
                 {/* Send Message */}
-                <form
-                  onSubmit={handleSendMessage}
-                  style={styles.sendForm}
-                >
+                <form onSubmit={handleSendMessage} style={styles.sendForm}>
                   <input
                     type="text"
                     placeholder="Write a message..."
                     value={newMessage}
-                    onChange={(event) =>
-                      setNewMessage(event.target.value)
-                    }
+                    onChange={(event) => setNewMessage(event.target.value)}
                     onKeyDown={handleKeyDown}
                     style={styles.chatInput}
                     aria-label="Message"
+                    maxLength={5000}
+                    disabled={isSending}
                   />
-
                   <button
                     type="submit"
                     style={{
                       ...styles.sendBtn,
-                      opacity:
-                        newMessage.trim().length === 0
-                          ? 0.6
-                          : 1,
+                      opacity: newMessage.trim().length === 0 || isSending ? 0.6 : 1,
                     }}
-                    disabled={!newMessage.trim()}
+                    disabled={!newMessage.trim() || isSending}
                   >
-                    Send
+                    {isSending ? 'Sending...' : 'Send'}
                   </button>
                 </form>
               </>
             ) : (
               <div style={styles.noChatSelected}>
                 <h2 style={styles.noChatTitle}>
-                  Select a conversation
+                  {isLoading ? 'Loading messages...' : 'Select a conversation'}
                 </h2>
-
                 <p style={styles.noChatText}>
-                  Choose a conversation from the left to view
-                  messages.
+                  {isLoading
+                    ? 'Your conversations will appear here.'
+                    : loadError
+                      ? 'Reload the conversations to try again.'
+                      : 'Choose a conversation from the left to view messages.'}
                 </p>
               </div>
             )}
@@ -397,10 +352,7 @@ export default function Messages() {
           style={{ color: '#64748b' }}
         >
           © {new Date().getFullYear()}{' '}
-          <span
-            className="font-semibold"
-            style={{ color: '#003366' }}
-          >
+          <span className="font-semibold" style={{ color: '#003366' }}>
             UpperLevel Group
           </span>
           . All rights reserved.
@@ -416,11 +368,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     margin: '0 auto',
     width: '100%',
   },
-
   header: {
     marginBottom: '24px',
   },
-
   title: {
     fontSize: '28px',
     fontWeight: '800',
@@ -428,13 +378,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     marginBottom: '4px',
     letterSpacing: '-0.02em',
   },
-
   subtitle: {
     fontSize: '14px',
     color: '#475569',
     fontWeight: '500',
   },
-
   chatWindow: {
     display: 'grid',
     gridTemplateColumns: '280px 1fr',
@@ -443,18 +391,15 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: '16px',
     border: '1px solid #e2e8f0',
     minHeight: '520px',
-    boxShadow:
-      '0 4px 6px -1px rgba(0, 51, 102, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+    boxShadow: '0 4px 6px -1px rgba(0, 51, 102, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
     overflow: 'hidden',
   },
-
   threadList: {
     borderRight: '1px solid #e2e8f0',
     padding: '16px',
     backgroundColor: '#f8fafc',
     overflowY: 'auto',
   },
-
   threadHeader: {
     display: 'flex',
     alignItems: 'center',
@@ -463,7 +408,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderBottom: '1px solid #e2e8f0',
     marginBottom: '10px',
   },
-
   threadHeaderTitle: {
     fontSize: '11px',
     color: '#64748b',
@@ -471,7 +415,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
   },
-
   threadCount: {
     fontSize: '10px',
     color: '#003366',
@@ -481,7 +424,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: '8px',
     fontWeight: '800',
   },
-
   threadItem: {
     width: '100%',
     textAlign: 'left',
@@ -493,8 +435,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     transition: 'background-color 0.2s',
     backgroundColor: 'transparent',
     display: 'block',
+    position: 'relative',
   },
-
   activeThread: {
     width: '100%',
     textAlign: 'left',
@@ -504,11 +446,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     backgroundColor: '#ffffff',
     marginBottom: '6px',
-    boxShadow:
-      '0 4px 6px -1px rgba(0, 51, 102, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+    boxShadow: '0 4px 6px -1px rgba(0, 51, 102, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
     display: 'block',
+    position: 'relative',
   },
-
   threadName: {
     fontSize: '14px',
     display: 'block',
@@ -516,14 +457,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: '800',
     marginBottom: '2px',
   },
-
   threadRole: {
     fontSize: '12px',
     color: '#475569',
     fontWeight: '600',
     display: 'block',
   },
-
   threadPreview: {
     display: 'block',
     marginTop: '7px',
@@ -534,7 +473,16 @@ const styles: { [key: string]: React.CSSProperties } = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
-
+  unreadBadge: {
+    display: 'inline-block',
+    marginTop: '8px',
+    backgroundColor: '#003366',
+    color: '#ffffff',
+    borderRadius: '999px',
+    padding: '2px 7px',
+    fontSize: '10px',
+    fontWeight: '800',
+  },
   emptyThreads: {
     padding: '24px 12px',
     textAlign: 'center',
@@ -542,7 +490,17 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '12px',
     fontWeight: '500',
   },
-
+  retryBtn: {
+    marginTop: '10px',
+    padding: '7px 12px',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    color: '#003366',
+    backgroundColor: '#ffffff',
+    fontSize: '12px',
+    fontWeight: '700',
+    cursor: 'pointer',
+  },
   chatArea: {
     display: 'flex',
     flexDirection: 'column',
@@ -551,7 +509,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     backgroundColor: '#ffffff',
     minWidth: 0,
   },
-
   chatHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -560,21 +517,18 @@ const styles: { [key: string]: React.CSSProperties } = {
     marginBottom: '4px',
     borderBottom: '1px solid #f1f5f9',
   },
-
   chatName: {
     margin: 0,
     color: '#003366',
     fontSize: '17px',
     fontWeight: '800',
   },
-
   chatRole: {
     margin: '3px 0 0 0',
     color: '#64748b',
     fontSize: '12px',
     fontWeight: '600',
   },
-
   onlineBadge: {
     color: '#b45309',
     backgroundColor: '#fef3c7',
@@ -584,7 +538,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '10px',
     fontWeight: '800',
   },
-
   messageBox: {
     overflowY: 'auto',
     display: 'flex',
@@ -593,14 +546,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     height: '360px',
     padding: '18px 4px',
   },
-
   messageWrapper: {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
     maxWidth: '75%',
   },
-
   messageBubble: {
     padding: '12px 16px',
     borderRadius: '12px',
@@ -609,33 +560,28 @@ const styles: { [key: string]: React.CSSProperties } = {
     lineHeight: '1.5',
     wordBreak: 'break-word',
   },
-
   messageTime: {
     fontSize: '9px',
     color: '#94a3b8',
     fontWeight: '500',
   },
-
   emptyMessages: {
     margin: 'auto',
     textAlign: 'center',
     padding: '32px',
   },
-
   emptyMessagesTitle: {
     margin: '0 0 4px 0',
     color: '#003366',
     fontSize: '15px',
     fontWeight: '800',
   },
-
   emptyMessagesText: {
     margin: 0,
     color: '#64748b',
     fontSize: '12px',
     fontWeight: '500',
   },
-
   sendForm: {
     display: 'flex',
     gap: '12px',
@@ -643,7 +589,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     paddingTop: '16px',
     borderTop: '1px solid #f1f5f9',
   },
-
   chatInput: {
     flex: 1,
     padding: '12px 16px',
@@ -656,7 +601,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: '500',
     minWidth: 0,
   },
-
   sendBtn: {
     padding: '12px 24px',
     backgroundColor: '#003366',
@@ -669,20 +613,23 @@ const styles: { [key: string]: React.CSSProperties } = {
     boxShadow: '0 2px 4px rgba(0, 51, 102, 0.2)',
     transition: 'background-color 0.2s',
   },
-
+  errorText: {
+    margin: '8px 0 0',
+    color: '#b91c1c',
+    fontSize: '12px',
+    fontWeight: '600',
+  },
   noChatSelected: {
     margin: 'auto',
     textAlign: 'center',
     padding: '40px',
   },
-
   noChatTitle: {
     margin: '0 0 6px 0',
     color: '#003366',
     fontSize: '18px',
     fontWeight: '800',
   },
-
   noChatText: {
     margin: 0,
     color: '#64748b',
