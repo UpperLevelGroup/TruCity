@@ -51,6 +51,11 @@ const navigation = [
         path: "/admin/oversight",
         icon: "⚖",
       },
+       {
+        label: "Admin Account Management",
+        path: "/admin/AdminAccountManagement",
+        icon: "⚖",
+      },
     ],
   },
 
