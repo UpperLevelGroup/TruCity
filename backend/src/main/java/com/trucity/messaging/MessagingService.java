@@ -237,6 +237,13 @@ public class MessagingService {
         Conversation conversation =
                 getConversation(conversationId);
 
+        if ("TERMINATED".equalsIgnoreCase(conversation.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.GONE,
+                    "This conversation has been terminated by platform administration."
+            );
+        }
+
         ensureParticipant(
                 conversation,
                 senderType,

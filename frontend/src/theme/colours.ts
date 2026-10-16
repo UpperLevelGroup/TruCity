@@ -1,20 +1,20 @@
-// Blue and White Theme Scheme
-
+// TruCity shared brand palette. Keep UI areas aligned to these values.
 export const C = {
-  bg: "#F8FAFC",        // Crisp Ice-White Page Background
-    surface: "#EFF6FF",   // Very Light Blue Container/Pill Background
-    card: "#FFFFFF",      // Pure White Card Background
-    border: "#CBD5E1",    // Subtle Blue-Gray Border
-    primary: "#1D4ED8",   // Strong Royal Blue (Buttons, Headers)
-    accent: "#0284C7",    // Vibrant Ocean Blue (Active States, Highlights)
-    glow: "rgba(2, 132, 199, 0.12)", // Soft Blue Highlight Glow
-    text: "#0F172A",      // Deep Navy/Charcoal (High-Contrast Text)
-    textMuted: "#64748B", // Muted Slate Gray Text
-    headerBg: "#1E3A8A",  // Dark Navy Header Accent
-    crimson: "#EF4444",   // Red (Dismiss / Alert)
-    gold: "#D97706",      // Warm Amber (Badges)
-    emerald: "#059669",   // Clean Emerald Green (Verified Badges)
-    orange: "#EA580C",
+  bg: "#F8FCFF",
+  surface: "#F1F8FC",
+  card: "#FFFFFF",
+  border: "#D4D2E6",
+  primary: "#00466D",
+  accent: "#1E92D2",
+  glow: "rgba(30, 146, 210, 0.12)",
+  text: "#00273D",
+  textMuted: "#526A78",
+  headerBg: "#00273D",
+  crimson: "#C62828",
+  gold: "#FFAD01",
+  emerald: "#16805D",
+  orange: "#C66A00",
+  highlight: "#FFD784",
 };
 
 export default C;

@@ -4070,14 +4070,4 @@ const SkylineBars = () => (
   </>
 );
 
-
-/*
-|--------------------------------------------------------------------------
-| Patch skyline content through a wrapper component.
-|
-| This keeps the main JobListing JSX clean while remaining CSS-only.
-|--------------------------------------------------------------------------
-*/
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 void SkylineBars;

@@ -149,7 +149,8 @@ interface BackendMessageResponse {
   senderId: string;
   senderType: string;
   senderName?: string | null;
-  message: string;
+  text?: string;
+  message?: string; // tolerate legacy payloads while API clients migrate
   createdAt: string;
   readAt?: string | null;
 }
@@ -157,8 +158,11 @@ interface BackendMessageResponse {
 interface BackendConversationResponse {
   id: string;
 
-  participantId: string;
+  participantId: string | null;
   participantType: string;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount?: number;
 
   participantName?: string | null;
   participantRole?: string | null;
@@ -655,7 +659,7 @@ function mapMessage(
       ? "me"
       : "them",
 
-    text: message.message,
+    text: message.text ?? message.message ?? "",
 
     timestamp:
       formatMessageTime(
@@ -674,11 +678,18 @@ function mapConversation(
   conversation: BackendConversationResponse
 ): CompanyChatThread {
   const messages =
-    Array.isArray(
-      conversation.messages
-    )
+    Array.isArray(conversation.messages)
       ? conversation.messages
-      : [];
+      : conversation.lastMessage
+        ? [{
+            id: `last-${conversation.id}`,
+            conversationId: conversation.id,
+            senderId: "",
+            senderType: "OTHER",
+            text: conversation.lastMessage,
+            createdAt: conversation.lastMessageAt ?? "",
+          }]
+        : [];
 
   return {
     id: conversation.id,
@@ -699,7 +710,7 @@ function mapConversation(
           mapMessage(message)
       ),
 
-    unread: 0,
+    unread: Math.max(0, Number(conversation.unreadCount ?? 0) || 0),
   };
 }
 
@@ -1435,8 +1446,7 @@ export const companyService = {
       await api.post(
         `/api/messages/conversations/${data.threadId}/messages`,
         {
-          message:
-            messageText,
+          text: messageText,
         }
       );
 
@@ -1468,10 +1478,8 @@ export const companyService = {
         >(
           "/api/messages/conversations",
           {
-            participantId,
-
-            participantType:
-              participantType.toUpperCase(),
+            targetId: participantId,
+            targetType: participantType.toUpperCase(),
           }
         );
 
@@ -1525,9 +1533,17 @@ export const companyService = {
         return null;
       }
 
-      return mapConversation(
-        response.data
-      );
+      const payload = response.data as BackendConversationResponse & {
+        conversation?: BackendConversationResponse;
+        messages?: BackendMessageResponse[];
+      };
+      const conversation = payload.conversation ?? payload;
+      return mapConversation({
+        ...conversation,
+        messages: Array.isArray(payload.messages)
+          ? payload.messages
+          : conversation.messages,
+      });
     } catch (error: any) {
       if (
         error?.response?.status ===

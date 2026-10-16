@@ -18,7 +18,8 @@ interface Message {
   senderType: string;
   senderId: string | null;
   senderName?: string | null;
-  message: string;
+  text?: string;
+  message?: string; // legacy response compatibility
   createdAt: string;
   readAt?: string | null;
 }
@@ -338,7 +339,7 @@ export default function Messages() {
       await api.post<Message>(
         `/api/messages/conversations/${selectedConversation.id}/messages`,
         {
-          message: messageText.trim(),
+          text: messageText.trim(),
         }
       );
 
@@ -1242,7 +1243,7 @@ export default function Messages() {
                                   }}
                                 >
                                   {
-                                    message.message
+                                    message.text ?? message.message ?? ""
                                   }
                                 </div>
                               </div>

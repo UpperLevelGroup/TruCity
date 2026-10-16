@@ -46,6 +46,11 @@ const navigation = [
         path: "/admin/applications",
         icon: "↗",
       },
+      {
+        label: "Platform Oversight",
+        path: "/admin/oversight",
+        icon: "⚖",
+      },
     ],
   },
 

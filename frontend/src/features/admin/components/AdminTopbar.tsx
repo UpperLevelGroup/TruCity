@@ -78,13 +78,7 @@ export default function AdminTopbar() {
       : "";
 
 
-  /*
-   * Convert the backend role into a readable label.
-   *
-   * Example:
-   * ADMIN       -> Admin
-   * SUPER_ADMIN -> Super Admin
-   */
+  
   const roleName =
     user?.roles?.[0] ?? "";
 
@@ -99,10 +93,7 @@ export default function AdminTopbar() {
       );
 
 
-  /*
-   * Determine what should be displayed while
-   * the logged-in user is being loaded.
-   */
+
   const displayName =
     loadingUser
       ? "Loading..."

@@ -164,8 +164,8 @@ export default function Messages() {
     <div
       className="min-h-screen font-sans flex flex-col justify-between overflow-x-hidden relative"
       style={{
-        backgroundColor: '#ffffff',
-        color: '#003366',
+        backgroundColor: 'var(--trucity-page)',
+        color: 'var(--trucity-text)',
         fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >

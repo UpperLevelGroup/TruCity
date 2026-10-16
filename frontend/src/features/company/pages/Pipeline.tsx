@@ -457,7 +457,7 @@ const handleViewCandidate = useCallback(
 
     setSelectedPipelineCandidate(candidate);
     setSelectedCandidate(createCandidateFallback(candidate));
-    setIsProfileExpanded(true);
+    
     setSelectedDocument(null);
     setLoadingDetails(false);
 

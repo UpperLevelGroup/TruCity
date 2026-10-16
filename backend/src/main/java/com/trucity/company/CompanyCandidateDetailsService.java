@@ -1,3 +1,4 @@
+
 package com.trucity.company;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,6 +23,9 @@ public class CompanyCandidateDetailsService {
     private static final String INTRO_REEL_BUCKET =
             "candidate-profile-intro-reel";
 
+    private static final String DOCUMENTS_BUCKET =
+            "candidate-profile-documents";
+
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
     private final SupabaseStorageService supabaseStorageService;
@@ -31,20 +35,44 @@ public class CompanyCandidateDetailsService {
             UUID candidateId,
             String employerEmail
     ) {
+        return getCandidateDetailsInternal(
+                candidateId,
+                employerEmail,
+                false
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public CompanyCandidateDetailsResponse getCandidateDetailsForAdmin(
+            UUID candidateId
+    ) {
+        return getCandidateDetailsInternal(
+                candidateId,
+                "ADMIN",
+                true
+        );
+    }
+
+    private CompanyCandidateDetailsResponse getCandidateDetailsInternal(
+            UUID candidateId,
+            String employerEmail,
+            boolean adminAccess
+    ) {
         if (candidateId == null) {
-            throw new IllegalArgumentException("Candidate id is required.");
+            throw new IllegalArgumentException(
+                    "Candidate id is required."
+            );
         }
 
-        if (employerEmail == null || employerEmail.isBlank()) {
+        if (!adminAccess
+                && (employerEmail == null || employerEmail.isBlank())) {
             throw new IllegalArgumentException(
                     "Authenticated employer is required."
             );
         }
 
-        boolean belongsToEmployer = hasApplicationForEmployer(
-                candidateId,
-                employerEmail
-        );
+        boolean belongsToEmployer = adminAccess
+                || hasApplicationForEmployer(candidateId, employerEmail);
 
         if (!belongsToEmployer) {
             throw new IllegalArgumentException(
@@ -168,11 +196,13 @@ public class CompanyCandidateDetailsService {
                 new ArrayList<>();
 
         for (Object[] row : rows) {
-            result.add(new CompanyCandidateDetailsResponse.SkillResponse(
-                    toStringValue(row[0]),
-                    toStringValue(row[1]),
-                    toNullableInt(row[2])
-            ));
+            result.add(
+                    new CompanyCandidateDetailsResponse.SkillResponse(
+                            toStringValue(row[0]),
+                            toStringValue(row[1]),
+                            toNullableInt(row[2])
+                    )
+            );
         }
 
         return result;
@@ -290,13 +320,19 @@ public class CompanyCandidateDetailsService {
                         >() {}
                 );
 
+        String documentsJson = toStringValue(row[3]);
+
         List<CompanyCandidateDetailsResponse.DocumentResponse> documents =
                 readJsonList(
-                        toStringValue(row[3]),
+                        documentsJson,
                         new TypeReference<
                                 List<CompanyCandidateDetailsResponse.DocumentResponse>
                         >() {}
                 );
+
+        // Generate fresh signed URLs for documents that have a storage path.
+        // The stored JSON and existing document metadata remain unchanged.
+        documents = refreshDocumentUrls(documents, documentsJson);
 
         List<CompanyCandidateDetailsResponse.ProjectResponse> projects =
                 readJsonList(
@@ -338,6 +374,89 @@ public class CompanyCandidateDetailsService {
                 reelMeta,
                 preferences
         );
+    }
+
+    /**
+     * Refreshes signed document URLs from their saved storage paths.
+     *
+     * Older document records may not contain storagePath. Those records are
+     * returned with their existing dataUrl because a new signed URL cannot
+     * be generated without knowing the object's storage path.
+     */
+    private List<CompanyCandidateDetailsResponse.DocumentResponse>
+    refreshDocumentUrls(
+            List<CompanyCandidateDetailsResponse.DocumentResponse> documents,
+            String documentsJson
+    ) {
+        if (documents == null
+                || documents.isEmpty()
+                || documentsJson == null
+                || documentsJson.isBlank()) {
+            return documents == null ? List.of() : documents;
+        }
+
+        final JsonNode root;
+
+        try {
+            root = objectMapper.readTree(documentsJson);
+        } catch (JsonProcessingException e) {
+            return documents;
+        }
+
+        if (root == null || !root.isArray()) {
+            return documents;
+        }
+
+        List<CompanyCandidateDetailsResponse.DocumentResponse> refreshed =
+                new ArrayList<>(documents.size());
+
+        for (int i = 0; i < documents.size(); i++) {
+            CompanyCandidateDetailsResponse.DocumentResponse document =
+                    documents.get(i);
+
+            JsonNode documentNode = root.path(i);
+            JsonNode storagePathNode = documentNode.path("storagePath");
+
+            if (storagePathNode.isMissingNode()
+                    || storagePathNode.isNull()
+                    || !storagePathNode.isTextual()) {
+                refreshed.add(document);
+                continue;
+            }
+
+            String storagePath = storagePathNode.asText().trim();
+
+            if (storagePath.isBlank()) {
+                refreshed.add(document);
+                continue;
+            }
+
+            try {
+                String freshSignedUrl =
+                        supabaseStorageService.createSignedUrl(
+                                DOCUMENTS_BUCKET,
+                                storagePath,
+                                3600
+                        );
+
+                refreshed.add(
+                        new CompanyCandidateDetailsResponse.DocumentResponse(
+                                document.id(),
+                                document.name(),
+                                document.status(),
+                                document.fileName(),
+                                document.fileSize(),
+                                freshSignedUrl
+                        )
+                );
+            } catch (RuntimeException e) {
+                // Keep the candidate details response available if one
+                // document's URL cannot be refreshed.
+                refreshed.add(document);
+            }
+        }
+
+        return refreshed;
     }
 
     private CompanyCandidateDetailsResponse.IntroReelResponse

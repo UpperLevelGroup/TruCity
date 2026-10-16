@@ -33,3 +33,36 @@ textarea,
 select {
   font: inherit;
 }
+
+/* TruCity cross-role dashboard consistency */
+:root { --tc-primary:#00466D; --tc-deep:#97bcd2; --tc-accent:#1E92D2; --tc-amber:#FFAD01; --tc-page:#F8FCFF; --tc-border:#D4D2E6; --tc-text:#183247; --tc-muted:#64748B; }
+.tc-candidate-sidebar { inset:0 auto 0 0 !important; width:260px !important; height:100dvh !important; overflow-y:auto !important; border:0 !important; border-right:1px solid var(--tc-border) !important; background:#fff !important; box-shadow:8px 0 30px rgba(0,39,61,.045); }
+.tc-candidate-sidebar-inner { width:100% !important; max-width:none !important; height:auto !important; min-height:100% !important; flex-direction:column !important; align-items:stretch !important; justify-content:flex-start !important; gap:20px !important; padding:20px 14px !important; overflow:visible !important; }
+.tc-candidate-sidebar-inner > a:first-child { width:100% !important; height:62px !important; flex:none !important; overflow:hidden !important; }
+.tc-candidate-sidebar-inner > a:first-child img { position:static !important; width:175px !important; max-width:100% !important; height:auto !important; transform:none !important; }
+.tc-candidate-sidebar-inner nav[aria-label="Candidate navigation"]:first-of-type { display:flex !important; height:auto !important; width:100% !important; flex-direction:column !important; align-items:stretch !important; gap:5px !important; }
+.tc-candidate-sidebar-inner nav[aria-label="Candidate navigation"]:nth-of-type(2) { display:none !important; }
+.tc-candidate-sidebar-inner nav[aria-label="Candidate navigation"] a { min-height:44px !important; height:auto !important; justify-content:flex-start !important; padding:11px 13px !important; border-radius:11px !important; color:#43596B !important; font-weight:650 !important; }
+.tc-candidate-sidebar-inner nav[aria-label="Candidate navigation"] a[aria-current="page"] { background:#EAF6FC !important; color:var(--tc-primary) !important; }
+.tc-candidate-sidebar-inner nav[aria-label="Candidate navigation"] a[aria-current="page"]::after { display:none !important; }
+.tc-candidate-sidebar-inner > div:last-child { margin-top:auto; width:100%; flex-wrap:wrap; justify-content:flex-start; padding-top:16px; border-top:1px solid #EAF0F4; }
+.tc-candidate-sidebar-inner > div:last-child button { min-height:40px !important; }
+.tc-candidate-main { width:auto !important; max-width:none !important; min-height:100dvh !important; margin-left:260px !important; padding:30px clamp(18px,3vw,44px) 48px !important; }
+.tc-candidate-footer { margin-left:260px !important; }
+/* Match company/admin navigation geometry and brand surfaces. */
+.tc-company .tc-shell { background:var(--tc-page) !important; }
+.tc-company .tc-sidebar { width:260px !important; background:#fff !important; border-right:1px solid var(--tc-border) !important; box-shadow:8px 0 30px rgba(0,39,61,.035) !important; }
+.tc-company .tc-nav-button { border-radius:11px !important; color:#43596B !important; }
+.tc-company .tc-nav-button.active { background:#EAF6FC !important; color:var(--tc-primary) !important; box-shadow:none !important; }
+.tc-company .tc-main { background:var(--tc-page) !important; }
+@media(max-width:1023px) {
+  .tc-candidate-sidebar { position:sticky !important; inset:auto !important; width:100% !important; height:auto !important; max-height:none !important; overflow:visible !important; border-right:0 !important; border-bottom:1px solid var(--tc-border) !important; }
+  .tc-candidate-sidebar-inner { min-height:0 !important; flex-direction:row !important; align-items:center !important; gap:10px !important; padding:10px 14px !important; }
+  .tc-candidate-sidebar-inner > a:first-child { width:100px !important; height:48px !important; }
+  .tc-candidate-sidebar-inner > a:first-child img { width:100px !important; }
+  .tc-candidate-sidebar-inner nav[aria-label="Candidate navigation"]:first-of-type { display:none !important; }
+  .tc-candidate-sidebar-inner nav[aria-label="Candidate navigation"]:nth-of-type(2) { display:flex !important; flex-direction:row !important; overflow-x:auto !important; }
+  .tc-candidate-sidebar-inner > div:last-child { margin-top:0; width:auto; border-top:0; padding-top:0; flex-wrap:nowrap; }
+  .tc-candidate-main { margin-left:0 !important; min-height:calc(100dvh - 72px) !important; padding-top:28px !important; }
+  .tc-candidate-footer { margin-left:0 !important; }
+}

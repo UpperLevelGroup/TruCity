@@ -28,6 +28,8 @@ import AdminAnalytics from "../features/admin/pages/AdminAnalytics";
 import AdminSettings from "../features/admin/pages/AdminSettings";
 import AdminMessages from "../features/admin/pages/Messages";
 import AdminGuidance from "../features/admin/pages/AdminGuidance";
+import AdminOversight from "../features/admin/pages/AdminOversight";
+import AdminAccountManagement from "../features/admin/pages/AdminAccountManagement";
 
 import CompanyLayout from "../layouts/CompanyLayout";
 import CompanyDashboard from "../features/company/pages/CompanyDashboard";
@@ -211,6 +213,20 @@ export default function AppRoutes() {
           path="/admin"
           element={<AdminDashboard />}
         />
+
+        {/* Central platform oversight and moderation */}
+        <Route 
+         path="/admin/oversight" 
+         element={<AdminOversight />} 
+        />
+
+        
+        {/* AdminAccountManagement */}
+        <Route 
+         path="/admin/AdminAccountManagement" 
+         element={<AdminAccountManagement />} 
+        />
+
 
         {/* Users */}
         <Route
